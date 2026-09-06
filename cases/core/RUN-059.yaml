@@ -1,0 +1,61 @@
+{
+  "format": "rollout-runner/v1",
+  "id": "RUN-059",
+  "baseline": "e2578d01859bb98d9a85846bafbfb2c771a6f117",
+  "input": {
+    "spec": {
+      "replicas": 1,
+      "rolloutStrategy": {
+        "type": "RoleRollingUpdate"
+      },
+      "template": {
+        "roles": [
+          {
+            "name": "backend",
+            "replicas": 3,
+            "workerReplicas": 0
+          },
+          {
+            "name": "frontend",
+            "replicas": 3,
+            "workerReplicas": 0,
+            "maxUnavailable": 2,
+            "maxSurge": 1,
+            "partition": 1
+          }
+        ]
+      }
+    }
+  },
+  "update": {
+    "roles": [
+      "frontend"
+    ],
+    "from": "A",
+    "to": "B"
+  },
+  "expect": {
+    "mode": "Role",
+    "desired": 3,
+    "maxUnavailable": 2,
+    "maxSurge": 1,
+    "partition": 1,
+    "startOrder": [
+      2,
+      1
+    ],
+    "protectedOrdinals": [
+      0
+    ],
+    "unchangedRoles": [
+      "backend"
+    ],
+    "finalOld": 1,
+    "finalNew": 2,
+    "initialStarts": 2
+  },
+  "process": {
+    "holdSeconds": 10,
+    "release": "one-unit-at-a-time"
+  }
+}

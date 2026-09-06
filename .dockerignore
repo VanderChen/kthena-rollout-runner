@@ -1,0 +1,7 @@
+.git
+artifacts
+internal
+go.sum
+go.mod
+deploy
+docs

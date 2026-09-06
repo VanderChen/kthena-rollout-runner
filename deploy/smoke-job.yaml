@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rollout-smoke-01
+  namespace: rollout-runner
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      serviceAccountName: rollout-runner
+      restartPolicy: Never
+      containers:
+        - name: runner
+          image: kthena-rollout-runner:dev-021
+          imagePullPolicy: IfNotPresent
+          args:
+            - --cases=/cases/core
+            - --artifacts=/artifacts
+            - --run-id=smoke-01
+            - --select=RUN-001,RUN-004,RUN-010,RUN-016,RUN-024,RUN-031,RUN-047
+            - --controller-image=kthena-controller-manager:resync-010-e2578d01
+          volumeMounts:
+            - {name: results, mountPath: /artifacts}
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: rollout-results

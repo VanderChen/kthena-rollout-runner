@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rollout-runner
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: production020-ranktable-parser
+  namespace: kthena-system
+  labels:
+    app.kubernetes.io/component: pod-ranktable-parser
+    modelserving.volcano.sh/group-name: production020-template
+data:
+  annotation-name: production.kthena.io/ranktable
+  parser-template: |
+    {{- $data := . | fromJson -}}
+    podName: {{ $data.pod_name | quote }}
+    serverId: {{ $data.server_id | quote }}
+    devices: []
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: production020-ranktable-template
+  namespace: kthena-system
+  labels:
+    app.kubernetes.io/component: ranktable-template
+    modelserving.volcano.sh/group-name: production020-template
+    ranktable-level: role
+data:
+  inference-engine: production020
+  ranktable-level: role
+  pod-parser-template: production020-ranktable-parser
+  ranktable-template: |
+    {"version":"1.0","server_count":"{{ .ServerCount }}","status":"{{ .Status }}"}
+  mount-path: /etc/production020-ranktable
+  filename: ranktable.json

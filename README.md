@@ -37,7 +37,7 @@ A全Ready → 建立UID基线 → 提交B（从出生NotReady）→ 检查初始
 - Watch从List游标开始，断线仅尝试续传，无法连续恢复记INCONCLUSIVE，
   不用relist后的健康快照冒充遗漏过程安全。
 
-详见[配置与观察契约](docs/CONTRACT.md)。
+详见[60项计数与过程预期](docs/CORE_EXPECTATIONS.md)和[配置与观察契约](docs/CONTRACT.md)。
 
 ## 构建和测试
 
@@ -53,6 +53,8 @@ kind load docker-image kthena-rollout-runner:dev-021-r4 --name kthena-resync-010
 ```
 
 `make test`执行`go test ./...`、`go test -race ./...`和`go vet ./...`。
+本次镜像实测架构为linux/arm64。若构建主机与目标节点架构不同，除了GOARCH，
+还需用`docker build --platform linux/<目标架构>`保证基础镜像与二进制架构一致。
 检查器测试包含超预算删除、Ready信用撤销、surge合法信用、worker完整性、保护范围、
 PG提前删除、Watch事件不合并、410观察缺口以及revision hash/name映射。
 
@@ -66,13 +68,13 @@ export KUBECONFIG=/tmp/rollout-runner-kind.kubeconfig
 
 kubectl apply -f deploy/production-fixture.yaml
 kubectl apply -f deploy/runner.yaml
-kubectl apply -f deploy/core-job-r4.yaml
-kubectl -n rollout-runner logs -f job/rollout-core-60-r4
-kubectl -n rollout-runner get job rollout-core-60-r4
+kubectl apply -f deploy/core-job-r4b.yaml
+kubectl -n rollout-runner logs -f job/rollout-core-60-r4b
+kubectl -n rollout-runner get job rollout-core-60-r4b
 ```
 
 `deploy/runner.yaml`创建CI ServiceAccount/ClusterRoleBinding、结果PVC和独立reader Pod；
-`deploy/core-job-r4.yaml`才启动60项Job；`core-job.yaml`保留早期r3 attempt。
+`deploy/core-job-r4b.yaml`才启动60项Job；r3/r4 YAML保留早期attempt。
 Job不自动重跑：`backoffLimit: 0`。
 默认用例业务namespace名为`rr-<run-id>-run-NNN`，每例结束按UID删除并等待消失；
 清理失败停止suite，未执行的后续行标NOT_RUN。不会清理其他已有工作负载。
@@ -80,11 +82,16 @@ Job不自动重跑：`backoffLimit: 0`。
 重跑时在新的Job YAML中修改Job名及`--run-id`，保留旧attempt，不覆盖旧结果。
 结果根目录已存在时runner直接拒绝运行。同一个开发集群不要并发运行两套suite。
 
+本地Kind验证需保证宿主机/容器VM持续运行；主机休眠会计入Job的墙钟deadline，
+而Go单调时钟统计可能不计休眠。一次实测就出现“用例60 PASS、Pod退出0、Job仍因
+DeadlineExceeded失败”。验收必须同时检查用例结果和Job状态，不只读summary。
+macOS可在验证期间临时使用`caffeinate -i`防止空闲休眠，验证后退出；不要改永久设置。
+
 导出当前attempt（先在本机创建artifacts目录）：
 
 ```sh
 mkdir -p artifacts
-kubectl -n rollout-runner cp rollout-results-reader:/artifacts/core-60-r4 ./artifacts/core-60-r4
+kubectl -n rollout-runner cp rollout-results-reader:/artifacts/core-60-r4b ./artifacts/core-60-r4b
 ```
 
 PVC与reader不随Job结束删除，以便保留证据；不应在导出前删除rollout-runner namespace。
@@ -118,6 +125,8 @@ go run ./cmd/rollout-runner \
 工作负载沿用production形态：Volcano、headless-service/ranktable、
 busybox:1.36、每Pod请求5m CPU/4Mi memory。A/B只有frontend的ROLLOUT_VERSION改变；
 Role模式backend仍为A。所有真实请求保存在before/after.yaml，可用于人工重放。
+这些文件首先是原始请求证据；跨集群手工重放时需换namespace并清除resourceVersion等
+旧集群metadata。通常直接复用cases/core配置交给runner重新渲染更稳妥。
 这是`controlled-readiness`变体，不验证真实模型/GPU/RPC或节点拓扑调度能力。
 该测试替身还将A/B的terminationGracePeriodSeconds统一设为1秒，缩短Kind中旧容器退出的等待；
 这不修改滚动U/S/P，但本轮不能代替长时间Terminating/finalizer故障场景的覆盖。
@@ -148,4 +157,5 @@ PASS须过程和终态都通过，ERROR/INCONCLUSIVE/NOT_RUN都不折算成功�
 过程检查，不能只改数字后宣称已支持。Watch也不证明没有API副作用的controller内部选择；
 那类检查仍需要专用trace/手工证据。
 
-验证进度与最终验收证据见[VERIFICATION.md](VERIFICATION.md)。
+最终Kind验收：RUN-001～RUN-060全部通过，Job Complete、退出码0。
+详见[60行实测结果](docs/KIND_RESULTS.md)与[完整验收证据](VERIFICATION.md)。

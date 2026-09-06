@@ -1,6 +1,6 @@
 .PHONY: test build image
 GOARCH ?= arm64
-IMAGE ?= kthena-rollout-runner:dev-021-r3
+IMAGE ?= kthena-rollout-runner:dev-021-r4
 
 test:
 	go test ./...

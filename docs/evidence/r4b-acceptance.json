@@ -1,0 +1,169 @@
+{
+  "capturedAt": "2026-09-06T10:58:08Z",
+  "baseline": "e2578d01859bb98d9a85846bafbfb2c771a6f117",
+  "suite": {
+    "runID": "core-60-r4b",
+    "kthenaBaseline": "e2578d01859bb98d9a85846bafbfb2c771a6f117",
+    "availableCases": 60,
+    "selected": 60,
+    "passed": 60
+  },
+  "job": {
+    "name": "rollout-core-60-r4b",
+    "uid": "e7737027-fc53-4b43-a449-9f6ea96aaf1d",
+    "status": {
+      "completionTime": "2026-09-06T10:57:25Z",
+      "conditions": [
+        {
+          "lastProbeTime": "2026-09-06T10:57:25Z",
+          "lastTransitionTime": "2026-09-06T10:57:25Z",
+          "message": "Reached expected number of succeeded pods",
+          "reason": "CompletionsReached",
+          "status": "True",
+          "type": "SuccessCriteriaMet"
+        },
+        {
+          "lastProbeTime": "2026-09-06T10:57:25Z",
+          "lastTransitionTime": "2026-09-06T10:57:25Z",
+          "message": "Reached expected number of succeeded pods",
+          "reason": "CompletionsReached",
+          "status": "True",
+          "type": "Complete"
+        }
+      ],
+      "ready": 0,
+      "startTime": "2026-09-06T10:14:11Z",
+      "succeeded": 1,
+      "terminating": 0,
+      "uncountedTerminatedPods": {
+      }
+    }
+  },
+  "runnerPod": {
+    "name": "rollout-core-60-r4b-q9n94",
+    "uid": "a8f1ae47-ea5f-4314-b1ad-0d7837d43cd9",
+    "container": {
+      "allocatedResources": {
+        "cpu": "100m",
+        "memory": "128Mi"
+      },
+      "containerID": "containerd://d1614322ab8abc323d9277b7d58f1a326a736696726b19b4a3222d1e6e1d1304",
+      "image": "docker.io/library/kthena-rollout-runner:dev-021-r4",
+      "imageID": "sha256:b9528d5a3144e1230201252f96194d80894172c5160c49042d896ecbb4051e00",
+      "lastState": {
+      },
+      "name": "runner",
+      "ready": false,
+      "resources": {
+        "limits": {
+          "memory": "1Gi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "restartCount": 0,
+      "started": false,
+      "state": {
+        "terminated": {
+          "containerID": "containerd://d1614322ab8abc323d9277b7d58f1a326a736696726b19b4a3222d1e6e1d1304",
+          "exitCode": 0,
+          "finishedAt": "2026-09-06T10:57:22Z",
+          "reason": "Completed",
+          "startedAt": "2026-09-06T10:14:11Z"
+        }
+      },
+      "user": {
+        "linux": {
+          "gid": 0,
+          "supplementalGroups": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            6,
+            10,
+            11,
+            20,
+            26,
+            27
+          ],
+          "uid": 0
+        }
+      },
+      "volumeMounts": [
+        {
+          "mountPath": "/artifacts",
+          "name": "results"
+        },
+        {
+          "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+          "name": "kube-api-access-dpnnt",
+          "readOnly": true,
+          "recursiveReadOnly": "Disabled"
+        }
+      ]
+    }
+  },
+  "environmentUnchanged": [
+    {
+      "kind": "deployment",
+      "namespace": "kthena-system",
+      "name": "kthena-controller-manager",
+      "uid": "e34ba51b-b005-4caa-b413-0a07d1fcc50f",
+      "unchangedSpecSHA256": "685f187f6805423256d5ba6074eb00e352e158a7c1d0d4180680bf89213c5382"
+    },
+    {
+      "kind": "crd",
+      "namespace": null,
+      "name": "modelservings.workload.serving.volcano.sh",
+      "uid": "671b8406-dd20-4a31-9a51-8ff9a7e8c3e9",
+      "unchangedSpecSHA256": "ca658bc484ca69cee18915967d7aee2f3a260bb523bd803e7021b0b8d5744484"
+    },
+    {
+      "kind": "deployment",
+      "namespace": "volcano-system",
+      "name": "volcano-controllers",
+      "uid": "ca5ec68f-01f1-445b-933a-4ea806d2e72f",
+      "unchangedSpecSHA256": "2a17c764ab7ccf11a1439a0398b1167368173da4cf13f3f3ecf2af33faf79e2f"
+    },
+    {
+      "kind": "deployment",
+      "namespace": "volcano-system",
+      "name": "volcano-scheduler",
+      "uid": "c4974f75-98d2-487f-b4bf-5dcbf1f3b592",
+      "unchangedSpecSHA256": "01a0245f05012ba2db96d5deb1b4faff80bfd72a53a38715b39db901d9a0c47f"
+    }
+  ],
+  "controllerPodsUnchanged": [
+    {
+      "name": "kthena-controller-manager-8665459bcd-w85kj",
+      "uid": "ed3df4c6-43dc-433f-a1de-c05f591a42c3",
+      "containers": [
+        [
+          "kthena-controller-manager",
+          "sha256:739584e01a39de03b52edae09c870ecfe32725dc59590c7071277f6c600d34d2",
+          0
+        ]
+      ]
+    }
+  ],
+  "remainingNamespaces": [
+    "bug-010-audit-qd5fz",
+    "bug-010-matrix",
+    "bug-010-matrix-final",
+    "bug-010-upgrade",
+    "default",
+    "kthena-system",
+    "kube-node-lease",
+    "kube-public",
+    "kube-system",
+    "local-path-storage",
+    "rollout-runner",
+    "volcano-system"
+  ],
+  "summarySHA256": "09d60150951e463f24680ea086d3ab1a9e4e3284519eb83aaf19d5c288b0ff3d",
+  "auditSHA256": "052ca04eff5974fc741df61ec4461da10f228aa8a9ea1b1045b3e83e2a7fea38"
+}

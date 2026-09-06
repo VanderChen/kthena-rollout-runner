@@ -68,6 +68,12 @@ No HyperNode/topology tree or placement correctness is configured or tested.
 The controlled fixture uses a one-second termination grace period for both A and B;
 long termination/finalizer behavior is outside this core-suite execution profile.
 
+Case durationSeconds uses Go's monotonic clock; event timestamps and Kubernetes
+Job deadlines use wall-clock time. Host/VM suspension can make them diverge.
+Successful Job acceptance therefore requires both a passing case summary and an
+actual Job Complete condition with runner exit code zero. Keep the Kind host
+awake during verification; never rewrite a Failed Job as successful in reports.
+
 ## Extension policy
 
 Add new case files and reviewed process checks for new scenario families.

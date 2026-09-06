@@ -156,6 +156,10 @@ func noViolation(t *testing.T, l *Ledger) {
 		t.Fatalf("unexpected violation: %v", l.Violations)
 	}
 }
+func releasedEvent(l *Ledger, pods map[string]*unstructured.Unstructured, verb string, p *unstructured.Unstructured) {
+	l.Released[string(p.GetUID())] = true
+	event(l, pods, verb, p)
+}
 func hasViolation(t *testing.T, l *Ledger, code string) {
 	t.Helper()
 	for _, v := range l.Violations {
@@ -176,7 +180,7 @@ func TestDeletedOldSlotKeepsBudgetUntilReady(t *testing.T) {
 	event(l, p, "DELETED", makePod("SG", "frontend", 1, "A", true, "entry"))
 	hasViolation(t, l, "BUDGET_VIOLATION")
 	for n := 0; n < 3; n++ {
-		event(l, p, "ADDED", makePod("SG", "frontend", n, "B", true, "entry"))
+		releasedEvent(l, p, "ADDED", makePod("SG", "frontend", n, "B", true, "entry"))
 	}
 	hasViolation(t, l, "BUDGET_VIOLATION") // final health never clears the failure
 }
@@ -186,7 +190,7 @@ func TestReadyCreditAllowsNextOldStart(t *testing.T) {
 		event(l, p, "DELETED", makePod("SG", "frontend", n, "A", true, "entry"))
 		event(l, p, "ADDED", makePod("SG", "frontend", n, "B", false, "entry"))
 		noViolation(t, l)
-		event(l, p, "MODIFIED", makePod("SG", "frontend", n, "B", true, "entry"))
+		releasedEvent(l, p, "MODIFIED", makePod("SG", "frontend", n, "B", true, "entry"))
 	}
 	noViolation(t, l)
 }
@@ -194,7 +198,7 @@ func TestSurgeMustBeReady(t *testing.T) {
 	for _, ready := range []bool{false, true} {
 		t.Run(fmt.Sprint(ready), func(t *testing.T) {
 			l, p := fixture(t, "RUN-016", 0)
-			event(l, p, "ADDED", makePod("SG", "frontend", 3, "B", ready, "entry"))
+			releasedEvent(l, p, "ADDED", makePod("SG", "frontend", 3, "B", ready, "entry"))
 			event(l, p, "DELETED", makePod("SG", "frontend", 2, "A", true, "entry"))
 			if ready {
 				noViolation(t, l)
@@ -206,7 +210,7 @@ func TestSurgeMustBeReady(t *testing.T) {
 }
 func TestHybridCanStartTwoWithOneReadySurge(t *testing.T) {
 	l, p := fixture(t, "RUN-010", 0)
-	event(l, p, "ADDED", makePod("SG", "frontend", 3, "B", true, "entry"))
+	releasedEvent(l, p, "ADDED", makePod("SG", "frontend", 3, "B", true, "entry"))
 	for _, n := range []int{2, 1} {
 		event(l, p, "DELETED", makePod("SG", "frontend", n, "A", true, "entry"))
 	}
@@ -216,7 +220,7 @@ func TestHybridCanStartTwoWithOneReadySurge(t *testing.T) {
 }
 func TestReadyRegressionRevokesCredit(t *testing.T) {
 	l, p := fixture(t, "RUN-010", 0)
-	event(l, p, "ADDED", makePod("SG", "frontend", 3, "B", true, "entry"))
+	releasedEvent(l, p, "ADDED", makePod("SG", "frontend", 3, "B", true, "entry"))
 	for _, n := range []int{2, 1} {
 		event(l, p, "DELETED", makePod("SG", "frontend", n, "A", true, "entry"))
 	}
@@ -231,7 +235,7 @@ func TestRoleWorkersAreOneUnitAndNeedAllReady(t *testing.T) {
 	if len(l.Started) != 1 {
 		t.Fatal("counted Pods instead of Role")
 	}
-	event(l, p, "ADDED", makePod("Role", "frontend", 2, "B", true, "entry"))
+	releasedEvent(l, p, "ADDED", makePod("Role", "frontend", 2, "B", true, "entry"))
 	event(l, p, "ADDED", makePod("Role", "frontend", 2, "B", false, "worker-0"))
 	noViolation(t, l)
 	if l.Check(p).TargetReady != 0 {
@@ -345,7 +349,7 @@ func TestRevisionHashResolvesToOwnedControllerRevisionName(t *testing.T) {
 		event(l, pods, "DELETED", makePod("SG", "frontend", n, "A", true, "entry"))
 		p := makePod("SG", "frontend", n, "B", true, "entry")
 		p.SetAnnotations(map[string]string{"scheduling.k8s.io/group-name": fmt.Sprintf("model-%d", n)})
-		event(l, pods, "ADDED", p)
+		releasedEvent(l, pods, "ADDED", p)
 	}
 	objects := map[string]map[string]*unstructured.Unstructured{"pods": pods, "podgroups": {}, "modelservings": {}, "controllerrevisions": {}}
 	for n := 0; n < 3; n++ {
@@ -423,4 +427,23 @@ func TestFinalPassCannotOverrideLateLatchedViolation(t *testing.T) {
 			t.Fatalf("latched violation became %s", r.Status)
 		}
 	}
+}
+
+func TestTargetCannotBecomeReadyBeforeRunnerRelease(t *testing.T) {
+	l, p := fixture(t, "RUN-010", 0)
+	// For example, a controller accidentally drops the fixture readinessProbe.
+	// Capacity budgets alone would still pass, but this is not the declared run.
+	event(l, p, "ADDED", makePod("SG", "frontend", 3, "B", true, "entry"))
+	hasViolation(t, l, "CONTROL_VIOLATION")
+}
+
+func TestPartialTargetCannotBypassReadinessControl(t *testing.T) {
+	l, p := fixture(t, "RUN-031", 1)
+	for _, member := range []string{"entry", "worker-0"} {
+		event(l, p, "DELETED", makePod("Role", "frontend", 2, "A", true, member))
+	}
+	// The Role is incomplete, but even a single unauthorized Ready member
+	// means the driver can no longer enforce the intended hold barrier.
+	event(l, p, "ADDED", makePod("Role", "frontend", 2, "B", true, "entry"))
+	hasViolation(t, l, "CONTROL_VIOLATION")
 }

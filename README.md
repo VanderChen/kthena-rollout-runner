@@ -19,6 +19,8 @@ A全Ready → 建立UID基线 → 提交B（从出生NotReady）→ 检查初始
 最终容量、版本、PG和revision收敛 → 保存结果 → 清理本例namespace。
 
 - 默认每个停点观察10秒，期间Watch和断言一直运行，不是只采样窗口末尾。
+- B的任一Pod未经runner按UID放行就Ready，立即报CONTROL_VIOLATION；
+  避免readinessProbe丢失等控制失效被误判为快速通过。
 - Pod首次deletionTimestamp/Deleted即记录旧实例开始替换；多Pod按SG或Role去重。
 - 旧Pod消失不会清除启动记录。健康固定规模替换检查
   `D - startedOld + currentTargetReady >= max(D-U, 0)`。
@@ -46,8 +48,8 @@ make test
 
 # 先确认实际Kind节点架构；不是所有集群都用arm64。
 kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}'
-make image GOARCH=arm64 IMAGE=kthena-rollout-runner:dev-021-r3
-kind load docker-image kthena-rollout-runner:dev-021-r3 --name kthena-resync-010
+make image GOARCH=arm64 IMAGE=kthena-rollout-runner:dev-021-r4
+kind load docker-image kthena-rollout-runner:dev-021-r4 --name kthena-resync-010
 ```
 
 `make test`执行`go test ./...`、`go test -race ./...`和`go vet ./...`。
@@ -64,13 +66,14 @@ export KUBECONFIG=/tmp/rollout-runner-kind.kubeconfig
 
 kubectl apply -f deploy/production-fixture.yaml
 kubectl apply -f deploy/runner.yaml
-kubectl apply -f deploy/core-job.yaml
-kubectl -n rollout-runner logs -f job/rollout-core-60
-kubectl -n rollout-runner get job rollout-core-60
+kubectl apply -f deploy/core-job-r4.yaml
+kubectl -n rollout-runner logs -f job/rollout-core-60-r4
+kubectl -n rollout-runner get job rollout-core-60-r4
 ```
 
 `deploy/runner.yaml`创建CI ServiceAccount/ClusterRoleBinding、结果PVC和独立reader Pod；
-`deploy/core-job.yaml`才启动60项Job。Job不自动重跑：`backoffLimit: 0`。
+`deploy/core-job-r4.yaml`才启动60项Job；`core-job.yaml`保留早期r3 attempt。
+Job不自动重跑：`backoffLimit: 0`。
 默认用例业务namespace名为`rr-<run-id>-run-NNN`，每例结束按UID删除并等待消失；
 清理失败停止suite，未执行的后续行标NOT_RUN。不会清理其他已有工作负载。
 
@@ -81,7 +84,7 @@ kubectl -n rollout-runner get job rollout-core-60
 
 ```sh
 mkdir -p artifacts
-kubectl -n rollout-runner cp rollout-results-reader:/artifacts/core-60-r3 ./artifacts/core-60-r3
+kubectl -n rollout-runner cp rollout-results-reader:/artifacts/core-60-r4 ./artifacts/core-60-r4
 ```
 
 PVC与reader不随Job结束删除，以便保留证据；不应在导出前删除rollout-runner namespace。
@@ -116,6 +119,8 @@ go run ./cmd/rollout-runner \
 busybox:1.36、每Pod请求5m CPU/4Mi memory。A/B只有frontend的ROLLOUT_VERSION改变；
 Role模式backend仍为A。所有真实请求保存在before/after.yaml，可用于人工重放。
 这是`controlled-readiness`变体，不验证真实模型/GPU/RPC或节点拓扑调度能力。
+该测试替身还将A/B的terminationGracePeriodSeconds统一设为1秒，缩短Kind中旧容器退出的等待；
+这不修改滚动U/S/P，但本轮不能代替长时间Terminating/finalizer故障场景的覆盖。
 
 ## 报告与已知边界
 

@@ -51,6 +51,12 @@ In the healthy fixed-size A to B transition:
 - require non-terminating active logical units <= D+S;
 - enforce explicit eligible/protected sets and old-start order.
 
+Every target Pod must remain NotReady until its exact UID has been authorized by
+the runner's release action. An unauthorized Ready Pod latches CONTROL_VIOLATION,
+including a single Ready entry in an otherwise incomplete Role. This assertion
+checks the experiment's controllability; it does not grant readiness credit on
+release. Credit still requires an actual complete Ready unit from the Pod stream.
+
 All invariants run throughout waits and holds. Each released unit must become
 Ready, and when eligible old units remain, the next old start must occur within
 the deadline. Final partition stops can contain A. Complete P=0 rollout must
@@ -59,6 +65,8 @@ also converge status and owned revision references.
 Raw PodGroup count is not used as an instantaneous surge budget; PG ownership,
 gang minMember/minResources and association are verified at convergence.
 No HyperNode/topology tree or placement correctness is configured or tested.
+The controlled fixture uses a one-second termination grace period for both A and B;
+long termination/finalizer behavior is outside this core-suite execution profile.
 
 ## Extension policy
 

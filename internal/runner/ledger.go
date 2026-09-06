@@ -232,6 +232,12 @@ func (l *Ledger) Check(pods map[string]*unstructured.Unstructured) Metrics {
 			if p.DeletionTimestamp != nil {
 				m.Terminating++
 			}
+			// The test controls each target Pod's readiness by UID. A Ready
+			// target before release invalidates the experiment even if its
+			// capacity happens to keep the rolling budget within bounds.
+			if podVersion(p) == "B" && podReady(p) && !l.Released[string(p.UID)] {
+				l.fail("CONTROL_VIOLATION: target Ready before release: " + p.Name)
+			}
 		}
 		if u.Version == "B" {
 			m.New++

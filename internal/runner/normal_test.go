@@ -364,6 +364,102 @@ func TestNormalCompleteMixedRoleCapacityCanProvideReadyCredit(t *testing.T) {
 	}
 }
 
+func TestNormalPendingRenamedRolePreservesOldServingCapacity(t *testing.T) {
+	l, o := normalFixture(t, "RUN-125")
+	s := normalCase(t, "RUN-125").Scenario.Steps[0]
+	if err := l.Transition(s.Spec, "rename", s.Expect, o); err != nil {
+		t.Fatal(err)
+	}
+	addPendingExtraRoles(l, o)
+	for _, u := range l.units(o["pods"]) {
+		if !u.Ready || l.unitTarget(u) {
+			t.Fatal("complete old membership must remain available without satisfying the renamed target")
+		}
+	}
+	l.rememberReady(l.units(o["pods"]))
+	for uid, p := range o["pods"] {
+		if p.GetLabels()[LabelRole] == "extra" && l.Served[uid] {
+			t.Fatal("pending extra Role was recorded as previously Ready")
+		}
+	}
+	deleteNormal(l, o, "backend", 2, 0)
+	if err := l.error(); err != nil {
+		t.Fatal("first SG replacement has three healthy old cohorts: ", err)
+	}
+	deleteNormal(l, o, "backend", 1, 0)
+	requireNormalViolation(t, l, "BUDGET_VIOLATION")
+}
+
+func TestNormalAddedRoleIsReleasedWhileOldMembershipServes(t *testing.T) {
+	l, o := normalFixture(t, "RUN-123")
+	s := normalCase(t, "RUN-123").Scenario.Steps[0]
+	if err := l.Transition(s.Spec, "add", s.Expect, o); err != nil {
+		t.Fatal(err)
+	}
+	addPendingExtraRoles(l, o)
+	candidates := l.releaseCandidates(o, nil)
+	if len(candidates) != 3 {
+		t.Fatalf("pending new Roles must still be released, got %d SG candidates", len(candidates))
+	}
+	for _, u := range candidates {
+		if !u.Complete || !u.Ready {
+			t.Fatal("new complete membership should coexist with Ready old membership")
+		}
+	}
+	deleteNormal(l, o, "frontend", 2, 0)
+	if l.units(o["pods"])["model-2"].Ready {
+		t.Fatal("remaining backend plus pending extra cannot replace the lost old frontend capacity")
+	}
+}
+
+func addPendingExtraRoles(l *NormalLedger, o Objects) {
+	l.RevisionLayouts["fixture-membership"] = l.Model
+	for group := 0; group < l.Model.N; group++ {
+		p := normalTestPod("Role", "extra", 0, "A", false, "entry")
+		labels := p.GetLabels()
+		labels[LabelGroup] = fmt.Sprintf("model-%d", group)
+		labels["modelserving.volcano.sh/revision"] = "fixture-membership"
+		p.SetLabels(labels)
+		p.SetName(fmt.Sprintf("model-%d-extra-0-0", group))
+		p.SetUID(types.UID(p.GetName()))
+		o["pods"][string(p.GetUID())] = p
+	}
+}
+
+func TestNormalProductionWorkerIdentityWithoutEntryMarker(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		marker string
+		valid  bool
+	}{
+		{"model-3-frontend-0-1", "", true},
+		{"model-3-frontend-0-1", "false", true},
+		{"model-3-frontend-0-0", "", false},
+		{"model-3-frontend-0-1", "invalid", false},
+	} {
+		t.Run(tc.name+"/"+tc.marker, func(t *testing.T) {
+			l, o := normalFixture(t, "RUN-126")
+			p := normalTestPod("Role", "frontend", 0, "A", false, "worker-1")
+			p.SetName(tc.name)
+			labels := p.GetLabels()
+			delete(labels, LabelEntry)
+			if tc.marker != "" {
+				labels[LabelEntry] = tc.marker
+			}
+			p.SetLabels(labels)
+			o["pods"][string(p.GetUID())] = p
+			l.After("pods", "ADDED", p, o)
+			if tc.valid {
+				if err := l.error(); err != nil {
+					t.Fatal("valid production worker identity rejected: ", err)
+				}
+			} else {
+				requireNormalViolation(t, l, "IDENTITY_MISSING")
+			}
+		})
+	}
+}
+
 func TestNormalAcceptedGroupScaleIntentSurvivesImmediateRestore(t *testing.T) {
 	l, o := normalFixture(t, "RUN-166")
 	spec := cloneMap(l.Model.Spec)

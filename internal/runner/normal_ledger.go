@@ -99,6 +99,12 @@ func (l *NormalLedger) fail(s string) {
 	l.Violations = append(l.Violations, l.Phase+": "+s)
 }
 func podIsEntry(p *corev1.Pod) bool { return p.Labels[LabelEntry] == "true" }
+func podHasEntryIdentity(p *corev1.Pod) bool {
+	marker := p.Labels[LabelEntry]
+	// Production labels entries explicitly and leaves the marker absent on
+	// workers, whose generated names end in a positive Pod index.
+	return marker == "true" || marker == "false" || (marker == "" && ordinal(p.Name) > 0)
+}
 func roleUnitKey(p *corev1.Pod) string {
 	return p.Labels[LabelGroup] + "/" + p.Labels[LabelRole] + "/" + p.Labels[LabelRoleID]
 }
@@ -188,10 +194,12 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 		out[key] = u
 	}
 	for k, u := range out {
+		u.Ready = false
 		for i := len(l.History) - 1; i >= 0; i-- {
 			candidate := l.History[i]
 			expected := 0
 			matched := true
+			cohortReady := true
 			for name, layout := range candidate.Roles {
 				if current, ok := l.Model.Roles[name]; ok {
 					layout.R = current.R
@@ -207,12 +215,17 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 						if !r.Complete {
 							matched = false
 						}
+						cohortReady = cohortReady && r.Ready
 					}
 				}
 				if count != layout.R {
 					matched = false
 				}
 			}
+			// A newly added Role can coexist with the complete old membership.
+			// Its pending Pods do not remove the old cohort's serving capacity.
+			// Exact target membership remains a separate final-state predicate.
+			u.Ready = u.Ready || (matched && cohortReady)
 			actual := 0
 			for _, r := range roles {
 				if r.Group == u.Group {
@@ -221,10 +234,8 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 			}
 			if matched && actual == expected {
 				u.Complete = true
-				break
 			}
 		}
-		u.Ready = u.Ready && u.Complete
 		out[k] = u
 	}
 	return out
@@ -678,7 +689,7 @@ func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, o
 				l.BornRanktable[string(p.UID)] = enabled
 			}
 		}
-		if convertPod(o, &p) == nil && owned(&p, l.Owner) && p.Namespace != "" && (p.Labels["modelserving.volcano.sh/revision"] == "" || p.Labels[LabelRoleID] == "" || (p.Labels[LabelEntry] != "true" && p.Labels[LabelEntry] != "false")) {
+		if convertPod(o, &p) == nil && owned(&p, l.Owner) && p.Namespace != "" && (p.Labels["modelserving.volcano.sh/revision"] == "" || p.Labels[LabelRoleID] == "" || !podHasEntryIdentity(&p)) {
 			l.fail("IDENTITY_MISSING: " + p.Name)
 		}
 		if convertPod(o, &p) == nil && owned(&p, l.Owner) && l.Profile == "controlled" && podReady(&p) && !l.Released[string(p.UID)] {
@@ -714,7 +725,9 @@ func (l *NormalLedger) rememberReady(units map[string]NormalUnit) {
 	for _, u := range units {
 		if u.Ready {
 			for _, p := range u.Pods {
-				l.Served[string(p.UID)] = true
+				if podReady(p) {
+					l.Served[string(p.UID)] = true
+				}
 			}
 		}
 	}
@@ -830,7 +843,7 @@ func (l *NormalLedger) conditions(cs []ScenarioCondition, objects Objects) bool 
 func (l *NormalLedger) releaseCandidates(objects Objects, exclude []ScenarioCondition) []NormalUnit {
 	var out []NormalUnit
 	for _, u := range l.units(objects["pods"]) {
-		if !u.Complete || !u.Active || u.Ready {
+		if !u.Complete || !u.Active {
 			continue
 		}
 		good := true

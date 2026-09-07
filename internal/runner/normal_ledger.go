@@ -473,17 +473,11 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	d, v, _, _ := l.scopeBudget(u)
 	// Only healthy loss consumes additional availability. A commitment marks
 	// every member immediately; later worker deletion cannot spend it twice.
-	healthyLoss := u.Ready
-	for _, p := range u.Pods {
-		if l.Served[string(p.UID)] && !l.Committed[string(p.UID)] && podReady(p) {
-			healthyLoss = true
-		}
-	}
 	readyAfter := ready
 	if u.Ready {
 		readyAfter--
 	}
-	if !scale && !reservedEarlier && healthyLoss && readyAfter < max(d-v, 0) {
+	if !scale && !reservedEarlier && u.Ready && readyAfter < max(d-v, 0) {
 		l.fail(fmt.Sprintf("BUDGET_VIOLATION: %s ready=%d delete=%s minimum=%d", u.Scope, ready, key, max(d-v, 0)))
 	}
 	if !scale && active > d && l.unitTarget(u) {
@@ -492,7 +486,9 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !scale && !reservedEarlier && active <= d && u.Ready && l.unitTarget(u) {
 		l.fail("UNEXPECTED_TARGET_REPLACED: " + key)
 	}
-	if !scale && !reservedEarlier && !l.unitTarget(u) {
+	// Already unavailable old units may be replaced before healthy old units.
+	// Descending healthy replacement order applies when consuming capacity.
+	if !scale && !reservedEarlier && u.Ready && !l.unitTarget(u) {
 		_, _, _, partition := l.scopeBudget(u)
 		for _, other := range units {
 			if other.Scope != u.Scope || other.Ordinal <= u.Ordinal || other.Ordinal < partition || other.Ordinal >= d || !other.Active || l.unitTarget(other) {

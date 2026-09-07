@@ -699,8 +699,21 @@ func TestNormalAcceptedRoleScaleIntentSurvivesImmediateRestore(t *testing.T) {
 			if l.RoleScaleIntents["new-role-member"] != "" || l.Committed["new-role-member"] {
 				t.Fatal("Role shrink intent leaked onto a replacement Pod UID")
 			}
-			// A Role shrink cannot authorize deletion of the retained ordinal0
-			// or commit the entire ServingGroup as if this were an SG rollout.
+			// Restore this group's healthy capacity before checking an additional
+			// loss. Replacing an already unavailable group costs no Ready unit.
+			for uid, pod := range objects["pods"] {
+				if pod.GetLabels()[LabelGroup] == "model-1" && pod.GetDeletionTimestamp() != nil {
+					replacement := pod.DeepCopy()
+					replacement.SetUID("refilled-role2")
+					replacement.SetDeletionTimestamp(nil)
+					delete(objects["pods"], uid)
+					objects["pods"][string(replacement.GetUID())] = replacement
+					l.Released[string(replacement.GetUID())] = true
+					break
+				}
+			}
+			// A Role shrink cannot authorize deleting the retained ordinal0 of
+			// this now healthy group below the availability budget.
 			deleteNormal(l, objects, "frontend", 1, 0)
 			requireNormalViolation(t, l, "BUDGET_VIOLATION")
 		})
@@ -738,6 +751,39 @@ func TestNormalRoleScaleCommitsOnlyTheDeletingInstance(t *testing.T) {
 	if metrics := l.Metrics(objects["pods"]); len(metrics) != 1 || metrics[0].Ready != 3 {
 		t.Fatalf("three fully Ready groups lost capacity after partial shrink/restore: %+v", metrics)
 	}
+}
+
+func TestNormalUnreadyGroupReplacementDoesNotSpendHealthyCapacity(t *testing.T) {
+	l, objects := normalFixture(t, "RUN-172")
+	steps := normalCase(t, "RUN-172").Scenario.Steps
+	if err := l.Transition(steps[1].Spec, "shrink", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	for group := 0; group < 2; group++ {
+		deleteNormal(l, objects, "frontend", group, 2)
+		deleteNormal(l, objects, "frontend", group, 1)
+	}
+	if err := l.Transition(steps[2].Spec, "restore", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	for uid, pod := range objects["pods"] {
+		if pod.GetDeletionTimestamp() != nil {
+			delete(objects["pods"], uid)
+		}
+	}
+	// Expansion has not yet restored the missing instances. Both groups have
+	// a previously serving Ready entry, but no complete current Ready cohort.
+	if l.units(objects["pods"])["model-1"].Ready {
+		t.Fatal("partially restored group must be unavailable before replacement")
+	}
+	deleteNormal(l, objects, "frontend", 1, 0)
+	if err := l.error(); err != nil {
+		t.Fatal("replacing an already unavailable group lost no healthy capacity: ", err)
+	}
+	// The still healthy SG2 cannot use that permission: its removal would
+	// consume additional capacity below the zero-unavailable budget.
+	deleteNormal(l, objects, "frontend", 2, 0)
+	requireNormalViolation(t, l, "BUDGET_VIOLATION")
 }
 
 // Use the real API entry label. The original core test helper predates member

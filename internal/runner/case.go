@@ -19,9 +19,10 @@ import (
 const Baseline = "e2578d01859bb98d9a85846bafbfb2c771a6f117"
 
 type Case struct {
-	Format   string `json:"format"`
-	ID       string `json:"id"`
-	Baseline string `json:"baseline"`
+	Scenario *Scenario `json:"scenario,omitempty"`
+	Format   string    `json:"format"`
+	ID       string    `json:"id"`
+	Baseline string    `json:"baseline"`
 	Input    struct {
 		Spec map[string]interface{} `json:"spec"`
 	} `json:"input"`
@@ -82,6 +83,9 @@ func LoadCases(dir string) ([]Case, error) {
 	return out, nil
 }
 func (c Case) Validate() error {
+	if c.Scenario != nil {
+		return c.validateScenario()
+	}
 	e := c.Expect
 	if len(c.ID) != 7 || !strings.HasPrefix(c.ID, "RUN-") {
 		return fmt.Errorf("invalid case ID")

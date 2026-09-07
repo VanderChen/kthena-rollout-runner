@@ -6,11 +6,13 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -31,23 +33,26 @@ import (
 
 type Options struct {
 	CaseDir, OutDir, Kubeconfig, RunID, Select, ControllerImage string
+	ControllerCommit                                            string
 	Hold                                                        time.Duration
 	Timeout                                                     time.Duration
 }
 type Result struct {
-	ID           string    `json:"id"`
-	Status       string    `json:"status"`
-	Error        string    `json:"error,omitempty"`
-	CleanupError string    `json:"cleanupError,omitempty"`
-	Namespace    string    `json:"namespace"`
-	Started      time.Time `json:"started"`
-	Duration     float64   `json:"durationSeconds"`
-	HoldSeconds  float64   `json:"holdSeconds"`
-	Sequence     []int     `json:"startSequence"`
-	Metrics      []Metrics `json:"timeline"`
-	Violations   []string  `json:"violations,omitempty"`
-	Checkpoints  int       `json:"checkpoints"`
-	Releases     int       `json:"releases"`
+	NormalStarts  []NormalStart `json:"normalStarts,omitempty"`
+	NormalMetrics []ScopeMetric `json:"normalMetrics,omitempty"`
+	ID            string        `json:"id"`
+	Status        string        `json:"status"`
+	Error         string        `json:"error,omitempty"`
+	CleanupError  string        `json:"cleanupError,omitempty"`
+	Namespace     string        `json:"namespace"`
+	Started       time.Time     `json:"started"`
+	Duration      float64       `json:"durationSeconds"`
+	HoldSeconds   float64       `json:"holdSeconds"`
+	Sequence      []int         `json:"startSequence"`
+	Metrics       []Metrics     `json:"timeline"`
+	Violations    []string      `json:"violations,omitempty"`
+	Checkpoints   int           `json:"checkpoints"`
+	Releases      int           `json:"releases"`
 }
 type Summary struct {
 	RunID     string   `json:"runID"`
@@ -116,7 +121,7 @@ func Run(ctx context.Context, opt Options) error {
 			selected[id] = true
 		}
 	}
-	summary := Summary{RunID: opt.RunID, Baseline: Baseline, Available: len(cases)}
+	summary := Summary{RunID: opt.RunID, Baseline: r.testedCommit(), Available: len(cases)}
 	for _, c := range cases {
 		if len(selected) > 0 && !selected[c.ID] {
 			continue
@@ -131,7 +136,12 @@ func Run(ctx context.Context, opt Options) error {
 			continue
 		}
 		fmt.Printf("CASE %s START run=%s\n", c.ID, opt.RunID)
-		result := r.runCase(ctx, c)
+		var result Result
+		if c.Scenario != nil {
+			result = r.runNormalCase(ctx, c)
+		} else {
+			result = r.runCase(ctx, c)
+		}
 		summary.Results = append(summary.Results, result)
 		if result.Status == "PASS" {
 			summary.Passed++
@@ -215,8 +225,45 @@ func (r *Runner) preflight(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	provenance := map[string]interface{}{}
+	if path, err := os.Executable(); err == nil {
+		if data, err := os.ReadFile(path); err == nil {
+			provenance["binarySHA256"] = fmt.Sprintf("%x", sha256.Sum256(data))
+		}
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		provenance["goBuildInfo"] = info
+	}
+	inputs := map[string]string{}
+	paths, err := filepath.Glob(filepath.Join(r.opt.CaseDir, "RUN-*.yaml"))
+	if err != nil {
+		return err
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		inputs[filepath.Base(path)] = fmt.Sprintf("%x", sha256.Sum256(data))
+	}
+	provenance["caseSHA256"] = inputs
+	if r.opt.Kubeconfig == "" {
+		ns, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+		if err != nil {
+			return err
+		}
+		name, err := os.Hostname()
+		if err != nil {
+			return err
+		}
+		pod, err := r.kube.CoreV1().Pods(strings.TrimSpace(string(ns))).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		provenance["runnerPod"] = pod
+	}
 	return writeJSON(filepath.Join(r.root, "environment.json"), map[string]interface{}{
-		"baseline": Baseline, "kubernetes": version, "nodes": nodes.Items, "controller": deployment, "controllerPods": controllerPods.Items, "volcano": deps.Items, "modelServingCRD": crd.Object, "options": r.opt,
+		"baseline": r.testedCommit(), "kubernetes": version, "nodes": nodes.Items, "controller": deployment, "controllerPods": controllerPods.Items, "volcano": deps.Items, "modelServingCRD": crd.Object, "options": r.opt, "runner": provenance,
 	})
 }
 func (r *Runner) runCase(ctx context.Context, c Case) (res Result) {

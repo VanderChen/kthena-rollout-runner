@@ -45,16 +45,25 @@ type Observer struct {
 	seq     int64
 	err     error
 	ledger  *Ledger
+	normal  *NormalLedger
 }
 
 func NewObserver(ctx context.Context, client dynamic.Interface, ns, dir string) (*Observer, error) {
+	return newObserver(ctx, client, ns, dir, false)
+}
+
+func newObserver(ctx context.Context, client dynamic.Interface, ns, dir string, plugins bool) (*Observer, error) {
 	f, err := os.Create(filepath.Join(dir, "observations.jsonl"))
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	o := &Observer{cancel: cancel, objects: map[string]map[string]*unstructured.Unstructured{}, journal: f, encoder: json.NewEncoder(f)}
-	for _, gvr := range []schema.GroupVersionResource{PodGVR, MSGVR, PGGVR, CRGVR} {
+	resources := []schema.GroupVersionResource{PodGVR, MSGVR, PGGVR, CRGVR}
+	if plugins {
+		resources = append(resources, schema.GroupVersionResource{Version: "v1", Resource: "services"}, schema.GroupVersionResource{Version: "v1", Resource: "configmaps"})
+	}
+	for _, gvr := range resources {
 		api := client.Resource(gvr).Namespace(ns)
 		list, err := api.List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -143,6 +152,9 @@ func (o *Observer) accept(kind, event string, u *unstructured.Unstructured) {
 	if err := o.encoder.Encode(Observation{Sequence: o.seq, Received: time.Now().UTC(), Kind: kind, Event: event, Object: u}); err != nil {
 		o.err = err
 	}
+	if o.normal != nil {
+		o.normal.Before(kind, event, u, o.objects)
+	}
 	if event == "DELETED" {
 		delete(o.objects[kind], string(u.GetUID()))
 	} else {
@@ -150,6 +162,9 @@ func (o *Observer) accept(kind, event string, u *unstructured.Unstructured) {
 	}
 	if o.ledger != nil {
 		o.ledger.Observe(kind, event, u, o.objects["pods"])
+	}
+	if o.normal != nil {
+		o.normal.After(kind, event, u, o.objects)
 	}
 }
 func (o *Observer) Arm(c Case, uid string) error {

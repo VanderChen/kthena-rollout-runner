@@ -23,6 +23,7 @@ func main() {
 	flag.StringVar(&o.RunID, "run-id", "", "unique attempt name; existing attempt is never overwritten")
 	flag.StringVar(&o.Select, "select", "", "comma-separated IDs; empty executes all files")
 	flag.StringVar(&o.ControllerImage, "controller-image", "", "required exact tested controller image")
+	flag.StringVar(&o.ControllerCommit, "controller-commit", "", "tested controller source commit; recorded separately from catalogue baseline")
 	flag.DurationVar(&o.Hold, "hold", 0, "override each case hold window; 0 keeps its declared duration")
 	flag.DurationVar(&o.Timeout, "phase-timeout", 180*time.Second, "bounded wait for each expected transition")
 	flag.Parse()

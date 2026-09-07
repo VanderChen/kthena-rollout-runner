@@ -2,15 +2,13 @@
 
 内部开发/CI工具：Go + client-go，一个Kubernetes Job，逐用例串行执行。
 
-本次实现范围为 **RUN-001～RUN-060：30个SG + 30个Role基础配置组合**。
-每例独立YAML，保留未配置、显式0及不同partition输入；不把同一有效预算的不同输入合并。
-其余624个场景尚未实现，不能计作自动通过。源码无需依赖Kthena controller内部函数。
+第一大类执行集已扩展为 **RUN-001～RUN-303**，配置位于 `cases/normal/`。
+新增243项覆盖默认值、协调、插件、历史布局、扩缩容及滚动中再次变更。
+当前正在做Kind开发验证，配置数量不代表实际通过数量。
+参见[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。
 
-被测生产基线：`production/release-1.0@e2578d01859bb98d9a85846bafbfb2c771a6f117`。
-实际验证使用Kind `kthena-resync-010`、Kubernetes v1.34.0、Linux/arm64、
-Volcano v1.14.1、controller镜像
-`kthena-controller-manager:resync-010-e2578d01`。
-部署前核对实际镜像和架构；其他集群须预装相同API的Kthena及Volcano，不会由runner改换controller版本。
+原 `cases/core/` 的60份输入及历史验收结果保留不变。以下核心过程和旧Kind结果描述
+对应原60项；新集群验证必须显式传入当前production镜像及 `--controller-commit`。
 
 ## 核心过程检查
 
@@ -152,10 +150,9 @@ RUN-001/
 PASS须过程和终态都通过，ERROR/INCONCLUSIVE/NOT_RUN都不折算成功。
 原始journal可能含测试PodSpec及插件配置，不收集Secret对象或kubeconfig。
 
-当前是60个固定规模、健康初始态、无coordination的核心组合执行器，
-不是684个场景的完整解释器。扩缩、故障恢复、依赖图、人工操作等需要新增对应
-过程检查，不能只改数字后宣称已支持。Watch也不证明没有API副作用的controller内部选择；
+`cases/core` 保留60个固定规模核心组合；`cases/normal` 扩展第一类303项。
+第一类之外的故障恢复、拒绝及人工操作等目录条目仍未在本次范围内。Watch也不证明没有API副作用的controller内部选择；
 那类检查仍需要专用trace/手工证据。
 
-最终Kind验收：RUN-001～RUN-060全部通过，Job Complete、退出码0。
+历史core Kind验收：RUN-001～RUN-060全部通过，Job Complete、退出码0。
 详见[60行实测结果](docs/KIND_RESULTS.md)与[完整验收证据](VERIFICATION.md)。

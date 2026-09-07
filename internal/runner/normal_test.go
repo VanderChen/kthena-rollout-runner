@@ -325,6 +325,44 @@ func TestNormalExactTargetOrdinalsCannotBeSubstituted(t *testing.T) {
 	}
 }
 
+func TestNormalExplicitGangMinimumPreservesRoleDistribution(t *testing.T) {
+	policy := func(name string, minimum int64) interface{} {
+		return map[string]interface{}{
+			"name": name, "minSubGroups": minimum, "subGroupSize": int64(1),
+			"labelSelector":  map[string]interface{}{"matchLabels": map[string]interface{}{"modelserving.volcano.sh/name": "model", LabelRole: name}},
+			"matchLabelKeys": []interface{}{LabelRoleID},
+		}
+	}
+	pg := &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{
+		"minMember": int64(4), "subGroupPolicy": []interface{}{policy("frontend", 1), policy("backend", 3)},
+	}}}
+	expected := map[string]RoleLayout{"frontend": {R: 1}, "backend": {R: 3}}
+	if ok, reason := explicitGangRoleFacts(pg, "model", expected); !ok {
+		t.Fatal("valid explicit minimum rejected: ", reason)
+	}
+	swapped := pg.DeepCopy()
+	if err := unstructured.SetNestedSlice(swapped.Object, []interface{}{policy("frontend", 3), policy("backend", 1)}, "spec", "subGroupPolicy"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := explicitGangRoleFacts(swapped, "model", expected); ok {
+		t.Fatal("same total minMember concealed swapped Role minimums")
+	}
+	wrongSelector := pg.DeepCopy()
+	policies, _, _ := unstructured.NestedSlice(wrongSelector.Object, "spec", "subGroupPolicy")
+	policies[0].(map[string]interface{})["matchLabelKeys"] = []interface{}{LabelGroup}
+	if err := unstructured.SetNestedSlice(wrongSelector.Object, policies, "spec", "subGroupPolicy"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := explicitGangRoleFacts(wrongSelector, "model", expected); ok {
+		t.Fatal("group identity substituted for Role instance identity")
+	}
+	missing := pg.DeepCopy()
+	unstructured.RemoveNestedField(missing.Object, "spec", "subGroupPolicy")
+	if ok, _ := explicitGangRoleFacts(missing, "model", expected); ok {
+		t.Fatal("missing explicit Gang Role policy passed")
+	}
+}
+
 func TestNormalRoleExpansionDoesNotReclassifyHealthyServingGroup(t *testing.T) {
 	l, o := normalFixture(t, "RUN-227")
 	s := normalCase(t, "RUN-227").Scenario.Steps[0]
@@ -336,8 +374,42 @@ func TestNormalRoleExpansionDoesNotReclassifyHealthyServingGroup(t *testing.T) {
 	if err := l.Transition(next.Spec, "expand-role", next.Expect, o); err != nil {
 		t.Fatal(err)
 	}
+	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 2 {
+		t.Fatalf("expansion erased the two still-serving old SGs: %+v", metrics)
+	}
 	deleteNormal(l, o, "frontend", 1, 0)
 	requireNormalViolation(t, l, "BUDGET_VIOLATION")
+}
+
+func TestNormalAtomicRoleExpansionKeepsAccurateOldCapacity(t *testing.T) {
+	l, o := normalFixture(t, "RUN-162")
+	s := normalCase(t, "RUN-162").Scenario.Steps[0]
+	if err := l.Transition(s.Spec, "atomic-expand", s.Expect, o); err != nil {
+		t.Fatal(err)
+	}
+	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 3 {
+		t.Fatalf("three complete old layouts must remain available: %+v", metrics)
+	}
+	deleteNormal(l, o, "frontend", 1, 0)
+	requireNormalViolation(t, l, "BUDGET_VIOLATION")
+	requireNormalViolation(t, l, "ORDER_MISMATCH")
+	if len(l.Starts) != 1 || l.Starts[0].ReadyBefore != 3 || l.Starts[0].Minimum != 3 {
+		t.Fatalf("wrong evidence for actual zero-unavailable violation: %+v", l.Starts)
+	}
+}
+
+func TestNormalOldSmallHistoryCannotLowerSettledCapacity(t *testing.T) {
+	l, o := normalFixture(t, "RUN-162")
+	s := normalCase(t, "RUN-162").Scenario.Steps[0]
+	if err := l.Transition(s.Spec, "expand", s.Expect, o); err != nil {
+		t.Fatal(err)
+	}
+	// After a completed expansion the baseline requires two frontend Roles.
+	// A surviving one-Role historical cohort cannot satisfy that capacity.
+	l.Base = l.Model
+	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 0 {
+		t.Fatalf("an older smaller history lowered the new baseline: %+v", metrics)
+	}
 }
 
 func TestNormalCompleteMixedRoleCapacityCanProvideReadyCredit(t *testing.T) {

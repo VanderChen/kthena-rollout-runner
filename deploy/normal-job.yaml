@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rollout-normal-r7-303
+  namespace: rollout-runner
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 43200
+  template:
+    spec:
+      serviceAccountName: rollout-runner
+      restartPolicy: Never
+      containers:
+        - name: runner
+          image: kthena-rollout-runner:normal-022-r7
+          imagePullPolicy: IfNotPresent
+          args:
+            - --cases=/cases/normal
+            - --artifacts=/artifacts
+            - --phase-timeout=420s
+            - --run-id=normal-r7-303
+            - --controller-image=kthena-controller-manager:normal-022-538b2825
+            - --controller-commit=538b2825c06bc1e8c5392d18f18f84faee9fca95
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: results, mountPath: /artifacts}
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: rollout-results

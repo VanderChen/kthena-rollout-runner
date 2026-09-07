@@ -201,11 +201,16 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 			matched := true
 			cohortReady := true
 			for name, layout := range candidate.Roles {
+				readyMinimum := layout.R
+				if baseline, ok := l.Base.Roles[name]; ok {
+					readyMinimum = baseline.R
+				}
 				if current, ok := l.Model.Roles[name]; ok {
+					readyMinimum = min(readyMinimum, current.R)
 					layout.R = current.R
 				}
 				expected += layout.R
-				count := 0
+				count, readyCount := 0, 0
 				for _, r := range roles {
 					if r.Group == u.Group && r.Role == name {
 						count++
@@ -215,17 +220,21 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 						if !r.Complete {
 							matched = false
 						}
-						cohortReady = cohortReady && r.Ready
+						if r.Ready {
+							readyCount++
+						}
 					}
 				}
 				if count != layout.R {
 					matched = false
 				}
+				cohortReady = cohortReady && readyCount >= readyMinimum
 			}
-			// A newly added Role can coexist with the complete old membership.
-			// Its pending Pods do not remove the old cohort's serving capacity.
+			// Newly added Roles/replicas can coexist with the old membership.
+			// Pending additions do not remove the old cohort's serving capacity;
+			// an explicit reduction only requires its smaller remaining capacity.
 			// Exact target membership remains a separate final-state predicate.
-			u.Ready = u.Ready || (matched && cohortReady)
+			u.Ready = u.Ready || cohortReady
 			actual := 0
 			for _, r := range roles {
 				if r.Group == u.Group {

@@ -142,6 +142,7 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 			return false, "PodGroup ownership/lifecycle"
 		}
 		minMembers := 0
+		expectedGangRoles := map[string]RoleLayout{}
 		gang := mapValue(mapValue(l.Model.Spec, "template"), "gangPolicy")
 		minimums := mapValue(gang, "minRoleReplicas")
 		for name, r := range model.Roles {
@@ -153,10 +154,17 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 				minimum = intValue(minimums, name, r.R)
 			}
 			minMembers += minimum * (1 + r.W)
+			r.R = minimum
+			expectedGangRoles[name] = r
 		}
 		actual, _, _ := unstructured.NestedInt64(pg.Object, "spec", "minMember")
 		if actual != int64(minMembers) {
 			return false, fmt.Sprintf("PG %s minMember=%d want=%d", pg.GetName(), actual, minMembers)
+		}
+		if len(minimums) > 0 {
+			if ok, reason := explicitGangRoleFacts(pg, e.current.GetName(), expectedGangRoles); !ok {
+				return false, reason
+			}
 		}
 		for key, want := range map[string]string{"cpu": fmt.Sprintf("%dm", 5*minMembers), "memory": fmt.Sprintf("%dMi", 4*minMembers)} {
 			raw, _, _ := unstructured.NestedString(pg.Object, "spec", "minResources", key)
@@ -240,6 +248,36 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 	}
 	return true, ""
 }
+
+// The explicit Role minimum must reach the scheduler as a Role constraint.
+// A correct total minMember cannot detect swapped or missing Role minimums.
+func explicitGangRoleFacts(pg *unstructured.Unstructured, modelName string, roles map[string]RoleLayout) (bool, string) {
+	policies, found, err := unstructured.NestedSlice(pg.Object, "spec", "subGroupPolicy")
+	if err != nil || !found || len(policies) != len(roles) {
+		return false, "PodGroup explicit Gang Role policy count"
+	}
+	seen := map[string]bool{}
+	for _, raw := range policies {
+		policy, ok := raw.(map[string]interface{})
+		if !ok {
+			return false, "PodGroup invalid Gang Role policy"
+		}
+		name := textValue(policy, "name")
+		role, ok := roles[name]
+		if !ok || seen[name] || intValue(policy, "minSubGroups", -1) != role.R || intValue(policy, "subGroupSize", -1) != 1+role.W {
+			return false, "PodGroup Gang Role minimum/layout: " + name
+		}
+		seen[name] = true
+		selector := mapValue(policy, "labelSelector")
+		labels := mapValue(selector, "matchLabels")
+		keys := listValue(policy, "matchLabelKeys")
+		if len(labels) != 2 || labels["modelserving.volcano.sh/name"] != modelName || labels[LabelRole] != name || len(listValue(selector, "matchExpressions")) != 0 || len(keys) != 1 || keys[0] != LabelRoleID {
+			return false, "PodGroup Gang Role selector: " + name
+		}
+	}
+	return true, ""
+}
+
 func targetFacts(units []NormalUnit, target ScenarioTarget) (bool, string) {
 	counts := map[string]int{}
 	ordinals := map[string]string{}

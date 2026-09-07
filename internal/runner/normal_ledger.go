@@ -514,7 +514,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 		// In SG mode an explicit Role scale-down removes only that Role instance;
 		// it is not permission to replace all other members of the ServingGroup.
 		for _, pod := range u.Pods {
-			if l.ScaleUIDs[string(pod.UID)] || l.RoleScaleIntents[string(pod.UID)] != "" {
+			if roleUnitKey(pod) == roleUnitKey(&p) && (l.ScaleUIDs[string(pod.UID)] || l.RoleScaleIntents[string(pod.UID)] != "") {
 				l.Committed[string(pod.UID)] = true
 				start.UIDs = append(start.UIDs, string(pod.UID))
 			}

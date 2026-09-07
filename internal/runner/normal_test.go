@@ -707,6 +707,39 @@ func TestNormalAcceptedRoleScaleIntentSurvivesImmediateRestore(t *testing.T) {
 	}
 }
 
+func TestNormalRoleScaleCommitsOnlyTheDeletingInstance(t *testing.T) {
+	l, objects := normalFixture(t, "RUN-167")
+	steps := normalCase(t, "RUN-167").Scenario.Steps
+	if err := l.Transition(steps[1].Spec, "shrink", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	deleteNormal(l, objects, "frontend", 0, 2)
+	for uid, pod := range objects["pods"] {
+		if pod.GetLabels()[LabelGroup] == "model-0" && ordinal(pod.GetLabels()[LabelRoleID]) == 1 && l.Committed[uid] {
+			t.Fatal("selection of another Role instance spent its capacity before any deletion signal")
+		}
+	}
+	if err := l.Transition(steps[2].Spec, "restore", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	// The controller can observe the restore after deleting Role2 but before
+	// deleting Role1. Its surviving Ready UID must still provide capacity.
+	for uid, pod := range objects["pods"] {
+		if pod.GetDeletionTimestamp() != nil {
+			replacement := pod.DeepCopy()
+			replacement.SetUID("restored-role2")
+			replacement.SetDeletionTimestamp(nil)
+			delete(objects["pods"], uid)
+			objects["pods"][string(replacement.GetUID())] = replacement
+			l.Released[string(replacement.GetUID())] = true
+			break
+		}
+	}
+	if metrics := l.Metrics(objects["pods"]); len(metrics) != 1 || metrics[0].Ready != 3 {
+		t.Fatalf("three fully Ready groups lost capacity after partial shrink/restore: %+v", metrics)
+	}
+}
+
 // Use the real API entry label. The original core test helper predates member
 // layout checking and uses descriptive labels that are not production values.
 func normalTestPod(mode, role string, n int, version string, ready bool, member string) *unstructured.Unstructured {

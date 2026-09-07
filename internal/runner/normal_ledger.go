@@ -75,6 +75,7 @@ type NormalLedger struct {
 	Starts               []NormalStart          `json:"starts"`
 	Violations           []string               `json:"violations"`
 	ScaleUIDs            map[string]bool        `json:"scaleUIDs"`
+	RoleScaleIntents     map[string]string      `json:"roleScaleIntentPodUIDs,omitempty"`
 	ScaleGroups          map[int]bool           `json:"scaleGroups"`
 	Ceiling              map[string]int         `json:"ceiling"`
 	Armed                bool                   `json:"armed"`
@@ -398,7 +399,7 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 		// Already-issued deletion commitments survive new partition/budget values.
 		for _, pod := range u.Pods {
 			uid := string(pod.UID)
-			if l.Committed[uid] || l.PGPods[uid] || l.ScaleUIDs[uid] || l.ScaleGroups[u.Group] {
+			if l.Committed[uid] || l.PGPods[uid] || l.ScaleUIDs[uid] || l.RoleScaleIntents[uid] != "" || l.ScaleGroups[u.Group] {
 				continue
 			}
 			if e.NoReplacement || (!temporaryTarget && ((unchanged && l.unitTarget(u)) || u.Ordinal < p)) {
@@ -422,6 +423,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 		return
 	}
 	l.dynamicScaleBefore(kind, event, o, objects)
+	l.roleScaleBefore(kind, event, o, objects)
 	l.coordinationBefore(kind, event, o, objects)
 	l.podGroupBefore(kind, event, o, objects)
 	if kind != "pods" || (event != "DELETED" && o.GetDeletionTimestamp() == nil) {
@@ -450,7 +452,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if reservedEarlier {
 		reason = "rollout-in-flight"
 	}
-	scale := l.ScaleUIDs[uid] || l.ScaleGroups[u.Group] || l.PGScale[uid]
+	scale := l.ScaleUIDs[uid] || l.ScaleGroups[u.Group] || l.PGScale[uid] || l.RoleScaleIntents[uid] != ""
 	if scale {
 		reason = "scale"
 	}
@@ -512,7 +514,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 		// In SG mode an explicit Role scale-down removes only that Role instance;
 		// it is not permission to replace all other members of the ServingGroup.
 		for _, pod := range u.Pods {
-			if l.ScaleUIDs[string(pod.UID)] {
+			if l.ScaleUIDs[string(pod.UID)] || l.RoleScaleIntents[string(pod.UID)] != "" {
 				l.Committed[string(pod.UID)] = true
 				start.UIDs = append(start.UIDs, string(pod.UID))
 			}
@@ -550,7 +552,7 @@ func (l *NormalLedger) dynamicScaleBefore(kind, event string, o *unstructured.Un
 		role = p.Labels[LabelRole]
 		roleKey = roleUnitKey(&p)
 	}
-	if l.ScaleGroups[group] || l.ScaleUIDs[string(o.GetUID())] {
+	if l.ScaleGroups[group] || l.ScaleUIDs[string(o.GetUID())] || l.RoleScaleIntents[string(o.GetUID())] != "" {
 		return
 	}
 	ru := l.roleUnits(objects["pods"])
@@ -742,6 +744,66 @@ func (l *NormalLedger) rememberReady(units map[string]NormalUnit) {
 	}
 }
 
+// A published PodGroup minimum reduction confirms that the controller has
+// accepted this group's Role scale-down. Its finite, already selected Pod UIDs
+// may finish deletion after an immediate replicas restore. Preserve only that
+// selection, not a group-wide exemption or permissions for future Pod UIDs.
+func (l *NormalLedger) roleScaleBefore(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	if kind != "podgroups" || event != "MODIFIED" || o.GetDeletionTimestamp() != nil || !objectOwned(o, l.Owner) || len(l.ScaleUIDs) == 0 {
+		return
+	}
+	previous := objects["podgroups"][string(o.GetUID())]
+	if previous == nil || previous.GetName() != o.GetName() || !objectOwned(previous, l.Owner) {
+		return
+	}
+	oldTotal, _, oldErr := unstructured.NestedInt64(previous.Object, "spec", "minMember")
+	newTotal, _, newErr := unstructured.NestedInt64(o.Object, "spec", "minMember")
+	if oldErr != nil || newErr != nil || newTotal < 0 || oldTotal <= newTotal {
+		return
+	}
+	type minimum struct{ count, size int64 }
+	policies := func(pg *unstructured.Unstructured) map[string]minimum {
+		values, _, err := unstructured.NestedSlice(pg.Object, "spec", "subGroupPolicy")
+		if err != nil {
+			return nil
+		}
+		out := map[string]minimum{}
+		for _, value := range values {
+			policy, ok := value.(map[string]interface{})
+			if !ok {
+				return nil
+			}
+			name, _, _ := unstructured.NestedString(policy, "name")
+			role, _, _ := unstructured.NestedString(policy, "labelSelector", "matchLabels", LabelRole)
+			keys, _, _ := unstructured.NestedStringSlice(policy, "matchLabelKeys")
+			count, foundCount, countErr := unstructured.NestedInt64(policy, "minSubGroups")
+			size, foundSize, sizeErr := unstructured.NestedInt64(policy, "subGroupSize")
+			if _, duplicate := out[name]; duplicate || name == "" || role != name || len(keys) != 1 || keys[0] != LabelRoleID || !foundCount || !foundSize || countErr != nil || sizeErr != nil || count < 0 || size < 1 {
+				return nil
+			}
+			out[name] = minimum{count, size}
+		}
+		return out
+	}
+	oldPolicies, newPolicies := policies(previous), policies(o)
+	for role, reduced := range newPolicies {
+		old, existed := oldPolicies[role]
+		desired, known := l.Model.Roles[role]
+		if !existed || !known || old.count <= reduced.count || reduced.count != int64(desired.R) || old.size != reduced.size || reduced.size != int64(desired.W+1) {
+			continue
+		}
+		for uid, pod := range objects["pods"] {
+			if !l.ScaleUIDs[uid] || !objectOwned(pod, l.Owner) || pod.GetLabels()[LabelGroup] != o.GetName() || pod.GetLabels()[LabelRole] != role {
+				continue
+			}
+			if l.RoleScaleIntents == nil {
+				l.RoleScaleIntents = map[string]string{}
+			}
+			l.RoleScaleIntents[uid] = string(o.GetUID())
+		}
+	}
+}
+
 // PodGroup deletion is an independent destructive signal. Cross-resource watch
 // ordering can lag Pod readiness, so this check uses an optimistic upper bound
 // from explicit releases. The Pod stream additionally checks actual Ready.
@@ -752,13 +814,28 @@ func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstru
 	l.PGCommitted[string(o.GetUID())] = true
 	group := ordinal(o.GetName())
 	if l.ScaleGroups[group] {
+		// The first selected PG deletion starts the finite SG shrink batch.
+		// A rapid replicas restore can arrive while later PGs in that same
+		// batch are still being deleted. Retain only its selected Pod UIDs.
 		for uid, p := range objects["pods"] {
-			if objectOwned(p, l.Owner) && ordinal(p.GetLabels()[LabelGroup]) == group {
+			if l.ScaleUIDs[uid] && l.ScaleGroups[ordinal(p.GetLabels()[LabelGroup])] && objectOwned(p, l.Owner) {
+				if !l.PGPods[uid] {
+					l.PGPhase[uid] = l.Phase
+				}
 				l.PGPods[uid] = true
-				l.PGPhase[uid] = l.Phase
 				l.PGScale[uid] = true
 			}
 		}
+		return
+	}
+	selected, unselected := false, false
+	for uid, p := range objects["pods"] {
+		if objectOwned(p, l.Owner) && p.GetLabels()[LabelGroup] == o.GetName() {
+			selected = selected || l.PGScale[uid]
+			unselected = unselected || !l.PGScale[uid]
+		}
+	}
+	if selected && !unselected {
 		return
 	}
 	if l.Model.Mode == "Role" {

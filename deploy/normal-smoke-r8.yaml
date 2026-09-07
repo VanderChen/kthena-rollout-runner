@@ -1,11 +1,11 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: rollout-normal-r8-303
+  name: rollout-normal-smoke-r8
   namespace: rollout-runner
 spec:
   backoffLimit: 0
-  activeDeadlineSeconds: 43200
+  activeDeadlineSeconds: 3600
   template:
     spec:
       serviceAccountName: rollout-runner
@@ -16,9 +16,10 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --cases=/cases/normal
+            - --select=RUN-162,RUN-166,RUN-167,RUN-169,RUN-171,RUN-172,RUN-174,RUN-176,RUN-177,RUN-181,RUN-182,RUN-183,RUN-187,RUN-188
             - --artifacts=/artifacts
             - --phase-timeout=420s
-            - --run-id=normal-r8-303
+            - --run-id=normal-smoke-r8
             - --controller-image=kthena-controller-manager:normal-022-538b2825
             - --controller-commit=538b2825c06bc1e8c5392d18f18f84faee9fca95
           resources:

@@ -568,6 +568,145 @@ func TestNormalAcceptedGroupScaleIntentSurvivesImmediateRestore(t *testing.T) {
 	requireNormalViolation(t, l, "UNEXPECTED_TARGET_REPLACED")
 }
 
+func TestNormalAcceptedGroupScaleBatchSurvivesImmediateRestore(t *testing.T) {
+	for _, accepted := range []bool{false, true} {
+		t.Run(fmt.Sprint(accepted), func(t *testing.T) {
+			l, objects := normalFixture(t, "RUN-176")
+			for uid, pod := range objects["pods"] {
+				if pod.GetLabels()[LabelGroup] == "model-2" {
+					delete(l.Released, uid)
+					_ = unstructured.SetNestedSlice(pod.Object, []interface{}{map[string]interface{}{"type": "Ready", "status": "False"}}, "status", "conditions")
+				}
+			}
+			steps := normalCase(t, "RUN-176").Scenario.Steps
+			if err := l.Transition(steps[1].Spec, "shrink", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			pg := func(group int) *unstructured.Unstructured {
+				p := &unstructured.Unstructured{}
+				p.SetName(fmt.Sprintf("model-%d", group))
+				p.SetUID(types.UID(fmt.Sprintf("pg-%d", group)))
+				p.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+				return p
+			}
+			if accepted {
+				l.Before("podgroups", "DELETED", pg(2), objects)
+			}
+			if err := l.Transition(steps[2].Spec, "restore", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			l.Before("podgroups", "DELETED", pg(1), objects)
+			if !accepted {
+				requireNormalViolation(t, l, "BUDGET_VIOLATION")
+				return
+			}
+			if l.error() != nil {
+				t.Fatal("remaining finite scale batch was revoked: ", l.error())
+			}
+			for uid, pod := range objects["pods"] {
+				if pod.GetLabels()[LabelGroup] == "model-1" {
+					if l.PGPhase[uid] != "shrink" {
+						t.Fatal("later PG event overwrote the original shrink phase")
+					}
+					replacement := pod.DeepCopy()
+					replacement.SetUID("new-group-member")
+					labels := replacement.GetLabels()
+					labels[LabelRoleID] = "frontend-1"
+					replacement.SetLabels(labels)
+					objects["pods"][string(replacement.GetUID())] = replacement
+					break
+				}
+			}
+			deleteNormal(l, objects, "frontend", 1, 0)
+			if l.PGScale["new-group-member"] || l.Committed["new-group-member"] {
+				t.Fatal("finite old batch committed a newly observed Pod UID")
+			}
+			// The batch contained SG2/SG1 only, never the retained SG0.
+			l.Before("podgroups", "DELETED", pg(0), objects)
+			requireNormalViolation(t, l, "BUDGET_VIOLATION")
+		})
+	}
+}
+
+func TestNormalAcceptedRoleScaleIntentSurvivesImmediateRestore(t *testing.T) {
+	for _, test := range []struct {
+		name                        string
+		publish, foreign, unchanged bool
+	}{
+		{name: "published reduction", publish: true},
+		{name: "request alone"},
+		{name: "foreign owner", publish: true, foreign: true},
+		{name: "unchanged minimum", publish: true, unchanged: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			l, objects := normalFixture(t, "RUN-167")
+			steps := normalCase(t, "RUN-167").Scenario.Steps
+			pg := &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minMember": int64(3),
+					"subGroupPolicy": []interface{}{map[string]interface{}{
+						"name": "frontend", "minSubGroups": int64(3), "subGroupSize": int64(1),
+						"labelSelector":  map[string]interface{}{"matchLabels": map[string]interface{}{LabelRole: "frontend"}},
+						"matchLabelKeys": []interface{}{LabelRoleID},
+					}},
+				},
+			}}
+			pg.SetName("model-1")
+			pg.SetUID("role-scale-pg")
+			pg.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+			objects["podgroups"][string(pg.GetUID())] = pg
+			if err := l.Transition(steps[1].Spec, "shrink", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			if test.publish {
+				changed := pg.DeepCopy()
+				if !test.unchanged {
+					_ = unstructured.SetNestedField(changed.Object, int64(1), "spec", "minMember")
+					_ = unstructured.SetNestedSlice(changed.Object, []interface{}{map[string]interface{}{
+						"name": "frontend", "minSubGroups": int64(1), "subGroupSize": int64(1),
+						"labelSelector":  map[string]interface{}{"matchLabels": map[string]interface{}{LabelRole: "frontend"}},
+						"matchLabelKeys": []interface{}{LabelRoleID},
+					}}, "spec", "subGroupPolicy")
+				}
+				if test.foreign {
+					changed.SetOwnerReferences([]metav1.OwnerReference{{UID: "foreign"}})
+				}
+				l.Before("podgroups", "MODIFIED", changed, objects)
+				objects["podgroups"][string(changed.GetUID())] = changed
+			}
+			deleteNormal(l, objects, "frontend", 0, 2)
+			deleteNormal(l, objects, "frontend", 0, 1)
+			if err := l.Transition(steps[2].Spec, "restore", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			deleteNormal(l, objects, "frontend", 1, 2)
+			if !test.publish || test.foreign || test.unchanged {
+				requireNormalViolation(t, l, "BUDGET_VIOLATION")
+				return
+			}
+			if l.error() != nil {
+				t.Fatal("published finite Role scale intent revoked at restore: ", l.error())
+			}
+			for uid, pod := range objects["pods"] {
+				if pod.GetLabels()[LabelGroup] == "model-1" && ordinal(pod.GetLabels()[LabelRoleID]) == 1 {
+					replacement := pod.DeepCopy()
+					replacement.SetUID("new-role-member")
+					delete(objects["pods"], uid)
+					objects["pods"][string(replacement.GetUID())] = replacement
+					break
+				}
+			}
+			if l.RoleScaleIntents["new-role-member"] != "" || l.Committed["new-role-member"] {
+				t.Fatal("Role shrink intent leaked onto a replacement Pod UID")
+			}
+			// A Role shrink cannot authorize deletion of the retained ordinal0
+			// or commit the entire ServingGroup as if this were an SG rollout.
+			deleteNormal(l, objects, "frontend", 1, 0)
+			requireNormalViolation(t, l, "BUDGET_VIOLATION")
+		})
+	}
+}
+
 // Use the real API entry label. The original core test helper predates member
 // layout checking and uses descriptive labels that are not production values.
 func normalTestPod(mode, role string, n int, version string, ready bool, member string) *unstructured.Unstructured {

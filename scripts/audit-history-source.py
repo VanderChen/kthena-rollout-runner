@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Independently bound the preparation before five real Role history faults."""
 import collections
+import copy
 import importlib.util
 import json
 import pathlib
@@ -39,7 +40,17 @@ def verify_source(p,rows,owner):
     assert receipt['accepted'] and receipt['uid']==before['metadata']['uid']==receipt['options']['preconditions']['uid']
     assert before['metadata']['uid']!=after['metadata']['uid']==boundary['controllerUID']
     assert before['metadata']['ownerReferences']==after['metadata']['ownerReferences']
-    assert before['spec']['containers']==after['spec']['containers']
+    # Admission assigns a fresh projected service-account volume name to each
+    # Pod. Compare its full payload and normalize only that random mount name.
+    normalized=[];projections=[]
+    for pod in (before,after):
+        containers=copy.deepcopy(pod['spec']['containers'])
+        mounts=[mount for c in containers for mount in c.get('volumeMounts',[]) if mount['mountPath']=='/var/run/secrets/kubernetes.io/serviceaccount']
+        assert len(mounts)==1 and mounts[0]['name'].startswith('kube-api-access-') and mounts[0]['readOnly']
+        volume=next(v for v in pod['spec']['volumes'] if v['name']==mounts[0]['name'])
+        assert 'projected' in volume and any('serviceAccountToken' in v for v in volume['projected']['sources'])
+        projections.append(volume['projected']);mounts[0]['name']='admitted-service-account-volume';normalized.append(containers)
+    assert normalized[0]==normalized[1] and projections[0]==projections[1] and before['spec']['serviceAccountName']==after['spec']['serviceAccountName']
     connected=m.read(ROOT/'artifacts/environment-022'/(p.parent.name+'-control')/'controller-connected.json')
     deployment=m.yaml(prep/'controller-controller-deployment.yaml')
     assert deployment['metadata']['uid']==connected['metadata']['uid'] and deployment['spec']==connected['spec']

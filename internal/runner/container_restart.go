@@ -83,6 +83,14 @@ func (e *normalExecution) restartContainer(ctx context.Context, p ScenarioStep, 
 	if !ok || before.State.Running == nil || before.ContainerID == "" {
 		return fmt.Errorf("INCONCLUSIVE: restart target container not running")
 	}
+	grace := p.Action == "restart-container-grace"
+	var workers []*corev1.Pod
+	if grace {
+		workers, err = e.armGraceRestart(ctx, target, pods, prefix)
+		if err != nil {
+			return err
+		}
+	}
 	if err = saveYAML(filepath.Join(e.dir, prefix+"-restart-target-before.yaml"), target); err != nil {
 		return err
 	}
@@ -95,8 +103,15 @@ func (e *normalExecution) restartContainer(ctx context.Context, p ScenarioStep, 
 		return err
 	}
 	var stdout, stderr bytes.Buffer
-	sent := time.Now().UTC()
-	commandCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	started := time.Now()
+	sent := started.UTC()
+	window := 90 * time.Second
+	if grace {
+		window = 30 * time.Second
+	}
+	deadline, deadlineCancel := context.WithDeadline(ctx, started.Add(window))
+	defer deadlineCancel()
+	commandCtx, cancel := context.WithTimeout(deadline, 15*time.Second)
 	execErr := executor.StreamWithContext(commandCtx, remotecommand.StreamOptions{Stdout: &stdout, Stderr: &stderr})
 	cancel()
 	errorText := ""
@@ -112,8 +127,7 @@ func (e *normalExecution) restartContainer(ctx context.Context, p ScenarioStep, 
 	}
 	defer journal.Close()
 	enc := json.NewEncoder(journal)
-	deadline, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
+	released := false
 	for {
 		current, err := e.r.kube.CoreV1().Pods(e.namespace).Get(deadline, target.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -128,11 +142,16 @@ func (e *normalExecution) restartContainer(ctx context.Context, p ScenarioStep, 
 		if err = e.locked(func() error { return nil }); err != nil {
 			return err
 		}
+		if grace {
+			if err = e.graceWorkersHealthy(deadline, workers); err != nil {
+				return err
+			}
+		}
 		observed, err := containerRestartObserved(target, current, sent)
 		if err != nil {
 			return err
 		}
-		if observed {
+		if observed && !released {
 			if err = journal.Sync(); err != nil {
 				return err
 			}
@@ -142,10 +161,47 @@ func (e *normalExecution) restartContainer(ctx context.Context, p ScenarioStep, 
 			// The restarted container has a fresh writable layer; release only
 			// this unchanged Pod after proving its new running container.
 			e.res.Releases++
-			return e.r.release(ctx, Unit{Key: current.Name, Pods: []*corev1.Pod{current}}, e.dir, e.res.Releases)
+			if err = e.r.release(deadline, Unit{Key: current.Name, Pods: []*corev1.Pod{current}}, e.dir, e.res.Releases); err != nil {
+				return err
+			}
+			if !grace {
+				return nil
+			}
+			released = true
+		}
+		if grace && released && observed && podReady(current) {
+			watchReady := false
+			if err = e.locked(func() error {
+				if obj := e.o.objects["pods"][string(target.UID)]; obj != nil {
+					var pod corev1.Pod
+					if convertPod(obj, &pod) == nil {
+						witness, witnessErr := containerRestartObserved(target, &pod, sent)
+						watchReady = witness && witnessErr == nil && podReady(&pod)
+					}
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+			if watchReady {
+				elapsed := time.Since(started)
+				if elapsed > window {
+					return fmt.Errorf("GRACE_RECOVERY_TIMEOUT: Ready not established within 30 seconds")
+				}
+				if err = journal.Sync(); err != nil {
+					return err
+				}
+				if err = saveYAML(filepath.Join(e.dir, prefix+"-grace-ready.yaml"), current); err != nil {
+					return err
+				}
+				return writeJSON(filepath.Join(e.dir, prefix+"-grace-recovery.json"), map[string]interface{}{"sent": sent, "readyReceived": time.Now().UTC(), "elapsedNanos": elapsed.Nanoseconds(), "graceSeconds": 30, "entryUID": target.UID, "healthyWorkers": workers, "apiAndWatchReady": true})
+			}
 		}
 		select {
 		case <-deadline.Done():
+			if grace {
+				return fmt.Errorf("GRACE_RECOVERY_TIMEOUT: same-UID restart and Ready within 30 seconds not established: %w", deadline.Err())
+			}
 			return fmt.Errorf("INCONCLUSIVE: actual fixture process exit and same-UID container restart not established: %w", deadline.Err())
 		case <-time.After(250 * time.Millisecond):
 		}

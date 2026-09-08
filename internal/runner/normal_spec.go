@@ -76,8 +76,9 @@ func (c Case) validateScenario() error {
 	recovery := n >= 304 && n <= 388 && c.Format == "rollout-runner/v3"
 	restart := n >= 389 && n <= 400 && c.Format == "rollout-runner/v3"
 	midRollout := n >= 401 && n <= 430 && c.Format == "rollout-runner/v3"
+	graceRestart := n >= 431 && n <= 432 && c.Format == "rollout-runner/v3"
 	controllerRestart := n >= 435 && n <= 440 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !controllerRestart) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -94,7 +95,7 @@ func (c Case) validateScenario() error {
 		return fmt.Errorf("missing executable steps")
 	}
 	for _, p := range s.Steps {
-		if p.ContainerRestart != nil && p.Action != "restart-container" {
+		if p.ContainerRestart != nil && p.Action != "restart-container" && p.Action != "restart-container-grace" {
 			return fmt.Errorf("container restart attached to unrelated action")
 		}
 		if p.PodFault != nil && p.Action != "recover-pod" {
@@ -104,6 +105,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "resume-after-grace":
+			if !graceRestart {
+				return fmt.Errorf("grace resumption not declared by this case")
+			}
 		case "terminate-controller":
 			if !controllerRestart {
 				return fmt.Errorf("controller termination not declared by this case")
@@ -120,6 +125,11 @@ func (c Case) validateScenario() error {
 			f := p.ContainerRestart
 			if !restart || f == nil || f.Group != 0 || f.Role != "frontend" || f.Ordinal != 0 || f.Member != "entry" || len(p.Spec) != 0 || !p.Expect.NoReplacement || !p.Expect.NoNewRevision {
 				return fmt.Errorf("invalid in-place container restart action")
+			}
+		case "restart-container-grace":
+			f := p.ContainerRestart
+			if !graceRestart || f == nil || f.Group != 0 || f.Role != "frontend" || f.Ordinal != 0 || f.Member != "entry" || len(p.Spec) != 0 || p.Expect.NoReplacement || !p.Expect.NoNewRevision || p.Release != "none" {
+				return fmt.Errorf("invalid bounded grace restart action")
 			}
 		case "recover-pod":
 			if !recovery || p.PodFault == nil || p.PodFault.Group != 0 || p.PodFault.Role != "frontend" || p.PodFault.Ordinal != 0 || (p.PodFault.Member != "entry" && p.PodFault.Member != "worker") {
@@ -173,6 +183,9 @@ func (c Case) validateScenario() error {
 	}
 	if restart && (len(s.Steps) != 2 || s.Steps[0].Action != "restart-container" || s.Steps[1].Action != "update" || textValue(s.InitialSpec, "recoveryPolicy") != "None") {
 		return fmt.Errorf("container restart cases require None, in-place restart then template update")
+	}
+	if graceRestart && (len(s.Steps) != 3 || s.Steps[0].Action != "update" || s.Steps[1].Action != "restart-container-grace" || s.Steps[2].Action != "resume-after-grace" || textValue(s.InitialSpec, "recoveryPolicy") != "RoleRecreate" || intValue(mapValue(s.InitialSpec, "template"), "restartGracePeriodSeconds", -1) != 30 || intValue(mapValue(s.Steps[0].Spec, "template"), "restartGracePeriodSeconds", -1) != 30) {
+		return fmt.Errorf("grace cases require accepted template grace=30, B window, in-place restart then convergence")
 	}
 	if controllerRestart {
 		terminations := 0

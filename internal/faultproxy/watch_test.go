@@ -27,6 +27,19 @@ func TestNewWatchFrameCannotOvertakeQueuedEventsAfterRuleClear(t *testing.T) {
 	}
 }
 
+func TestStatusSubresourcePauseDoesNotHoldWholeObjectWatch(t *testing.T) {
+	s, origin, streams := watchFixture(t)
+	response, current := connect(t, origin, streams)
+	defer response.Body.Close()
+	frames := readFrames(response)
+	control(t, s, "POST", "/v1/rules", Rule{ID: "status-pause", Namespace: "test", Resource: "pods", Subresource: "status", Mode: "hold", Count: -1, DurationSeconds: 30}, 201)
+	current.events <- event("MODIFIED", "test", "normal-event", false)
+	if nextUID(t, frames) != "normal-event" || state(t, s).Rules[0].Hits != 0 {
+		t.Fatal("status-only HTTP barrier intercepted whole-object watch")
+	}
+	control(t, s, "DELETE", "/v1/rules/status-pause", nil, 204)
+}
+
 func TestConcurrentClearAndIncomingEventsPreserveNamespaceOrder(t *testing.T) {
 	for attempt := 0; attempt < 10; attempt++ {
 		t.Run(fmt.Sprint(attempt), func(t *testing.T) {

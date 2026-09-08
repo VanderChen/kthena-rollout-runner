@@ -180,7 +180,7 @@ func (s *Server) deliverOrHold(out io.Writer, request requestContext, frame *wat
 	s.mu.Lock()
 	var selected *RuleStatus
 	for _, rule := range s.rules {
-		if !s.activeLocked(rule) || rule.InitialSync || rule.Resource != request.meta.Resource || !rule.matchesObject(frame.object) {
+		if !s.activeLocked(rule) || rule.InitialSync || rule.Subresource != "" || rule.Resource != request.meta.Resource || !rule.matchesObject(frame.object) {
 			continue
 		}
 		if rule.Mode == "hold" || rule.Mode == "drop-deletion" && (frame.event == "DELETED" || frame.object.DeletionTimestamp != nil) {

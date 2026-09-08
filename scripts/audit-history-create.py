@@ -157,6 +157,76 @@ def audit_case(p, trace):
     return {'id':case['id'],'classification':'PASS','watchRows':len(rows),'actualFailedCRCreates':len(injected),'persistenceBeforeTemplateMutations':persistence,'historyProbes':len(probes),'terminatingReferenceUIDs':sorted(terminating),'heldNanos':held['elapsedStableNanos'],'finalStableNanos':finalcp['elapsedStableNanos'],'healthyDeletionChecks':deletions,'limitRequest':limit,'sourcePartition':partition,'controllerReplacementUID':replacement['metadata']['uid'],'limitation':'References are checked using direct API reads throughout waits, with complete independent Watch for immutable Data, actual fault interval and stable final state. A pinned terminating Pod may share its revision with other live Pods. All-protected P=3 has no eligible old termination. No datastore internals are asserted.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-01-before-create-clear.json']}}
 
 
+def audit_old_surge_failure(p, trace):
+    result=m.read(p/'result.json');case=m.yaml(p/'case.yaml');source=case['scenario']['source'];config=source['config'];owner=m.yaml(p/'before-server.yaml')['metadata']['uid']
+    assert result['id']==case['id']==source['id'] and case['baseline']=='538b2825c06bc1e8c5392d18f18f84faee9fca95' and not result.get('violations')
+    assert result['status']=='FAIL' and 'TIMEOUT: C-allowed-target-after-old-release' in result['error']
+    n=int(case['id'][4:]);partition=config['roles']['f']['p']
+    assert 493<=n<=522 and (n-463)%10<5 and config['roles']['f']['s']==1 and partition<3
+    assert config['coordination']['dependencies']=={'f':['b']} and config['coordination']['maxSkew']=='50%'
+    original=m.yaml(p/'baseline-resources.yaml');baseline=m.mine(original,'pods',owner)
+    assert len(baseline)==6 and all(m.ready(o) and m.version(o)=='A' for o in baseline.values())
+    final_pods(m.yaml(p/'step-01-B-allowed-resources.yaml'),owner,baseline,partition,'B')
+    request=m.read(p/'step-02-request-time.json');assert request['generation']==3
+    checkpoints=[m.read(f) for f in p.glob('checkpoint-*.json')]
+    bcp=next(cp for cp in checkpoints if cp['phase']=='B-allowed-target-after-history-recovery')
+    held=next(cp for cp in checkpoints if cp['phase']=='C-after-allowed-B')
+    assert m.ts(bcp['completed'])<m.ts(request['sent']) and held['elapsedStableNanos']>=10_000_000_000
+    rule=m.read(p/'step-01-create-installed.json');hits=[r for r in trace if r.get('ruleID')==rule['id'] and r['action']=='error-request']
+    assert hits and all(r['status']==503 and r['method']=='POST' and r['resource']=='controllerrevisions' for r in hits)
+    cleared=[r for r in trace if r.get('ruleID')==rule['id'] and r['action']=='rule-cleared'];assert len(cleared)==1 and m.ts(cleared[0]['at'])<m.ts(bcp['completed'])
+    proxy=m.read(p/'fault-proxy-final.json');assert not proxy['errors'] and not any(r['active'] for r in proxy['rules'])
+    rows=[json.loads(s) for s in open(p/'observations.jsonl')];assert [r['sequence'] for r in rows]==list(range(1,len(rows)+1)) and not any(r['event']=='GAP' for r in rows)
+    raw=(ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json').read_bytes()
+    assert hashlib.sha256(raw).hexdigest()=='757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5' and source==next(r for r in json.loads(raw)['cases'] if r['id']==case['id'])
+    state=collections.defaultdict(dict);data={}
+    for row in rows:
+        o=row['object'];kind=row['kind'];key=o['metadata']['uid']
+        if kind=='controllerrevisions' and m.owned(o,owner):
+            assert key not in data or data[key]==o['data'];data[key]=o['data']
+        if row['event']=='DELETED':state[kind].pop(key,None)
+        else:state[kind][key]=o
+        if m.ts(rule['installed'])<=m.ts(row['received'])<m.ts(cleared[0]['at']):
+            pods=m.mine(state,'pods',owner);assert set(pods)==set(baseline) and all(m.ready(o) and m.version(o)=='A' for o in pods.values())
+            assert set(m.mine(state,'controllerrevisions',owner))==set(m.mine(original,'controllerrevisions',owner))
+    expected=collections.Counter({'C':3-partition,'B':1})
+    if partition:expected['A']=partition
+    def excess(pods):
+        mine={o['metadata']['uid']:o for o in pods if m.owned(o,owner)}
+        front={uid:o for uid,o in mine.items() if o['metadata']['labels'][m.R]=='frontend'}
+        if len(mine)!=7 or len(front)!=4 or not all(m.ready(o) for o in mine.values()) or collections.Counter(m.version(o) for o in front.values())!=expected:return None
+        old=next(o for o in front.values() if m.version(o)=='B')
+        if int(old['metadata']['labels'][m.I].rsplit('-',1)[1])<3:return None
+        for uid,o in mine.items():
+            if o['metadata']['labels'][m.R]=='backend' or int(o['metadata']['labels'][m.I].rsplit('-',1)[1])<partition:assert uid in baseline and m.version(o)=='A'
+        return old
+    probes=[m.read(f) for f in sorted(p.glob('history-probe-*.json'))];assert all('error' not in probe for probe in probes)
+    stable=[]
+    for probe in probes:
+        if excess(probe['pods']['items']):stable.append(probe)
+        else:stable=[]
+    assert len(stable)>300 and m.ts(stable[-1]['completed'])-m.ts(stable[0]['started'])>=390_000_000_000
+    old=excess(stable[-1]['pods']['items']);uid=old['metadata']['uid']
+    for probe in stable:
+        assert excess(probe['pods']['items'])['metadata']['uid']==uid
+        for pod in probe['pods']['items']:
+            if not m.owned(pod,owner):continue
+            cr=probe['histories']['model-'+pod['metadata']['labels'][REV]];assert m.owned(cr,owner) and not cr['metadata'].get('deletionTimestamp')
+    state=m.replay(rows,stable[0]['started']);assert excess(list(state['pods'].values()))['metadata']['uid']==uid
+    for row in rows:
+        if m.ts(row['received'])<=m.ts(stable[0]['started']):continue
+        o=row['object'];key=o['metadata']['uid']
+        if row['event']=='DELETED':state[row['kind']].pop(key,None)
+        else:state[row['kind']][key]=o
+        assert excess(list(state['pods'].values()))['metadata']['uid']==uid
+    final=m.yaml(p/'final-resources.yaml');assert excess(list(final['pods'].values()))['metadata']['uid']==uid
+    pinned=set(m.read(p/'step-01-terminating-trigger.json')['pinnedUIDs'].values());assert len(pinned)==1 and uid not in pinned
+    assert all(any(r['kind']=='pods' and r['event']=='DELETED' and r['object']['metadata']['uid']==pin and m.ts(r['received'])>m.ts(held['completed']) for r in rows) for pin in pinned)
+    before=m.yaml(p/'case-controller-before.yaml');after=m.yaml(p/'fault-controller-after.yaml');assert before['metadata']['uid']==after['metadata']['uid'] and after['status']['containerStatuses'][0]['restartCount']==0
+    assert not (p/'step-01-restart-controller-delete.json').exists()
+    return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'OLD_SURGE_RETAINED_AFTER_C','watchRows':len(rows),'oldSurge':old,'expectedFrontendCount':3,'actualReadyFrontendCount':4,'frontendVersions':dict(expected),'persistentSince':stable[0]['started'],'persistentUntil':stable[-1]['completed'],'persistentNanos':m.ts(stable[-1]['completed'])-m.ts(stable[0]['started']),'historyProbes':len(probes),'actualFailedCRCreates':len(hits),'faultExplicitlyCleared':cleared[0],'releasedPinnedUIDs':sorted(pinned),'limitation':'Failure is non-convergence caused by an extra live old B surge; referenced A/B/C history retention itself was observed and is required. The requested later controller restart and final C stable window were not exercised because C failed to converge. No Kthena code changes.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-02-request-time.json']}}
+
+
 def main():
     runid = sys.argv[1]; assert runid and '/' not in runid and '..' not in runid
     base = ROOT/'artifacts'/runid; control = ROOT/'artifacts/environment-022'/(runid+'-control')
@@ -171,7 +241,7 @@ def main():
         if m.ts(record['at']) >= start: trace.append(record)
     out = base/'independent-history-audit'; out.mkdir(); reports = []
     for result in results:
-        try: report = audit_case(base/result['id'],trace)
+        try: report = audit_case(base/result['id'],trace) if result['status']=='PASS' else audit_old_surge_failure(base/result['id'],trace)
         except (AssertionError,KeyError,StopIteration,FileNotFoundError) as err:
             import traceback
             report = {'id':result['id'],'classification':'PENDING_REVIEW','rawStatus':result['status'],'rawError':result.get('error'),'auditError':repr(err),'traceback':traceback.format_exc()}

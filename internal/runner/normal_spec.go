@@ -86,7 +86,8 @@ func (c Case) validateScenario() error {
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
 	historyCreate := n >= 463 && n <= 522 && (n-463)%10 < 5 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	historyGC := n == 535 && c.Format == "rollout-runner/v3"
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -113,6 +114,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "history-gc-list-error":
+			if !historyGC || !p.Expect.NoReplacement || !p.Expect.NoNewRevision || p.StableSeconds < 30 || p.Release != "none" || p.TimeoutSeconds < 600 {
+				return fmt.Errorf("history GC requires retained live references through the actual audit and retry window")
+			}
 		case "history-create-recovery":
 			if !historyCreate || p.Release != "one" || p.StableSeconds < 30 {
 				return fmt.Errorf("invalid history persistence recovery action")
@@ -273,6 +278,9 @@ func (c Case) validateScenario() error {
 	}
 	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), "O={0,1,2}")) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
+	}
+	if historyGC && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-gc-list-error" || intValue(s.InitialSpec, "revisionHistoryLimit", -1) != 0) {
+		return fmt.Errorf("history GC requires limit zero, actual frontend B/backend A, then an exact live-reference List fault")
 	}
 	if s.Steps[len(s.Steps)-1].Until != "settled" {
 		return fmt.Errorf("last step must verify a settled state")

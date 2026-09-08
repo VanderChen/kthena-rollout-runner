@@ -2,7 +2,7 @@
   "format": "rollout-runner/suite-v1",
   "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
   "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
-  "developmentScope": "RUN-455..462; fault after first B surge exists, before releasing B; Create faults the next owned Pod POST, Delete targets real DeleteCollection, Status binds B generation, List excludes named GET and Watch",
+  "developmentScope": "RUN-455..462; fault after first B surge exists, before releasing B; Create faults the next owned Pod POST, Delete targets the actual UID-preconditioned native Pod DELETE after audit-client expansion, Status binds B generation, List excludes named GET and Watch",
   "cases": [
     {
       "group": "2.2.3 Controller API读写失败",

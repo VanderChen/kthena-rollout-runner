@@ -18,7 +18,7 @@ import (
 	"kthena.local/rollout-runner/internal/faultproxy"
 )
 
-func apiRetryRule(id, namespace, owner string, generation int64, caseID string) (faultproxy.Rule, error) {
+func apiRetryRule(id, namespace, owner string, generation int64, caseID string, old *corev1.Pod) (faultproxy.Rule, error) {
 	n, err := strconv.Atoi(strings.TrimPrefix(caseID, "RUN-"))
 	if err != nil || n < 455 || n > 462 || generation < 2 {
 		return faultproxy.Rule{}, fmt.Errorf("invalid API retry identity or accepted B generation")
@@ -28,9 +28,12 @@ func apiRetryRule(id, namespace, owner string, generation int64, caseID string) 
 	case 0:
 		rule.Resource, rule.Methods, rule.OwnerUID = "pods", []string{"POST"}, owner
 	case 1:
-		// Production's normal Role/SG rollout calls DeleteCollection, not
-		// a named Pod Delete. Keep its real label selector in proxy evidence.
-		rule.Resource, rule.Methods, rule.CollectionOnly = "pods", []string{"DELETE"}, true
+		// The audit client expands rollout DeleteCollection into individual
+		// native Pod DELETE requests with exact UID preconditions.
+		if old == nil || old.UID == "" || old.Namespace != namespace || !owned(old, owner) || !podReady(old) || podVersion(old) != "A" {
+			return faultproxy.Rule{}, fmt.Errorf("delete API fault requires the captured healthy old Pod UID")
+		}
+		rule.Resource, rule.Methods, rule.Name, rule.UIDs = "pods", []string{"DELETE"}, old.Name, []string{string(old.UID)}
 	case 2:
 		rule.Resource, rule.Subresource, rule.Name = "modelservings", "status", "model"
 		rule.Methods, rule.OwnerUID, rule.Generation = []string{"PUT"}, owner, generation
@@ -90,7 +93,18 @@ func (e *normalExecution) retryAPIError(ctx context.Context, p ScenarioStep, pre
 		return err
 	}
 	id := fmt.Sprintf("%s-%s-%02d-api", e.r.opt.RunID, strings.ToLower(e.c.ID), e.phase)
-	rule, err := apiRetryRule(id, e.namespace, e.l.Owner, ms.GetGeneration(), e.c.ID)
+	var old *corev1.Pod
+	if e.c.ID == "RUN-456" || e.c.ID == "RUN-460" {
+		members, captureErr := deletionNotificationMembers(pods, e.l.Owner, e.l.Model.Mode)
+		if captureErr != nil {
+			return captureErr
+		}
+		old = members[0]
+		if err = saveYAML(filepath.Join(e.dir, prefix+"-api-delete-target.yaml"), old); err != nil {
+			return err
+		}
+	}
+	rule, err := apiRetryRule(id, e.namespace, e.l.Owner, ms.GetGeneration(), e.c.ID, old)
 	if err != nil {
 		return err
 	}

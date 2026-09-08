@@ -20,7 +20,11 @@ func TestAPIFaultMapsActualCollectionAndStatusGeneration(t *testing.T) {
 		if c.ID != fmt.Sprintf("RUN-%03d", 455+i) {
 			t.Fatal("API coverage gap")
 		}
-		rule, err := apiRetryRule("fault", "test", "owner", 2, c.ID)
+		var old corev1.Pod
+		if err := convertPod(makePod("SG", "frontend", 2, "A", true, "true"), &old); err != nil {
+			t.Fatal(err)
+		}
+		rule, err := apiRetryRule("fault", "test", "owner", 2, c.ID, &old)
 		if err != nil || rule.Count != 1 || rule.StatusCode != 503 || rule.DurationSeconds > 900 {
 			t.Fatal("unbounded API failure", rule, err)
 		}
@@ -30,8 +34,11 @@ func TestAPIFaultMapsActualCollectionAndStatusGeneration(t *testing.T) {
 				t.Fatal("unowned create")
 			}
 		case 1:
-			if !rule.CollectionOnly || rule.Methods[0] != "DELETE" || rule.Name != "" || rule.OwnerUID != "" {
-				t.Fatal("named Delete is not rollout DeleteCollection")
+			if rule.CollectionOnly || rule.Methods[0] != "DELETE" || rule.Name != old.Name || rule.OwnerUID != "" || len(rule.UIDs) != 1 || rule.UIDs[0] != string(old.UID) {
+				t.Fatal("actual native DELETE must bind the captured UID")
+			}
+			if _, err := apiRetryRule("fault", "test", "owner", 2, c.ID, nil); err == nil {
+				t.Fatal("unguarded deletion fault accepted")
 			}
 		case 2:
 			if rule.Resource != "modelservings" || rule.Subresource != "status" || rule.Generation != 2 || rule.OwnerUID != "owner" {

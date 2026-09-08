@@ -39,7 +39,7 @@ def main():
         (out/(row['id']+'.yaml')).write_text(normal.yaml(case)+'\n')
     manifest = {'format': 'rollout-runner/suite-v1', 'controllerCommit': normal.COMMIT,
                 'sourceSHA256': recovery.SOURCE_SHA,
-                'developmentScope': 'RUN-455..462; fault after first B surge exists, before releasing B; Create faults the next owned Pod POST, Delete targets real DeleteCollection, Status binds B generation, List excludes named GET and Watch',
+                'developmentScope': 'RUN-455..462; fault after first B surge exists, before releasing B; Create faults the next owned Pod POST, Delete targets the actual UID-preconditioned native Pod DELETE after audit-client expansion, Status binds B generation, List excludes named GET and Watch',
                 'cases': rows, 'inputs': {row['id']: hashlib.sha256((out/(row['id']+'.yaml')).read_bytes()).hexdigest() for row in rows}}
     (out/'suite.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n')
     print('Generated eight finite actual API retry scenarios.')

@@ -325,6 +325,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "drop-old-deletions":
+		return e.dropOldDeletions(ctx, p, prefix)
 	case "retry-api-error":
 		return e.retryAPIError(ctx, p, prefix)
 	case "resume-after-grace":

@@ -2,10 +2,10 @@
 
 内部开发/CI工具：Go + client-go，一个Kubernetes Job，逐用例串行执行。
 
-第一大类执行集已扩展为 **RUN-001～RUN-303**，配置位于 `cases/normal/`。
-新增243项覆盖默认值、协调、插件、历史布局、扩缩容及滚动中再次变更。
-当前正在做Kind开发验证，配置数量不代表实际通过数量。
-参见[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。
+执行集已扩展为 **708 个唯一用例**：正常流程 RUN-001～303、故障恢复 RUN-304～539、边界 RUN-540～611 和拒绝 DENY-001～097。
+第一类 Kind 独立复核 266 PASS/37 产品 FAIL；第二类 128 PASS/108 产品 FAIL。第三类 169 项已实现，通过本地门禁，Kind 验证正在进行。配置数量不代表通过数量。
+当前验证统一使用 Kthena production `538b2825c06bc1e8c5392d18f18f84faee9fca95`，未修改 Kthena 源码。
+参见[完整用例集及证据复核](docs/EXPANDED_SUITE.md)和[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。
 
 原 `cases/core/` 的60份输入及历史验收结果保留不变。以下核心过程和旧Kind结果描述
 对应原60项；新集群验证必须显式传入当前production镜像及 `--controller-commit`。
@@ -151,8 +151,8 @@ PASS须过程和终态都通过，ERROR/INCONCLUSIVE/NOT_RUN都不折算成功�
 原始journal可能含测试PodSpec及插件配置，不收集Secret对象或kubeconfig。
 
 `cases/core` 保留60个固定规模核心组合；`cases/normal` 扩展第一类303项。
-第一类之外的故障恢复、拒绝及人工操作等目录条目仍未在本次范围内。Watch也不证明没有API副作用的controller内部选择；
-那类检查仍需要专用trace/手工证据。
+故障恢复、边界及拒绝场景另有专用执行契约和审计。不同目录可能含同一 ID 的准备方式修正，不能直接把目录行数相加作为有效覆盖。
+Watch 不证明没有 API 副作用的控制器内部选择；故障场景还需按原生请求/响应、实际命中、源状态和解除后的恢复证据复核。
 
 历史core Kind验收：RUN-001～RUN-060全部通过，Job Complete、退出码0。
 详见[60行实测结果](docs/KIND_RESULTS.md)与[完整验收证据](VERIFICATION.md)。

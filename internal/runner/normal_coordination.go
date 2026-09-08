@@ -147,6 +147,17 @@ func (l *NormalLedger) coordinationBefore(kind, event string, o *unstructured.Un
 		l.fail("INVALID_COORDINATION: maxSkew")
 		return
 	}
+	// Skew compares concurrent Role rollouts. With only one unfinished Role,
+	// its own readiness lag is governed by U/S, not a self-imposed skew gate.
+	progressing := 0
+	for _, s := range states {
+		if s.Changed && s.Total > 0 && s.Ready < s.Total {
+			progressing++
+		}
+	}
+	if progressing <= 1 {
+		return
+	}
 	allowance := state.Total
 	for _, s := range states {
 		if !s.Changed || s.Total == 0 || s.Ready >= s.Total {

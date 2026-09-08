@@ -236,6 +236,41 @@ def audit_old_surge_failure(p, trace):
     return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'OLD_SURGE_RETAINED_AFTER_C','watchRows':len(rows),'oldSurge':old,'expectedFrontendCount':3,'actualReadyFrontendCount':4,'frontendVersions':dict(expected),'persistentSince':stable[0]['started'],'persistentUntil':stable[-1]['completed'],'persistentNanos':m.ts(stable[-1]['completed'])-m.ts(stable[0]['started']),'historyProbes':len(probes),'actualFailedCRCreates':len(hits),'faultExplicitlyCleared':cleared[0],'releasedPinnedUIDs':sorted(pinned),'limitation':'Failure is non-convergence caused by an extra live old B surge; referenced A/B/C history retention itself was observed and is required. The requested later controller restart and final C stable window were not exercised because C failed to converge. No Kthena code changes.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-02-request-time.json']}}
 
 
+def audit_single_role_oracle(p,trace):
+    case=m.yaml(p/'case.yaml');result=m.read(p/'result.json');source=case['scenario']['source'];config=source['config']
+    assert case['id']==result['id']==source['id']=='RUN-514' and result['status']=='FAIL'
+    assert config['roles']['f']=={'p':1,'r':3,'s':1,'u':1,'w':0} and config['coordination']['dependencies']=={'f':['b']}
+    want='B-allowed-target-after-history-recovery: SKEW_VIOLATION: group=0 role=frontend starts=2 allowance=1'
+    assert result['violations']==[want] and not (p/'step-02-request-time.json').exists()
+    raw=(ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json').read_bytes()
+    assert hashlib.sha256(raw).hexdigest()=='757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5' and source==next(r for r in json.loads(raw)['cases'] if r['id']=='RUN-514')
+    initial=m.yaml(p/'before-server.yaml');owner=initial['metadata']['uid'];b=m.yaml(p/'step-01-server.yaml')
+    aroles={r['name']:r for r in initial['spec']['template']['roles']};broles={r['name']:r for r in b['spec']['template']['roles']}
+    assert b['metadata']['uid']==owner and b['metadata']['generation']==2 and aroles['backend']==broles['backend']
+    assert m.version(aroles['frontend']['entryTemplate'])=='A' and m.version(broles['frontend']['entryTemplate'])=='B'
+    baseline=m.yaml(p/'baseline-resources.yaml');base=m.mine(baseline,'pods',owner);assert len(base)==6 and all(m.ready(o) and m.version(o)=='A' for o in base.values())
+    rows=[json.loads(s) for s in open(p/'observations.jsonl')];assert [r['sequence'] for r in rows]==list(range(1,len(rows)+1)) and not any(r['event']=='GAP' for r in rows)
+    state=collections.defaultdict(dict);deletions=[];data={}
+    for row in rows:
+        o=row['object'];uid=o['metadata']['uid'];kind=row['kind'];prev=state[kind].get(uid)
+        if kind=='controllerrevisions' and m.owned(o,owner):assert uid not in data or data[uid]==o['data'];data[uid]=o['data']
+        if kind=='pods' and m.owned(o,owner):
+            lab=o['metadata']['labels'];ordinal=int(lab[m.I].rsplit('-',1)[1])
+            if lab[m.R]=='backend' or ordinal==0:
+                assert uid in base and m.version(o)=='A' and not o['metadata'].get('deletionTimestamp') and row['event']!='DELETED'
+            if prev and m.ready(prev) and (row['event']=='DELETED' or o['metadata'].get('deletionTimestamp')):
+                available=[pod for pod in frontend(state,owner).values() if m.ready(pod)]
+                assert lab[m.R]=='frontend' and m.version(o)=='A' and ordinal in (1,2) and len(available)-1>=2
+                deletions.append({'uid':uid,'ordinal':ordinal,'sequence':row['sequence'],'readyBefore':len(available),'readyUIDsBefore':[p['metadata']['uid'] for p in available],'minimum':2})
+        if row['event']=='DELETED':state[kind].pop(uid,None)
+        else:state[kind][uid]=o
+    assert [d['ordinal'] for d in deletions]==[2,1] and all(d['readyBefore']==3 for d in deletions)
+    rule=m.read(p/'step-01-create-installed.json');errors=[t for t in trace if t.get('ruleID')==rule['id'] and t['action']=='error-request'];cleared=[t for t in trace if t.get('ruleID')==rule['id'] and t['action']=='rule-cleared']
+    assert errors and all(t['status']==503 for t in errors) and len(cleared)==1
+    proxy=m.read(p/'fault-proxy-final.json');assert not proxy['errors'] and not any(r['active'] for r in proxy['rules'])
+    return {'id':'RUN-514','classification':'RUNNER_ORACLE','failure':'SINGLE_CHANGED_ROLE_SELF_SKEW','watchRows':len(rows),'healthyDeletionChecks':deletions,'unchangedRole':'backend','changedRoles':['frontend'],'actualFailedCRCreates':len(errors),'limitation':'Only frontend is changing; inter-Role skew must not impose a self gate after every other Role is unchanged or complete. Both observed deletions obey descending order, P1 and Ready>=2. Raw run aborted before B convergence and C; requires rerun with corrected runner, no catalogue PASS or product failure credit.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml']}}
+
+
 def main():
     runid = sys.argv[1]; assert runid and '/' not in runid and '..' not in runid
     base = ROOT/'artifacts'/runid; control = ROOT/'artifacts/environment-022'/(runid+'-control')
@@ -250,7 +285,10 @@ def main():
         if m.ts(record['at']) >= start: trace.append(record)
     out = base/'independent-history-audit'; out.mkdir(); reports = []
     for result in results:
-        try: report = audit_case(base/result['id'],trace) if result['status']=='PASS' else audit_old_surge_failure(base/result['id'],trace)
+        try:
+            if result['status']=='PASS':report=audit_case(base/result['id'],trace)
+            elif result['id']=='RUN-514' and 'SKEW_VIOLATION' in result.get('error',''):report=audit_single_role_oracle(base/result['id'],trace)
+            else:report=audit_old_surge_failure(base/result['id'],trace)
         except (AssertionError,KeyError,StopIteration,FileNotFoundError) as err:
             import traceback
             report = {'id':result['id'],'classification':'PENDING_REVIEW','rawStatus':result['status'],'rawError':result.get('error'),'auditError':repr(err),'traceback':traceback.format_exc()}

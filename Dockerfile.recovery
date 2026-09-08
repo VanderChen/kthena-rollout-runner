@@ -1,0 +1,4 @@
+FROM busybox:1.36
+COPY bin/rollout-runner-recovery /usr/local/bin/rollout-runner
+COPY cases/recovery /cases/recovery
+ENTRYPOINT ["/usr/local/bin/rollout-runner"]

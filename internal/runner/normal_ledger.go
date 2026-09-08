@@ -53,6 +53,7 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	Recoveries           []*RecoveryRecord      `json:"recoveries,omitempty"`
 	PGScale              map[string]bool        `json:"podGroupScaleIntentUIDs"`
 	PGPhase              map[string]string      `json:"podGroupIntentPhase"`
 	BornRanktable        map[string]bool        `json:"ranktableAtPodCreation"`
@@ -422,6 +423,9 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !l.Armed {
 		return
 	}
+	if l.recoveryBefore(kind, event, o, objects) {
+		return
+	}
 	l.dynamicScaleBefore(kind, event, o, objects)
 	l.roleScaleBefore(kind, event, o, objects)
 	l.coordinationBefore(kind, event, o, objects)
@@ -658,6 +662,7 @@ func (l *NormalLedger) unitTarget(u NormalUnit) bool {
 	return true
 }
 func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	l.recoveryAfter(kind, event, o)
 	if kind == "controllerrevisions" && event != "DELETED" && objectOwned(o, l.Owner) {
 		data, _ := json.Marshal(o.Object["data"])
 		uid := string(o.GetUID())

@@ -17,6 +17,9 @@ import (
 
 func main() {
 	var o runner.Options
+	flag.StringVar(&o.FaultProxyAPI, "fault-proxy-api", "", "exact TLS API proxy URL configured in the tested controller")
+	flag.StringVar(&o.FaultProxyControl, "fault-proxy-control", "", "authenticated external fault control URL")
+	flag.StringVar(&o.FaultProxyTokenFile, "fault-proxy-token-file", "", "private control token file; never recorded in artifacts")
 	flag.StringVar(&o.CaseDir, "cases", "cases/core", "directory of independent YAML cases")
 	flag.StringVar(&o.OutDir, "artifacts", "artifacts", "persistent output directory")
 	flag.StringVar(&o.Kubeconfig, "kubeconfig", "", "empty uses in-cluster service account")

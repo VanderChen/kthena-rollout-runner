@@ -21,6 +21,7 @@ type Scenario struct {
 	Steps       []ScenarioStep         `json:"steps"`
 }
 type ScenarioStep struct {
+	PodFault               *PodFaultAction        `json:"podFault,omitempty"`
 	RequireLiveTerminating bool                   `json:"requireLiveTerminating,omitempty"`
 	Name                   string                 `json:"name"`
 	Action                 string                 `json:"action"`
@@ -70,7 +71,9 @@ func (r *Runner) testedCommit() string {
 }
 func (c Case) validateScenario() error {
 	n, err := strconv.Atoi(strings.TrimPrefix(c.ID, "RUN-"))
-	if err != nil || n < 61 || n > 303 || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Format != "rollout-runner/v2" || c.Baseline != ProductionCommit {
+	normal := n >= 61 && n <= 303 && c.Format == "rollout-runner/v2"
+	recovery := n >= 305 && n <= 388 && c.Format == "rollout-runner/v3"
+	if err != nil || (!normal && !recovery) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -87,10 +90,20 @@ func (c Case) validateScenario() error {
 		return fmt.Errorf("missing executable steps")
 	}
 	for _, p := range s.Steps {
+		if p.PodFault != nil && p.Action != "recover-pod" {
+			return fmt.Errorf("Pod fault attached to unrelated action")
+		}
 		if p.Name == "" || p.HoldSeconds < 0 || p.StableSeconds < 0 || p.TimeoutSeconds < 0 {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "recover-pod":
+			if !recovery || p.PodFault == nil || p.PodFault.Group != 0 || p.PodFault.Role != "frontend" || p.PodFault.Ordinal != 0 || (p.PodFault.Member != "entry" && p.PodFault.Member != "worker") {
+				return fmt.Errorf("invalid typed recovery action")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return fmt.Errorf("recovery target: %w", err)
+			}
 		case "update":
 			if _, err := readModel(p.Spec); err != nil {
 				return fmt.Errorf("%s: %w", p.Name, err)
@@ -130,6 +143,9 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("condition requires positive count")
 			}
 		}
+	}
+	if recovery && (len(s.Steps) != 1 || s.Steps[0].Action != "recover-pod") {
+		return fmt.Errorf("Pod recovery cases require their complete compound action")
 	}
 	if s.Steps[len(s.Steps)-1].Until != "settled" {
 		return fmt.Errorf("last step must verify a settled state")

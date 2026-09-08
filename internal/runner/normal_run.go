@@ -20,20 +20,21 @@ import (
 )
 
 type normalExecution struct {
-	capacityPod    *corev1.Pod
-	templateCM     *corev1.ConfigMap
-	tableVersion   string
-	baselineStatus map[string]interface{}
-	pinned         map[string]types.UID
-	r              *Runner
-	c              Case
-	o              *Observer
-	l              *NormalLedger
-	namespace, dir string
-	current        *unstructured.Unstructured
-	res            *Result
-	phase          int
-	waitDeadline   time.Time
+	faultController *corev1.Pod
+	capacityPod     *corev1.Pod
+	templateCM      *corev1.ConfigMap
+	tableVersion    string
+	baselineStatus  map[string]interface{}
+	pinned          map[string]types.UID
+	r               *Runner
+	c               Case
+	o               *Observer
+	l               *NormalLedger
+	namespace, dir  string
+	current         *unstructured.Unstructured
+	res             *Result
+	phase           int
+	waitDeadline    time.Time
 }
 
 func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
@@ -113,6 +114,7 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 		return
 	}
 	e := &normalExecution{pinned: map[string]types.UID{}, tableVersion: "1.0", r: r, c: c, o: o, namespace: res.Namespace, dir: dir, res: &res}
+	defer e.finalizeRecoveryEvidence()
 	defer func() {
 		// Cancel and drain all already-delivered events before freezing the verdict.
 		o.cancel()
@@ -312,6 +314,10 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "recover-pod":
+		if err := e.recoverPod(ctx, p, prefix); err != nil {
+			return err
+		}
 	case "update", "merge-patch":
 		current, err := api.Get(ctx, "model", metav1.GetOptions{})
 		if err != nil {

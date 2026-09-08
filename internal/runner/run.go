@@ -32,6 +32,7 @@ import (
 )
 
 type Options struct {
+	FaultProxyControl, FaultProxyAPI, FaultProxyTokenFile       string
 	CaseDir, OutDir, Kubeconfig, RunID, Select, ControllerImage string
 	ControllerCommit                                            string
 	Hold                                                        time.Duration
@@ -114,6 +115,14 @@ func Run(ctx context.Context, opt Options) error {
 	r := &Runner{opt: opt, rest: cfg, kube: kube, dynamic: dyn, root: root}
 	if err = r.preflight(ctx); err != nil {
 		return err
+	}
+	for _, c := range cases {
+		if c.Format == "rollout-runner/v3" {
+			if err = r.preflightRecovery(ctx); err != nil {
+				return err
+			}
+			break
+		}
 	}
 	selected := map[string]bool{}
 	if opt.Select != "" {

@@ -15,6 +15,9 @@ import (
 func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 	l := e.l
 	obj := e.o.objects
+	if ok, reason := l.recoverySettled(obj); !ok {
+		return false, reason
+	}
 	roles := l.roleUnits(obj["pods"])
 	groups := map[int]map[string][]NormalUnit{}
 	for _, u := range roles {

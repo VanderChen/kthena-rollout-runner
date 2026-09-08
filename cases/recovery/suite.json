@@ -1,0 +1,3802 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "developmentScope": "RUN-305..388 only; category2 total236 remains incomplete",
+  "cases": [
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-305",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-306",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-307",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-308",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-309",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-310",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-311",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-312",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-313",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-314",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-315",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-316",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-317",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-318",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-319",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-320",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-321",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-322",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-323",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-324",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-325",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-326",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-327",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-328",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-329",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-330",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-331",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-332",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-333",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-334",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-335",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-336",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-337",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-338",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-339",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属完整SG；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-340",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-341",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-342",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-343",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-344",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-345",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-346",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-347",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-348",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-349",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-350",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-351",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-352",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-353",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-354",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-355",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-356",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-357",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-358",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-359",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-360",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-361",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-362",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-363",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-364",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-365",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-366",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-367",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-368",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-369",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-370",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-371",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-372",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-373",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-374",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-375",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "RoleRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "故障恢复范围为所属f实例的entry和worker；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-376",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-377",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-378",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-379",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-380",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-381",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-382",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-383",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-384",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-385",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除未保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；故障恢复与模板更新去重，按当前允许目标恢复；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=0目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-386",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f entry Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-387",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    },
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "None",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "连续ordinal；A全Ready；f每实例有entry+1 worker",
+      "action": "暂停controller；提交f模板B；删除受保护ordinal0的f worker Pod；恢复controller并允许新Pod Ready",
+      "expect": "补齐真正缺失的Pod；不能把None解释为永不补建；受保护实例必须按历史A/W=1恢复，eligible部分升级B；区分外部删除与主动滚动损失，不再无预算删除额外健康实例；最终达到P=1目标、无缺失/重复实例",
+      "refs": [
+        "L04",
+        "L05",
+        "L06",
+        "H11",
+        "H16"
+      ],
+      "note": "Pod删除故障；不是容器原地重启",
+      "id": "RUN-388",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "恢复策略全交叉",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    }
+  ],
+  "inputs": {
+    "RUN-305": "34ad6648babd08882e733e6f868bcaed17149220ae794be0e1af5aec24d471b7",
+    "RUN-306": "79c4d7e2e34b5ee7facee2737af54a46f7008d64a3277cab909df350efc2dfb1",
+    "RUN-307": "e54f322ce03688f14e32d748bf12a9836cbc638f697314f289c862989527089b",
+    "RUN-308": "2d7c9468d347019f5b7e79c9321f3c9ce22e3cfc963728af7fb59a170ed7360a",
+    "RUN-309": "a13038be3bc898beee5c6792ba5061e159121026d23228a6f6b6a611ca015d82",
+    "RUN-310": "beeb77e1d993aee1b670a198314c163ac0eaa3f953aa0ea339aafeb857491225",
+    "RUN-311": "3b8f4ee353cfe4ecbab726f39ad17421228df6f2205715a573c268ef4db0a032",
+    "RUN-312": "b93711b9c5aa3da2c9397d397d169f4f9025e3eb393ed352d6e447c179c80cdc",
+    "RUN-313": "b134f40915f198bfac32f16fa2e6ae67d3394c4be3131f995f5aa0bf3b7b301b",
+    "RUN-314": "ea69217eba81b59b3acf164983f7c516a00979ce2fdc9c3369d6dae69ab943d0",
+    "RUN-315": "e67998e1d69530fa87347f30667aa987dee97af5db5fcd38d86fd1c7554f9f5a",
+    "RUN-316": "40830e91064f24da9e54f83b91a4b02bb2539716dc088a0764bfa05430dcfed0",
+    "RUN-317": "c89a3df7e3d3240d9aa0e6547f02aae0225846569b3d0a226b87757641b74218",
+    "RUN-318": "2066e6c494c68f6fb469086c9e7e9baaa83f36c5ee9c2896babc85b92921bd03",
+    "RUN-319": "5b61b24963568e825fb129339cef85eaf45fa821e5333b97b7d7de0a0ccd3e12",
+    "RUN-320": "c22816839cd8e4f1baeabd84e4595ac33a70182f0e6c4438c61c86f0ba55eb34",
+    "RUN-321": "e12a5ebf29424527c596b502005fbd6d96a969490f401c6ac89cb65979531d2b",
+    "RUN-322": "8b46124565449efeeec7ca4d75adc5c4e1f35485ac611b7064a641fbcff971b6",
+    "RUN-323": "dca09bb0239cc521a3f35998563e535cf26cf952512661606bafaee494f83c3e",
+    "RUN-324": "c9521171c0df47f36df156e5a7a9b5e4c80c502c363ddee0a0f9d97469a3bd3e",
+    "RUN-325": "9e75a4b7efb0ae6d6e82ecffd238839778a5ee3c7a0a3f3527a23bfc84ae0765",
+    "RUN-326": "10050fa9fabc37c4e91ead52acc1d9d0b874a2e5d0c6ee42dcdd6a1bca5bf140",
+    "RUN-327": "f84e7ac8c487f4f6b1c9c1a78d58c2a17035bc12b286ad305ff277b2bf1b30ea",
+    "RUN-328": "7c0b9d52a4156f4ebcbbaee118b6b5780f9322c120b8b5b63aebe7d9c2af52c0",
+    "RUN-329": "83ce21fe1f15a822ad34a7548ba03effbad109e4140167171733c36721d910d2",
+    "RUN-330": "c5343f7b298ed5ee4b5a1cf03f24d2696c4f474a146e77772a7c50dc4b956ed8",
+    "RUN-331": "5f00a440128729d776e24e6c32af97eecb5d062a9711b5335504b2f39d31a170",
+    "RUN-332": "cacce35fd89c9e6134b36cfbe4506ba5da24b2a31dbe248a7e705d0475375d4c",
+    "RUN-333": "d2302aa167fa227eefadd65644ae69cba943bcdbb73a78233a8b527d99f2d4b4",
+    "RUN-334": "24ba3672e619dc7093eed73006188dd4d26aa4bbf42f401c831621e6efdfd0c0",
+    "RUN-335": "264ca9e64cb8c3585a96f92a9af43f4c2fe3ee96222f58ae9d1908e2c4b2fe63",
+    "RUN-336": "4c61e22d131234e3d3553dfb76adfb745331d7a0d6e45642d1c6300e6c7314a3",
+    "RUN-337": "a6b05b6ab19a212cc462c8f5598dc8fd8ba1737166b2f9a77d6ff80f7bee017c",
+    "RUN-338": "88e255c8d7228ba5b7b5a2a575c595bda79e3493839fe8ad7664cd22ec0f57ff",
+    "RUN-339": "97cdf9e1351bf9a4186a344217a6517ba887dc4a5fac0c85f4ee6c093a400833",
+    "RUN-340": "ba90fef58ca6df48d11a4b0769090cc3ccf6a6a198c4109c77348f6f66c7fe46",
+    "RUN-341": "c372e368498f7c6b464717c78510873f478078ee6b3a48757a1b252dd116b690",
+    "RUN-342": "6cc8b45ffef4ef59fa5757d073532fa105f44037fa1279c36a2cd1b0dcaf1475",
+    "RUN-343": "d4fd9c935ca4cd77ebe5c096f23deaa21310d9efa85546290ac0429e2e9487f2",
+    "RUN-344": "9458d4b48c542d32f0af6b1251283c009317fbf2c3a0273cc35f0355474d7150",
+    "RUN-345": "b4eb1715832723201654fb22292648229cb52d88482cffba37d93a543992df6d",
+    "RUN-346": "7ae0275ed33fcbfffc5fc79527b378ab2f9617bf3a2ec4ca504431b5463d2791",
+    "RUN-347": "edad908459760119a843b3c27e89bc04fb6a20283fda6f07b857c0c5ab57f7d4",
+    "RUN-348": "4312399e4da7a65f8ccf979cb8536c05a332881dd2c12a975d54a98a856cf917",
+    "RUN-349": "357bdb283ad58915f80f4f628cd3acea289a1477df0e597e4b8480c27960bfba",
+    "RUN-350": "ab273a52f2e7c01091b5c0e3e36516ed4f9d967b12e0e24d20fbf97876f37560",
+    "RUN-351": "38b0885d5eae999245a941aef4fc6e7daf5d7e842600cd0207ca9545d20c015d",
+    "RUN-352": "9da3d249d8ff594240a67e476c0300c254b0877b5a44da23985ff0bdab084c87",
+    "RUN-353": "9ea43c097fb9fdc1b1eefb345a0e5dbf24a523ee6c3538043d6035bc8e9d67fb",
+    "RUN-354": "5d1e72b0f19e16fcab71cf1b688a9b534ed030c58e0bafaa8b74241b3ca8637f",
+    "RUN-355": "6fbc15bdaa179b414dcd3bd01fc9323c680927faa2b0f3a063a3649eec204655",
+    "RUN-356": "4a56e9ff31b80a2cc05ab4a943cf0daedb1bba9d772ee0e9ed754ad770e67466",
+    "RUN-357": "d4399017d367d5c23214f306eca4b13109b7c61aaecbbe94aac5860cd81c3187",
+    "RUN-358": "590dbfcaf04962facc90fb8ffef18a74e5e470efe8a486d32b4f5322ac9682b6",
+    "RUN-359": "f4674a31b05a866d50b80686bfc4b8241e5467b8ed9b18b2cbbee0459bfd34c1",
+    "RUN-360": "1b324650ad11767c78ada3079bed1911ab7d78f97e47ac6296bed40c311a4930",
+    "RUN-361": "2eff5a120033a215cd500bc33cb158b536c4f442863ae48b95b03f9b06a256ae",
+    "RUN-362": "5b59de0359a1d07795d52b91149ddda0ee31eb82378a48b21a066550d7087314",
+    "RUN-363": "c26c168335f6fec3963c1b2c497a2e1153d115854ed322d621d8292ad069fd0e",
+    "RUN-364": "0aaa0f25342e66ad4b58e17fb5c0ba16df5d0108c4f72608f4071bbc2f45f4d5",
+    "RUN-365": "3cb4afa653a6522438506f1cb2eafb1883c88ccaf6aca202e311612455365602",
+    "RUN-366": "fe08b8c04f1e3ae4491fd8489fd4460ed7cbc6bb9df4da05a3be55582546e1cf",
+    "RUN-367": "ff5943a9ecce786426281417f1f23ea8c2ecf124d2a0e9f2b7aa5135890b18fc",
+    "RUN-368": "469602e54723b975758b354c75eee9340eb2b990c023286fcc5e40e03f6c77a8",
+    "RUN-369": "59866b70ba3d63d6ad23599a3bad4322bf0a6c021b956f8d46943904adbd03eb",
+    "RUN-370": "66d990fd3ff5fbfe75b480c4198ede98be856b5745e413277e19bc1501440b87",
+    "RUN-371": "3a7a24bc15da037098b37cd12f829c3929f09edfdefe10d3d40e47610f94e5ff",
+    "RUN-372": "9812f3f5ad352836301dfb31a018afba1c6c92324f4c98f53183d278430b9d5d",
+    "RUN-373": "d6b2a1eceaf5edfb05802dc1091a93088ee87a817ebc0509c860ec7b96f16e5b",
+    "RUN-374": "a80fabfed20ac52dd8c9dbea882cc0b0d7bba8b1f3af09a79745765f7995268d",
+    "RUN-375": "d2ab921862a43ba08d800786c93a13464776a945514bdbb1acd4ac5d3de57cd6",
+    "RUN-376": "7587fa16aad6dbc01edb49c5bd711339859f08fe35d7cb8cd5d0753f3479608f",
+    "RUN-377": "06974f0a7d7ae3b57b6ad83fb12f792f51a444e292abf710bea68bf809bfc02b",
+    "RUN-378": "7c56683bacac9b4e04e8ae9901bd2a5472ae477e5218e3e8b3fe79ecb1a6250f",
+    "RUN-379": "038a35b83c36a53b768b025427e8ad6f446c3e64fd80f2ad70b0db356a14b386",
+    "RUN-380": "cb2f8cc63079d540d64dd628677bd678a0f7e93c7ff0f4409f23714cb8871c46",
+    "RUN-381": "2b63dadc9f1a548e6a92d46943ad8a17d1f12b09f5e99078fa262a1e940031bc",
+    "RUN-382": "d9c61dbabb180359aee7fef43b71cdf0928ca0d56c283c7039a2b91ad2adb7bf",
+    "RUN-383": "6f596d8f95ba85fda615a6fae4f54a4e158b45639d2f7ab711a509739d1383ea",
+    "RUN-384": "107f14e661fe3f688af9f5c050312813404dd844386066afdaafa441b2181a8a",
+    "RUN-385": "71687ddfa7a0f9185f429f6da7891dc059b22171507db7842ecd5248ce5a3dc5",
+    "RUN-386": "ef3c675a3c49b8edce578c1dc7e5f0889a3314f0b6763d65108549909a79d6b4",
+    "RUN-387": "d5c00aded0142e84c85374ab946ef1a9eafd797ac55f5541361057fa517fc8b2",
+    "RUN-388": "f37a6d10589f2af449c503db3f54acac06f8bae3caf210b3a7150909628f8240"
+  }
+}

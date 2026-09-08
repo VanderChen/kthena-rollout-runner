@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+# Copyright 2026 The Kthena Rollout Runner Authors.
+# SPDX-License-Identifier: Apache-2.0
+"""Independently check actual failed history writes, live references and B/C recovery."""
+import collections
+import hashlib
+import importlib.util
+import json
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+loader = importlib.util.spec_from_file_location('mid_audit', ROOT/'scripts/audit-midrollout.py')
+m = importlib.util.module_from_spec(loader); loader.loader.exec_module(m)
+REV = 'modelserving.volcano.sh/revision'
+
+
+def frontend(state, owner):
+    return {uid: o for uid, o in m.mine(state, 'pods', owner).items() if o['metadata']['labels'][m.R] == 'frontend'}
+
+
+def final_pods(state, owner, baseline, partition, version):
+    pods = m.mine(state, 'pods', owner)
+    assert len(pods) == 6 and all(m.ready(o) for o in pods.values())
+    front = frontend(state, owner); assert len(front) == 3
+    expected = collections.Counter(['A']*partition + [version]*(3-partition))
+    assert collections.Counter(m.version(o) for o in front.values()) == expected
+    for uid, o in pods.items():
+        lab = o['metadata']['labels']; assert lab.get(m.E) == 'true'
+        if lab[m.R] == 'backend' or int(lab[m.I].rsplit('-', 1)[1]) < partition:
+            assert uid in baseline and m.version(o) == 'A'
+    return pods
+
+
+def audit_case(p, trace):
+    case = m.yaml(p/'case.yaml'); result = m.read(p/'result.json'); original = m.yaml(p/'before-server.yaml'); owner = original['metadata']['uid']
+    n = int(case['id'][4:]); assert 463 <= n <= 522 and (n-463)%10 < 5 and result['status'] == 'PASS'
+    sourcepath = ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json'
+    raw = sourcepath.read_bytes(); assert hashlib.sha256(raw).hexdigest() == '757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5'
+    assert case['scenario']['source'] == next(r for r in json.loads(raw)['cases'] if r['id'] == case['id'])
+    source = case['scenario']['source']; config = source['config']; partition = config['roles']['f']['p']; minimum = 3-config['roles']['f']['u']
+    assert 'O={0,1,2}' in source['initial']
+    initial = m.yaml(p/'before.yaml')['spec']; requested = m.yaml(p/'step-01-request.yaml')['spec']; bserver = m.yaml(p/'step-01-server.yaml'); cserver = m.yaml(p/'step-02-server.yaml')
+    limit = config.get('revisionHistoryLimit', 'omitted')
+    for request in (initial, requested, m.yaml(p/'step-02-request.yaml')['spec']):
+        assert request.get('revisionHistoryLimit', 'omitted') == limit
+    for server in (original, bserver, cserver):
+        assert server['spec']['revisionHistoryLimit'] == (10 if limit == 'omitted' else limit)
+    assert bserver['metadata']['generation'] == 2 and cserver['metadata']['generation'] == 3
+    b = {r['name']:r for r in bserver['spec']['template']['roles']}; c = {r['name']:r for r in cserver['spec']['template']['roles']}
+    assert b['backend'] == c['backend']
+    assert m.version(b['frontend']['entryTemplate']) == 'B' and m.version(c['frontend']['entryTemplate']) == 'C'
+    rows = [json.loads(line) for line in (p/'observations.jsonl').read_text().splitlines()]
+    assert [r['sequence'] for r in rows] == list(range(1,len(rows)+1)) and not any(r['event'] == 'GAP' for r in rows)
+    baseline = m.yaml(p/'baseline-resources.yaml'); basepods = m.mine(baseline,'pods',owner); basecr = m.mine(baseline,'controllerrevisions',owner)
+    assert len(basepods) == 6 and len(basecr) == 1 and all(m.ready(o) and m.version(o) == 'A' for o in basepods.values())
+    assert {int(o['metadata']['labels'][m.I].rsplit('-',1)[1]) for o in frontend(baseline,owner).values()} == {0,1,2}
+    installed = m.read(p/'step-01-create-installed.json'); rid = installed['id']
+    assert installed['resource'] == 'controllerrevisions' and installed['namespace'] == result['namespace'] and installed['ownerUID'] == owner and installed['methods'] == ['POST']
+    assert installed['mode'] == 'error' and installed['statusCode'] == 503 and installed['count'] == -1
+    saved = m.read(p/'step-01-before-create-clear.json'); rule = next(r for r in saved['rules'] if r['id'] == rid)
+    assert rule['active'] and rule['hits'] > 0 and not saved['errors']
+    scope = [t for t in trace if t.get('ruleID') == rid]
+    injected = [t for t in scope if t['action'] == 'error-request']; cleared = [t for t in scope if t['action'] == 'rule-cleared']
+    assert len(injected) == rule['hits'] and len(cleared) == 1
+    clear = m.ts(cleared[0]['at']); assert all(t['status'] == 503 and t['method'] == 'POST' and t['resource'] == 'controllerrevisions' and t['namespace'] == result['namespace'] for t in injected)
+    checkpoints = [m.read(x) for x in p.glob('checkpoint-*.json')]
+    held = next(cp for cp in checkpoints if cp['phase'] == 'actual-CR-create-failure-no-template-actions')
+    bcp = next(cp for cp in checkpoints if cp['phase'] == 'B-allowed-target-after-history-recovery')
+    ccp = next(cp for cp in checkpoints if cp['phase'] == 'C-allowed-target-after-old-release')
+    finalcp = next(cp for cp in checkpoints if cp['phase'] == 'C-retained-after-controller-restart')
+    assert held['elapsedStableNanos'] >= 10_000_000_000 and m.ts(injected[0]['at']) < m.ts(held['stableSince']) < m.ts(held['completed']) < clear
+    assert finalcp['elapsedStableNanos'] >= 30_000_000_000
+    assert m.ts(bcp['completed']) < m.ts(m.read(p/'step-02-request-time.json')['sent'])
+    # API creation timestamps have only second precision. Prove the strict
+    # persist-before-mutation order using actual upstream response/request
+    # nanosecond timestamps, independently of informer delivery ordering.
+    bsent = m.ts(m.read(p/'step-01-request-time.json')['sent'])
+    csent = m.ts(m.read(p/'step-02-request-time.json')['sent'])
+    responses = {t['request']:t for t in trace if t['action']=='response'}
+    persistence = []
+    for version, begin, end in [('B',bsent,csent),('C',csent,m.ts(finalcp['completed']))]:
+        requests = [t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and begin<=m.ts(t['at'])<end]
+        created = [responses[t['request']] for t in requests if t['resource']=='controllerrevisions' and t['method']=='POST' and responses.get(t['request'],{}).get('status')==201]
+        assert len(created)==1
+        mutations = [t for t in requests if t['resource']=='pods' and t['method'] in ('POST','DELETE')]
+        assert all(m.ts(t['at'])>m.ts(created[0]['at']) for t in mutations)
+        persistence.append({'version':version,'persistedResponse':created[0],'laterPodMutationRequests':len(mutations)})
+    def preserved(state):
+        pods = m.mine(state,'pods',owner); crs = m.mine(state,'controllerrevisions',owner)
+        assert set(pods) == set(basepods) and all(m.ready(o) and m.version(o) == 'A' for o in pods.values())
+        assert set(crs) == set(basecr) and all(o['data'] == basecr[u]['data'] for u,o in crs.items())
+    preserved(m.yaml(p/'step-01-create-blocked-resources.yaml'))
+    state = collections.defaultdict(dict); deletions = []; historydata = {}; revisioncreates = {}; createdpods = []
+    for row in rows:
+        o = row['object']; uid = o['metadata']['uid']; kind = row['kind']; at = m.ts(row['received']); prev = state[kind].get(uid)
+        if kind == 'controllerrevisions' and m.owned(o,owner):
+            assert uid not in historydata or historydata[uid] == o['data']; historydata[uid] = o['data']
+            if row['event'] == 'ADDED': revisioncreates[o['metadata']['name']] = o
+        if kind == 'pods' and m.owned(o,owner):
+            if row['event'] == 'ADDED': createdpods.append(o)
+            if prev and m.ready(prev) and (row['event'] == 'DELETED' or o['metadata'].get('deletionTimestamp')):
+                if o['metadata']['labels'][m.R] == 'frontend':
+                    available = sum(m.ready(pod) for pod in frontend(state,owner).values()); assert available-1 >= minimum
+                    deletions.append({'sequence':row['sequence'],'uid':uid,'readyBefore':available,'minimum':minimum})
+                assert uid not in basepods or o['metadata']['labels'][m.R] == 'frontend' and int(o['metadata']['labels'][m.I].rsplit('-',1)[1]) >= partition
+        if row['event'] == 'DELETED': state[kind].pop(uid,None)
+        else: state[kind][uid] = o
+        if m.ts(installed['installed']) <= at < clear: preserved(state)
+        if m.ts(finalcp['stableSince']) <= at <= m.ts(finalcp['completed']): final_pods(state,owner,basepods,partition,'C')
+    for o in createdpods:
+        cr = revisioncreates['model-'+o['metadata']['labels'][REV]]
+        assert m.ts(cr['metadata']['creationTimestamp']) <= m.ts(o['metadata']['creationTimestamp'])
+    # Direct reads prove histories still exist even for Pods with a live
+    # deletionTimestamp. Full Watch adds immutable data and creation ordering.
+    probes = [m.read(x) for x in sorted(p.glob('history-probe-*.json'))]
+    assert probes and all('error' not in probe for probe in probes)
+    terminating = set()
+    for probe in probes:
+        for o in probe['pods']['items']:
+            if not m.owned(o,owner): continue
+            name = 'model-'+o['metadata']['labels'][REV]
+            cr = probe['histories'].get(name)
+            if cr is None:
+                # The runner only accepts a raced GC read after confirming the
+                # original Pod disappeared. Require its independent DELETE.
+                assert any(r['kind']=='pods' and r['event']=='DELETED' and r['object']['metadata']['uid']==o['metadata']['uid'] and m.ts(r['received'])<=m.ts(probe['completed']) for r in rows)
+                continue
+            assert m.owned(cr,owner) and not cr['metadata'].get('deletionTimestamp')
+            roles = {r['name']:r for r in cr['data']['data']}; assert m.version(roles[o['metadata']['labels'][m.R]]['entryTemplate']) == m.version(o)
+            if o['metadata'].get('deletionTimestamp') and 'rollout-runner/hold' in o['metadata'].get('finalizers',[]): terminating.add(o['metadata']['uid'])
+    trigger = m.read(p/'step-01-terminating-trigger.json')
+    assert trigger['eligible'] == (partition < 3)
+    if partition < 3:
+        pinned = set(trigger['pinnedUIDs'].values()); assert len(pinned) == 1 and pinned <= terminating
+        holdcp = next(cp for cp in checkpoints if cp['phase'] == 'C-after-allowed-B'); assert holdcp['elapsedStableNanos'] >= 10_000_000_000
+        for uid in pinned:
+            assert any(r['kind']=='pods' and r['event']=='DELETED' and r['object']['metadata']['uid']==uid and m.ts(r['received'])>m.ts(holdcp['completed']) for r in rows)
+    else:
+        assert not trigger['pinnedUIDs'] and not deletions
+    final_pods(m.yaml(p/'step-01-B-allowed-resources.yaml'),owner,basepods,partition,'B')
+    final = m.yaml(p/'final-resources.yaml'); finalpods = final_pods(final,owner,basepods,partition,'C')
+    final_pods(m.replay(rows,finalcp['stableSince']),owner,basepods,partition,'C')
+    before = m.yaml(p/'step-01-restart-controller-terminated.yaml'); replacement = m.yaml(p/'step-01-restart-controller-replacement.yaml'); after = m.yaml(p/'fault-controller-after.yaml')
+    receipt = m.read(p/'step-01-restart-controller-delete.json')
+    assert receipt['accepted'] and receipt['uid'] == before['metadata']['uid'] == receipt['options']['preconditions']['uid']
+    assert after['metadata']['uid'] == replacement['metadata']['uid'] != before['metadata']['uid']
+    assert before['metadata']['ownerReferences'] == replacement['metadata']['ownerReferences']
+    assert all(o['status']['containerStatuses'][0]['restartCount'] == 0 for o in (before,replacement,after))
+    assert len({o['status']['containerStatuses'][0]['imageID'] for o in (before,replacement,after)}) == 1
+    assert m.ts(ccp['completed']) < m.ts(receipt['sent']) < m.ts(finalcp['stableSince'])
+    cstate = m.yaml(p/'step-01-C-allowed-resources.yaml'); assert set(finalpods) == set(m.mine(cstate,'pods',owner))
+    assert not m.mine(final,'services',owner) and len(m.mine(final,'podgroups',owner)) == 1
+    cms = m.mine(final,'configmaps',owner); assert len(cms) == 6
+    for cm in cms.values(): assert sum(all(o['metadata']['labels'].get(k)==cm['metadata']['labels'].get(k) for k in (m.G,m.R,m.I)) for o in finalpods.values()) == 1
+    proxy = m.read(p/'fault-proxy-final.json'); assert not proxy['errors'] and not any(r['active'] for r in proxy['rules'])
+    return {'id':case['id'],'classification':'PASS','watchRows':len(rows),'actualFailedCRCreates':len(injected),'persistenceBeforeTemplateMutations':persistence,'historyProbes':len(probes),'terminatingReferenceUIDs':sorted(terminating),'heldNanos':held['elapsedStableNanos'],'finalStableNanos':finalcp['elapsedStableNanos'],'healthyDeletionChecks':deletions,'limitRequest':limit,'sourcePartition':partition,'controllerReplacementUID':replacement['metadata']['uid'],'limitation':'References are checked using direct API reads throughout waits, with complete independent Watch for immutable Data, actual fault interval and stable final state. A pinned terminating Pod may share its revision with other live Pods. All-protected P=3 has no eligible old termination. No datastore internals are asserted.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-01-before-create-clear.json']}}
+
+
+def main():
+    runid = sys.argv[1]; assert runid and '/' not in runid and '..' not in runid
+    base = ROOT/'artifacts'/runid; control = ROOT/'artifacts/environment-022'/(runid+'-control')
+    done = m.read(control/'completion.json'); build = m.read(control/'build.json')
+    assert done['controllerSpecRestored'] and done['historicalModelServingUIDsPreserved']==9 and not done['proxyErrors']
+    assert m.read(base/'environment.json')['runner']['binarySHA256'] == build['binarySHA256']
+    assert m.read(control/'controller-before.json')['spec'] == m.read(control/'controller-restored.json')['spec']
+    results = m.read(base/'summary.json')['results']; trace = []
+    start = min(m.ts(m.read(base/r['id']/'step-01-create-installed.json')['installed']) for r in results)
+    for line in (control/'proxy-trace.jsonl').open():
+        record = json.loads(line)
+        if m.ts(record['at']) >= start: trace.append(record)
+    out = base/'independent-history-audit'; out.mkdir(); reports = []
+    for result in results:
+        try: report = audit_case(base/result['id'],trace)
+        except (AssertionError,KeyError,StopIteration,FileNotFoundError) as err:
+            import traceback
+            report = {'id':result['id'],'classification':'PENDING_REVIEW','rawStatus':result['status'],'rawError':result.get('error'),'auditError':repr(err),'traceback':traceback.format_exc()}
+        reports.append(report)
+        with (out/(result['id']+'.json')).open('x') as f: json.dump(report,f,indent=2); f.write('\n')
+        print(report['id'],report['classification'],report.get('auditError',''))
+    pending = any(r['classification']=='PENDING_REVIEW' for r in reports)
+    with (out/'summary.json').open('x') as f: json.dump({'status':'PENDING_REVIEW' if pending else 'VERIFIED','cases':reports,'counts':dict(collections.Counter(r['classification'] for r in reports))},f,indent=2); f.write('\n')
+    if pending: sys.exit(1)
+
+
+if __name__ == '__main__': main()

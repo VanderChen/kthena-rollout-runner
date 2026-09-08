@@ -20,29 +20,33 @@ import (
 )
 
 type normalExecution struct {
-	rejectionExpected  *unstructured.Unstructured
-	rejectionChecked   time.Time
-	rejectionProbes    int
-	historyReferences  bool
-	historyProbe       int
-	historyChecked     time.Time
-	evictionTrackerUID string
-	readinessPod       *corev1.Pod
-	faultController    *corev1.Pod
-	capacityPod        *corev1.Pod
-	templateCM         *corev1.ConfigMap
-	tableVersion       string
-	baselineStatus     map[string]interface{}
-	pinned             map[string]types.UID
-	r                  *Runner
-	c                  Case
-	o                  *Observer
-	l                  *NormalLedger
-	namespace, dir     string
-	current            *unstructured.Unstructured
-	res                *Result
-	phase              int
-	waitDeadline       time.Time
+	preparingCompletionSource bool
+	completionStatusProbe     bool
+	completionStatusProbes    int
+	completionStatusChecked   time.Time
+	rejectionExpected         *unstructured.Unstructured
+	rejectionChecked          time.Time
+	rejectionProbes           int
+	historyReferences         bool
+	historyProbe              int
+	historyChecked            time.Time
+	evictionTrackerUID        string
+	readinessPod              *corev1.Pod
+	faultController           *corev1.Pod
+	capacityPod               *corev1.Pod
+	templateCM                *corev1.ConfigMap
+	tableVersion              string
+	baselineStatus            map[string]interface{}
+	pinned                    map[string]types.UID
+	r                         *Runner
+	c                         Case
+	o                         *Observer
+	l                         *NormalLedger
+	namespace, dir            string
+	current                   *unstructured.Unstructured
+	res                       *Result
+	phase                     int
+	waitDeadline              time.Time
 }
 
 func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
@@ -341,6 +345,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 		return e.rejectRequest(ctx, p, prefix)
 	case "prepare-history-source":
 		return e.prepareHistorySource(ctx, p, prefix)
+	case "sparse-completion-boundary":
+		return e.sparseCompletionBoundary(ctx, p, prefix)
 	case "stable-dependency-boundary":
 		return e.stableDependencyBoundary(ctx, p, prefix)
 	case "history-equal-collision":
@@ -578,6 +584,12 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 	var releaseAfter time.Time
 	lastReason := ""
 	for {
+		if e.completionStatusProbe && time.Since(e.completionStatusChecked) >= time.Second {
+			if err := e.probeCompletionStatus(ctx); err != nil {
+				return err
+			}
+			e.completionStatusChecked = time.Now()
+		}
 		if e.rejectionExpected != nil && time.Since(e.rejectionChecked) >= time.Second {
 			if err := e.probeRejectedSpec(ctx); err != nil {
 				return err

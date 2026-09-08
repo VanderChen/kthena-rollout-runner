@@ -49,11 +49,12 @@ type ScenarioCondition struct {
 	Count   int    `json:"count"`
 }
 type ScenarioExpectation struct {
-	BlockedByBudget bool             `json:"blockedByBudget,omitempty"`
-	NoFullPromotion bool             `json:"noFullPromotion,omitempty"`
-	NoReplacement   bool             `json:"noReplacement,omitempty"`
-	NoNewRevision   bool             `json:"noNewRevision,omitempty"`
-	Targets         []ScenarioTarget `json:"targets,omitempty"`
+	RequireCompleted bool             `json:"requireCompleted,omitempty"`
+	BlockedByBudget  bool             `json:"blockedByBudget,omitempty"`
+	NoFullPromotion  bool             `json:"noFullPromotion,omitempty"`
+	NoReplacement    bool             `json:"noReplacement,omitempty"`
+	NoNewRevision    bool             `json:"noNewRevision,omitempty"`
+	Targets          []ScenarioTarget `json:"targets,omitempty"`
 }
 type ScenarioTarget struct {
 	MinVersions map[string]int    `json:"minVersions,omitempty"`
@@ -96,13 +97,14 @@ func (c Case) validateScenario() error {
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
 	sparseBoundary := n >= 574 && n <= 603 && c.Format == "rollout-runner/v3"
 	numericBoundary := n >= 540 && n <= 572 && c.Format == "rollout-runner/v2"
+	completionBoundary := n >= 604 && n <= 609 && c.Format == "rollout-runner/v3"
 	dependencyBoundary := n == 573 && c.Format == "rollout-runner/v3"
 	equalCollision := n == 610 && c.Format == "rollout-runner/v3"
 	historyCollision := (n == 533 || n == 534) && c.Format == "rollout-runner/v3"
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -123,6 +125,9 @@ func (c Case) validateScenario() error {
 		return fmt.Errorf("missing executable steps")
 	}
 	for _, p := range s.Steps {
+		if p.Expect.RequireCompleted && !completionBoundary {
+			return fmt.Errorf("explicit complete-state guard is restricted to sparse completion boundaries")
+		}
 		if p.Expect.BlockedByBudget && (!sparseBoundary || n != 592 && n != 598 || !p.Expect.NoReplacement || p.StableSeconds < 30) {
 			return fmt.Errorf("budget-blocked stop is only declared by the two sparse zero-budget traps")
 		}
@@ -150,6 +155,13 @@ func (c Case) validateScenario() error {
 			model, err := readModel(p.Spec)
 			if err != nil || model.Mode != "Role" || model.N != 1 || model.Roles["frontend"].R != 3 || model.Roles["frontend"].W != 1 || model.Roles["frontend"].P != 1 {
 				return fmt.Errorf("invalid mixed historical source")
+			}
+		case "sparse-completion-boundary":
+			if !p.Expect.RequireCompleted || !completionBoundary || p.Release != "none" || p.StableSeconds < 30 || !p.Expect.NoReplacement || !p.Expect.NoNewRevision {
+				return fmt.Errorf("sparse completion must preserve actual B UIDs through automatic promotion before restart")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return err
 			}
 		case "stable-dependency-boundary":
 			if !dependencyBoundary || p.Release != "one" || p.StableSeconds < 30 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
@@ -298,6 +310,9 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("condition requires positive count")
 			}
 		}
+	}
+	if completionBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "sparse-completion-boundary") {
+		return fmt.Errorf("sparse completion cannot skip automatic promotion before restart")
 	}
 	if dependencyBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "stable-dependency-boundary") {
 		return fmt.Errorf("stable dependency boundary cannot skip its real source and post-clear gate")

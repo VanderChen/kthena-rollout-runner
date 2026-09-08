@@ -205,6 +205,16 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 			break
 		}
 	}
+	// Preparation establishes physical B members and plugin resources before
+	// restoring old current status. It must not require the completion under test.
+	if e.preparingCompletionSource {
+		return true, ""
+	}
+	if expect.RequireCompleted {
+		if err := completedBoundaryStatus(mapValue(ms.Object, "status")); err != nil {
+			return false, err.Error()
+		}
+	}
 	observed, _, _ := unstructured.NestedInt64(ms.Object, "status", "observedGeneration")
 	ready, _, _ := unstructured.NestedInt64(ms.Object, "status", "availableReplicas")
 	replicas, _, _ := unstructured.NestedInt64(ms.Object, "status", "replicas")

@@ -75,7 +75,8 @@ func (c Case) validateScenario() error {
 	normal := n >= 61 && n <= 303 && c.Format == "rollout-runner/v2"
 	recovery := n >= 304 && n <= 388 && c.Format == "rollout-runner/v3"
 	restart := n >= 389 && n <= 400 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	midRollout := n >= 401 && n <= 430 && (n >= 425 || (n-401)%4 != 0) && c.Format == "rollout-runner/v3"
+	if err != nil || (!normal && !recovery && !restart && !midRollout) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -102,6 +103,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "drop-ready", "restore-ready":
+			if !midRollout || n > 424 || (n-401)%4 != 2 {
+				return fmt.Errorf("readiness fault not declared by this case")
+			}
 		case "restart-container":
 			f := p.ContainerRestart
 			if !restart || f == nil || f.Group != 0 || f.Role != "frontend" || f.Ordinal != 0 || f.Member != "entry" || len(p.Spec) != 0 || !p.Expect.NoReplacement || !p.Expect.NoNewRevision {
@@ -145,7 +150,7 @@ func (c Case) validateScenario() error {
 		}
 		for _, cond := range p.Conditions {
 			switch cond.Kind {
-			case "unit", "started", "terminating", "pending", "unschedulable":
+			case "unit", "started", "terminating", "pending", "unschedulable", "running-not-ready", "image-pull-backoff":
 			default:
 				return fmt.Errorf("unsupported condition %q", cond.Kind)
 			}

@@ -367,6 +367,9 @@ func (e *normalExecution) recoveryController(ctx context.Context) (*corev1.Pod, 
 	if current == nil {
 		return nil, fmt.Errorf("CONTROLLER_STATE: production controller absent")
 	}
+	if before := e.faultController; before != nil && (before.UID != current.UID || before.Status.ContainerStatuses[0].RestartCount != current.Status.ContainerStatuses[0].RestartCount) {
+		return nil, fmt.Errorf("CONTROLLER_STATE: controller changed during this recovery case")
+	}
 	return current, nil
 }
 

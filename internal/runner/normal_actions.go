@@ -19,6 +19,14 @@ import (
 
 func (e *normalExecution) specialAction(ctx context.Context, p ScenarioStep, prefix string) error {
 	switch p.Action {
+	case "drop-ready":
+		return e.dropReady(ctx, prefix)
+	case "restore-ready":
+		if e.readinessPod == nil {
+			return fmt.Errorf("INCONCLUSIVE: exact readiness fault UID not recorded")
+		}
+		e.res.Releases++
+		return e.r.release(ctx, Unit{Key: e.readinessPod.Name, Pods: []*corev1.Pod{e.readinessPod}}, e.dir, e.res.Releases)
 	case "block-resources":
 		return e.blockResources(ctx, prefix)
 	case "restore-resources":

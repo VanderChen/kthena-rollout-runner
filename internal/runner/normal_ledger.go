@@ -900,10 +900,13 @@ func (l *NormalLedger) conditions(cs []ScenarioCondition, objects Objects) bool 
 					count++
 				}
 			}
-		case "terminating", "pending", "unschedulable":
+		case "terminating", "pending", "unschedulable", "running-not-ready", "image-pull-backoff":
 			for _, o := range objects["pods"] {
 				var p corev1.Pod
 				if convertPod(o, &p) != nil {
+					continue
+				}
+				if (c.Kind == "running-not-ready" || c.Kind == "image-pull-backoff") && !owned(&p, l.Owner) {
 					continue
 				}
 				u := NormalUnit{Group: ordinal(p.Labels[LabelGroup]), Role: p.Labels[LabelRole], Ordinal: ordinal(p.Labels[LabelRoleID]), Version: podVersion(&p)}
@@ -916,7 +919,7 @@ func (l *NormalLedger) conditions(cs []ScenarioCondition, objects Objects) bool 
 						unschedulable = true
 					}
 				}
-				if conditionMatches(c, u) && ((c.Kind == "terminating" && p.DeletionTimestamp != nil) || (c.Kind == "pending" && p.Status.Phase == corev1.PodPending) || (c.Kind == "unschedulable" && unschedulable)) {
+				if conditionMatches(c, u) && ((c.Kind == "terminating" && p.DeletionTimestamp != nil) || (c.Kind == "pending" && p.Status.Phase == corev1.PodPending) || (c.Kind == "unschedulable" && unschedulable) || actualContainerFault(&p, c.Kind)) {
 					count++
 				}
 			}

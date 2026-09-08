@@ -20,6 +20,7 @@ import (
 )
 
 type normalExecution struct {
+	readinessPod    *corev1.Pod
 	faultController *corev1.Pod
 	capacityPod     *corev1.Pod
 	templateCM      *corev1.ConfigMap
@@ -245,6 +246,16 @@ func (e *normalExecution) snapshot(name string) error {
 }
 func (e *normalExecution) execute(ctx context.Context) error {
 	s := e.c.Scenario
+	if e.c.Format == "rollout-runner/v3" {
+		controller, err := e.recoveryController(ctx)
+		if err != nil {
+			return err
+		}
+		e.faultController = controller
+		if err = saveYAML(filepath.Join(e.dir, "case-controller-before.yaml"), controller); err != nil {
+			return err
+		}
+	}
 	if err := e.prepareTemplate(ctx); err != nil {
 		return err
 	}

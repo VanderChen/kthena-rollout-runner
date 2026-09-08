@@ -86,3 +86,27 @@ func TestNoNewHistoryGuardIgnoresForeignOwnerOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestEquivalentHistoryCollisionCannotSkipNativeRaceOrAllowNewHistory(t *testing.T) {
+	cases, err := LoadCases(filepath.Join("..", "..", "cases", "history-equal"))
+	if err != nil || len(cases) != 1 || cases[0].ID != "RUN-610" {
+		t.Fatal(len(cases), err)
+	}
+	c := cases[0]
+	p := &c.Scenario.Steps[0]
+	original := *p
+	p.Action = "update"
+	if c.Validate() == nil {
+		t.Fatal("equivalent collision replaced by ordinary rollout")
+	}
+	*p = original
+	p.Expect.NoNewRevision = false
+	if c.Validate() == nil {
+		t.Fatal("equivalent precreated history may be replaced")
+	}
+	*p = original
+	p.Expect.NoReplacement = true
+	if c.Validate() == nil {
+		t.Fatal("B recovery prohibited by an invalid unchanged-UID guard")
+	}
+}

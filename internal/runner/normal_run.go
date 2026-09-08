@@ -341,6 +341,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 		return e.rejectRequest(ctx, p, prefix)
 	case "prepare-history-source":
 		return e.prepareHistorySource(ctx, p, prefix)
+	case "history-equal-collision":
+		return e.equalHistoryCollision(ctx, p, prefix)
 	case "history-collision-recovery":
 		return e.historyCollisionRecovery(ctx, p, prefix)
 	case "history-read-recovery", "history-object-recovery":

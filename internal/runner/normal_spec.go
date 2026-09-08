@@ -96,11 +96,12 @@ func (c Case) validateScenario() error {
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
 	sparseBoundary := n >= 574 && n <= 603 && c.Format == "rollout-runner/v3"
 	numericBoundary := n >= 540 && n <= 572 && c.Format == "rollout-runner/v2"
+	equalCollision := n == 610 && c.Format == "rollout-runner/v3"
 	historyCollision := (n == 533 || n == 534) && c.Format == "rollout-runner/v3"
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -148,6 +149,13 @@ func (c Case) validateScenario() error {
 			model, err := readModel(p.Spec)
 			if err != nil || model.Mode != "Role" || model.N != 1 || model.Roles["frontend"].R != 3 || model.Roles["frontend"].W != 1 || model.Roles["frontend"].P != 1 {
 				return fmt.Errorf("invalid mixed historical source")
+			}
+		case "history-equal-collision":
+			if !equalCollision || p.Release != "one" || p.StableSeconds < 30 || !p.Expect.NoNewRevision || p.Expect.NoReplacement || len(p.Spec) == 0 {
+				return fmt.Errorf("equivalent collision requires actual AlreadyExists, same history UID and automatic B")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return err
 			}
 		case "history-collision-recovery":
 			if !historyCollision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) == 0 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
@@ -368,6 +376,9 @@ func (c Case) validateScenario() error {
 	}
 	if numericBoundary && (len(s.Steps) != boundarySteps || s.Steps[0].Action != "update" || s.Steps[0].StableSeconds < 30 || boundarySteps == 2 && (s.Steps[1].Action != "update" || s.Steps[1].StableSeconds < 30)) {
 		return fmt.Errorf("numeric boundary requires literal A-to-B request and stable allowed target")
+	}
+	if equalCollision && (len(s.Steps) != 1 || s.Steps[0].Action != "history-equal-collision") {
+		return fmt.Errorf("equivalent collision requires its complete native API race")
 	}
 	if historyCollision && (len(s.Steps) != 1 || s.Steps[0].Action != "history-collision-recovery") {
 		return fmt.Errorf("collision requires precreated conflict plus native Create AlreadyExists sequence")

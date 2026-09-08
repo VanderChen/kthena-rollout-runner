@@ -85,7 +85,8 @@ func (c Case) validateScenario() error {
 	deletionReplay := (n == 449 || n == 452) && c.Format == "rollout-runner/v3"
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	historyCreate := n >= 463 && n <= 522 && (n-463)%10 < 5 && c.Format == "rollout-runner/v3"
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -112,6 +113,13 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "history-create-recovery":
+			if !historyCreate || p.Release != "one" || p.StableSeconds < 30 {
+				return fmt.Errorf("invalid history persistence recovery action")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return err
+			}
 		case "replay-old-deletions":
 			if !deletionReplay || p.Release != "one" || p.StableSeconds < 30 {
 				return fmt.Errorf("invalid protected old-UID deletion replay action")
@@ -262,6 +270,9 @@ func (c Case) validateScenario() error {
 	}
 	if lostDeletion && (len(s.Steps) != 1 || s.Steps[0].Action != "drop-old-deletions") {
 		return fmt.Errorf("lost-deletion cases require one uninterrupted controller run")
+	}
+	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), "O={0,1,2}")) {
+		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
 	}
 	if s.Steps[len(s.Steps)-1].Until != "settled" {
 		return fmt.Errorf("last step must verify a settled state")

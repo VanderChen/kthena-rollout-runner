@@ -20,6 +20,9 @@ import (
 )
 
 type normalExecution struct {
+	historyReferences  bool
+	historyProbe       int
+	historyChecked     time.Time
 	evictionTrackerUID string
 	readinessPod       *corev1.Pod
 	faultController    *corev1.Pod
@@ -326,6 +329,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "history-create-recovery":
+		return e.historyCreateRecovery(ctx, p, prefix)
 	case "replay-old-deletions":
 		return e.replayOldDeletions(ctx, p, prefix)
 	case "hold-initial-sync":
@@ -551,6 +556,12 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 	var releaseAfter time.Time
 	lastReason := ""
 	for {
+		if e.historyReferences && time.Since(e.historyChecked) >= time.Second {
+			if err := e.verifyHistoryReferences(ctx); err != nil {
+				return err
+			}
+			e.historyChecked = time.Now()
+		}
 		var candidates []NormalUnit
 		done := false
 		err := e.locked(func() error {

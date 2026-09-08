@@ -43,6 +43,8 @@ def version(spec, roles=('f',), v='B'):
 
 def initial(config,profile):
     spec={'template':{'roles':[]}}
+    if config.get('revisionHistoryLimit', 'omitted') != 'omitted':
+        spec['revisionHistoryLimit'] = config['revisionHistoryLimit']
     if 'n' in config: spec['replicas']=config['n']
     if config.get('schedulerName')!='omitted':spec['schedulerName']='volcano'
     if config.get('plugins')!='omitted':

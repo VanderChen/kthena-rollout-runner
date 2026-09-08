@@ -1,0 +1,1510 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "developmentScope": "30 continuous-ordinal history persistence cases; sparse ordinal fixtures remain unimplemented",
+  "cases": [
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-463",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=1保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-464",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 3,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=3保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-465",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 1,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=1被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-466",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=默认10被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-467",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-473",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=1保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-474",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 3,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=3保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-475",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 1,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=1被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-476",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=默认10被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-477",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-483",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=1保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-484",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 3,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=3保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-485",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 1,
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=1被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-486",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=默认10被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-487",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-493",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=1保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-494",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 3,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=3保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-495",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 1,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=1被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-496",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=默认10被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-497",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-503",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=1保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-504",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 3,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=3保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-505",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 1,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=1被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-506",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=默认10被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-507",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-513",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=1保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-514",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 0,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 3,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=3保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=0被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-515",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": 1,
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=1被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-516",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    },
+    {
+      "group": "2.3.1 历史持久化失败与live引用保护",
+      "kind": "运行",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "revisionHistoryLimit": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；f O={0,1,2}；b连续A；现有A历史可读",
+      "action": "更新f为B时注入目标CR创建失败；确认无模板驱动创建/删除后恢复CR API；到达允许目标后再仅改f为C；保留任一实际产生的旧终止实例直至检查引用，随后释放并重启controller",
+      "expect": "目标历史持久化先于模板驱动动作；b未变UID及其A历史保留；按P=0保护实际ordinal；所有live A/B/C、surge、terminating引用的CR不因historyLimit=默认10被回收，Data不可变；解除阻塞后自动达到最新允许目标，重启不误滚",
+      "refs": [
+        "H04",
+        "H05",
+        "H08",
+        "T16",
+        "S04"
+      ],
+      "note": "",
+      "id": "RUN-517",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.1",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.1"
+      ]
+    }
+  ],
+  "inputs": {
+    "RUN-463": "fedc961ee81e4854f88ccbd4275b646bb76ab3b9c7b1596751b773402cc51206",
+    "RUN-464": "918d9bc5a972956b270a708e3a5bc995b3f6d085a68a05de9ec4f4f33ae3fdaa",
+    "RUN-465": "5b6c5016499968375b793320d02d965d678422e983da170bc7ef08c9ba4809b1",
+    "RUN-466": "749b385d3e18a910c5126419e885139aef25ba5e84527a156ae804d028a19d60",
+    "RUN-467": "15a701bd01d2b88054e29b8b4ede6e4218de7baf824540690887efb3940298ff",
+    "RUN-473": "558a607f626428e95984cc104c81dcb50c8084dfdc46d1f11ee248b1bf53c0f9",
+    "RUN-474": "8122a2774360f1cc6571a08fa13a7eb523c504d3b80cd5f3c10f43b20d31bcf1",
+    "RUN-475": "1b4897f895b5f623fd2c7afa003b7ba88c698989ec6079408ed01a7561afcafc",
+    "RUN-476": "e0c4babf2bd3667a39d226ab07fe7b48ddad0ba80fe6801df3fdd92e4149f65d",
+    "RUN-477": "0e857d64a811764a48d4724bda261c3a789fd58cdebf99992d3d66c067838a1d",
+    "RUN-483": "6056b99f6aa7eced85e9e4978d218fef53e19fdb5f7388e8d7abae6594dda8fb",
+    "RUN-484": "09acf67523d5e283c65803c155155d286067b76a4225e4d87c42ffbd36a9b26b",
+    "RUN-485": "a1873547813e56ca951e9b62a6b5ff7160c49c617c107fff9a80ae818996d1f4",
+    "RUN-486": "f6c95d35cbaf2883554e50e342a8f9335f80b300ef300bfc1de6a07d62739432",
+    "RUN-487": "b6ebc7011ac8bf8d79ae8c5a9a4147ac483ff0043a9f08488eb9eea97b0c02a5",
+    "RUN-493": "7807e3e9e2863cbfb5a249fb65772981d20e546b2523c42e682eff24fe859577",
+    "RUN-494": "7a8a5b5017438bb34e301c20434f458981dd1833913d32029d20c0b2a1e69359",
+    "RUN-495": "dbaff9c52dac15d0f602481e55b2fc5c1ad50a660a50c40f46fbbbc65e4ae929",
+    "RUN-496": "be7ce4205d9b1e30d363b9ba821e7747789e1e913da3a0f4a426880c34a705c9",
+    "RUN-497": "dba9afee7f8639b19b63ced7c18a6150f1e26c8b01b6133af850be4aa3190eae",
+    "RUN-503": "01ce6e08fc6c0108141218eb3104f3059e708c95b8d70f13c8aa6be03d5fc3a1",
+    "RUN-504": "b22d5c4c29d61eff23637ebd1ec5044fa50ad08df1bb82c6841bd3cfc3e43626",
+    "RUN-505": "ee5e5d999212db874f5ec0036502e5fd0b9f3abe1bd1e55fed62b990beb7f9c2",
+    "RUN-506": "8a12a9f7af71193503fc9fa2250cd629df4015a49dc46a1dc3c853663e78f651",
+    "RUN-507": "8a27ef47c29c1e8c6da8485aca1eb5af10b0921ea0f56615369e9067a06a0622",
+    "RUN-513": "19df307b0f789f89bd81be24187668c49d9fceaa9dc46d787da93bf7112216ee",
+    "RUN-514": "0ae70f52f96d4d25a9947820a651978111f5eaa9229eb95611ccb411dd39f7a0",
+    "RUN-515": "5f2d3378b4f6333793dfdd3677ba1f7ead965c397481cfbf8451f37bcbb1c5a2",
+    "RUN-516": "8e4c00f6ec3b373dc0545196286d60307630bbf352f92a285a24f23987069707",
+    "RUN-517": "1a4d54119daca66b86f53ede160bf83e63100a2d38e01cb5336de04c00722f92"
+  }
+}

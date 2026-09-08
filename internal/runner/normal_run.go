@@ -314,6 +314,10 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "restart-container":
+		if err := e.restartContainer(ctx, p, prefix); err != nil {
+			return err
+		}
 	case "recover-pod":
 		if err := e.recoverPod(ctx, p, prefix); err != nil {
 			return err

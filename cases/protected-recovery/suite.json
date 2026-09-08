@@ -1,0 +1,55 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "developmentScope": "RUN-304 only; protected A/W1 with latest R2",
+  "cases": [
+    {
+      "group": "2.1.1 Pod删除与recoveryPolicy组合",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "3组A全Ready；group0受保护；f旧R=1、W=1",
+      "action": "将f R:1→2、W:1→2、模板A→B；随后删除group0的f entry并等待恢复",
+      "expect": "group0按历史A、W=1及最新R=2恢复，不能恢复成B或长期卡缺副本；其他组B收敛",
+      "refs": [
+        "P12",
+        "P13",
+        "H07",
+        "H09"
+      ],
+      "note": "",
+      "id": "RUN-304",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "稀疏ordinal与partition",
+      "section": "2.1.1",
+      "categoryPath": [
+        "2",
+        "2.1",
+        "2.1.1"
+      ]
+    }
+  ],
+  "inputs": {
+    "RUN-304": "67c5d2491ad69b50749ac67d6d755c58318c361f2ddaa24fddd8750426837f43"
+  }
+}

@@ -2,160 +2,8 @@
   "format": "rollout-runner/suite-v1",
   "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
   "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
-  "developmentScope": "Eight actual historical object faults after P1 A/B stop; exact old entry deletion, 30-second semantic safety window, correct owned original A data restored, automatic protected A/W1 recovery",
+  "developmentScope": "Five Role historical-fault sources: actual protected A and eligible B, preparation-only process replacement and finite orphan cleanup, then complete stable source before historical fault. Earlier preparation cleanup findings remain recorded.",
   "cases": [
-    {
-      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
-      "kind": "运行",
-      "config": {
-        "coordination": "omitted",
-        "mode": "SG",
-        "n": 3,
-        "recovery": "omitted",
-        "roles": {
-          "f": {
-            "r": 1,
-            "w": 1
-          }
-        },
-        "top": {
-          "p": 1,
-          "s": 1,
-          "u": 0
-        }
-      },
-      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=缺失",
-      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
-      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
-      "refs": [
-        "H07",
-        "L05"
-      ],
-      "note": "",
-      "id": "RUN-523",
-      "verification": "NOT_RUN_ON_BASELINE",
-      "legacyGroup": "ControllerRevision与混合历史",
-      "section": "2.3.2",
-      "categoryPath": [
-        "2",
-        "2.3",
-        "2.3.2"
-      ]
-    },
-    {
-      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
-      "kind": "运行",
-      "config": {
-        "coordination": "omitted",
-        "mode": "SG",
-        "n": 3,
-        "recovery": "omitted",
-        "roles": {
-          "f": {
-            "r": 1,
-            "w": 1
-          }
-        },
-        "top": {
-          "p": 1,
-          "s": 1,
-          "u": 0
-        }
-      },
-      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=Data损坏",
-      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
-      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
-      "refs": [
-        "H07",
-        "L05"
-      ],
-      "note": "",
-      "id": "RUN-525",
-      "verification": "NOT_RUN_ON_BASELINE",
-      "legacyGroup": "ControllerRevision与混合历史",
-      "section": "2.3.2",
-      "categoryPath": [
-        "2",
-        "2.3",
-        "2.3.2"
-      ]
-    },
-    {
-      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
-      "kind": "运行",
-      "config": {
-        "coordination": "omitted",
-        "mode": "SG",
-        "n": 3,
-        "recovery": "omitted",
-        "roles": {
-          "f": {
-            "r": 1,
-            "w": 1
-          }
-        },
-        "top": {
-          "p": 1,
-          "s": 1,
-          "u": 0
-        }
-      },
-      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=历史中缺f Role",
-      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
-      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
-      "refs": [
-        "H07",
-        "L05"
-      ],
-      "note": "",
-      "id": "RUN-526",
-      "verification": "NOT_RUN_ON_BASELINE",
-      "legacyGroup": "ControllerRevision与混合历史",
-      "section": "2.3.2",
-      "categoryPath": [
-        "2",
-        "2.3",
-        "2.3.2"
-      ]
-    },
-    {
-      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
-      "kind": "运行",
-      "config": {
-        "coordination": "omitted",
-        "mode": "SG",
-        "n": 3,
-        "recovery": "omitted",
-        "roles": {
-          "f": {
-            "r": 1,
-            "w": 1
-          }
-        },
-        "top": {
-          "p": 1,
-          "s": 1,
-          "u": 0
-        }
-      },
-      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=owner UID错误",
-      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
-      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
-      "refs": [
-        "H07",
-        "L05"
-      ],
-      "note": "",
-      "id": "RUN-527",
-      "verification": "NOT_RUN_ON_BASELINE",
-      "legacyGroup": "ControllerRevision与混合历史",
-      "section": "2.3.2",
-      "categoryPath": [
-        "2",
-        "2.3",
-        "2.3.2"
-      ]
-    },
     {
       "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
       "kind": "运行",
@@ -187,6 +35,46 @@
       ],
       "note": "",
       "id": "RUN-528",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.2",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.2"
+      ]
+    },
+    {
+      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=API读取失败",
+      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
+      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
+      "refs": [
+        "H07",
+        "L05"
+      ],
+      "note": "",
+      "id": "RUN-529",
       "verification": "NOT_RUN_ON_BASELINE",
       "legacyGroup": "ControllerRevision与混合历史",
       "section": "2.3.2",
@@ -318,11 +206,8 @@
     }
   ],
   "inputs": {
-    "RUN-523": "a78e6364a0eff5e8ddbd632b90f30bbf2b4c535f0b89613596c47c0e75a98e2d",
-    "RUN-525": "e678853c971f6b35012b6fa64a087e2c733096e73e4c29e9ad09aa3d051d3251",
-    "RUN-526": "f9c5a016d1bc558e08247a51f22118251b2d5cc65e3b6e7d17bb65bf1c65f325",
-    "RUN-527": "c9e6f1eb854f8a7418e3560d51437bc2120db83a023858c52e8fbe57d42e7a09",
     "RUN-528": "66a59a0a0713cdfa5782bffd78b2095c02bf2b01207500e70ed61ceb5467bc8a",
+    "RUN-529": "d5908a341824f60271bfbe140d77490476f5c761d3eeb54e2345dbdfe1924a47",
     "RUN-530": "0ea48474bacd1415b563cd6beb069726b1758de61170ddabebbea1b59e149712",
     "RUN-531": "aea0982d8b6a878f200d9a92392d19248f68294d95423b0502c08a27613969ef",
     "RUN-532": "add4715b8fc3275e8217cff935fdcd9a3d64f805841e77e751c3b48ae55ad4ca"

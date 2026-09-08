@@ -1,0 +1,4 @@
+FROM busybox:1.36
+COPY --chmod=0755 bin/rollout-runner-history-source /usr/local/bin/rollout-runner
+COPY cases/history-source /cases/history-source
+ENTRYPOINT ["/usr/local/bin/rollout-runner"]

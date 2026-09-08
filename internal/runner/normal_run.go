@@ -334,6 +334,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "prepare-history-source":
+		return e.prepareHistorySource(ctx, p, prefix)
 	case "history-collision-recovery":
 		return e.historyCollisionRecovery(ctx, p, prefix)
 	case "history-read-recovery", "history-object-recovery":

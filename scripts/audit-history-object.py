@@ -112,13 +112,18 @@ def audit_case(p,trace):
         role=next(r for r in history['data']['data'] if r['name']==o['metadata']['labels'][m.R])
         assert m.version(role['entryTemplate' if o['metadata']['labels'].get(m.E)=='true' else 'workerTemplate'])==m.version(o)
     controller=m.yaml(p/'case-controller-before.yaml');after=m.yaml(p/'fault-controller-after.yaml')
+    source_preparation=None
+    if (p/'source-history-boundary.json').exists():
+        loader=importlib.util.spec_from_file_location('history_source',ROOT/'scripts/audit-history-source.py');source_audit=importlib.util.module_from_spec(loader);loader.loader.exec_module(source_audit)
+        source_preparation=source_audit.verify_source(p,rows,owner)
+        controller=m.yaml(p/'source-preparation/controller-controller-replacement.yaml')
     assert controller['metadata']['uid']==after['metadata']['uid'] and after['status']['containerStatuses'][0]['restartCount']==0
     proxy=m.read(p/'fault-proxy-final.json');assert not proxy['errors'] and not any(r['active'] for r in proxy['rules'])
     assert len(m.mine(final,'podgroups',owner))==(3 if mode=='SG' else 1)
     for kind,want in [('configmaps',3 if mode=='SG' else 6),('services',3)]:
         resources=m.mine(final,kind,owner);assert len(resources)==want
         for resource in resources.values():assert any(all(o['metadata']['labels'].get(k)==resource['metadata']['labels'].get(k) for k in (m.G,m.R,m.I)) for o in pods.values())
-    return {'id':case['id'],'classification':'PASS','objectFault':anomaly,'watchRows':len(rows),'actualUnknownHistoryReads':len(unknown_reads),'successfulReadsAfterRestore':len(reads),'protectedOriginalUIDs':old,'protectedReplacementUIDs':created,'outsideUIDsPreserved':outside,'originalHistoryUID':cr['metadata']['uid'],'injectedHistoryUID':None if injected is None else injected['metadata']['uid'],'restoredHistoryUID':restored['metadata']['uid'],'unknownWindowNanos':held['elapsedStableNanos'],'finalStableNanos':finalcp['elapsedStableNanos'],'limitation':'Actual API object replaced before protected entry deletion. All source history data remains immutable per UID; only the declared fixture has invalid/foreign content. Final Pods reference correct restored owned histories. No claim of live history existence while intentionally absent.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-02-history-object-fixture.json']}}
+    return {'id':case['id'],'classification':'PASS','sourcePreparation':source_preparation,'objectFault':anomaly,'watchRows':len(rows),'actualUnknownHistoryReads':len(unknown_reads),'successfulReadsAfterRestore':len(reads),'protectedOriginalUIDs':old,'protectedReplacementUIDs':created,'outsideUIDsPreserved':outside,'originalHistoryUID':cr['metadata']['uid'],'injectedHistoryUID':None if injected is None else injected['metadata']['uid'],'restoredHistoryUID':restored['metadata']['uid'],'unknownWindowNanos':held['elapsedStableNanos'],'finalStableNanos':finalcp['elapsedStableNanos'],'limitation':'Actual API object replaced before protected entry deletion. All source history data remains immutable per UID; only the declared fixture has invalid/foreign content. Final Pods reference correct restored owned histories. No claim of live history existence while intentionally absent.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-02-history-object-fixture.json']}}
 
 
 

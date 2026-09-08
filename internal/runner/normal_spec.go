@@ -127,6 +127,14 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "prepare-history-source":
+			if !(historyRead || historyObject) || n < 528 || p.Name != "establish-protected-A-and-eligible-B" || p.StableSeconds != 10 || p.Release != "one" {
+				return fmt.Errorf("source preparation only applies to the five Role historical source cases")
+			}
+			model, err := readModel(p.Spec)
+			if err != nil || model.Mode != "Role" || model.N != 1 || model.Roles["frontend"].R != 3 || model.Roles["frontend"].W != 1 || model.Roles["frontend"].P != 1 {
+				return fmt.Errorf("invalid mixed historical source")
+			}
 		case "history-collision-recovery":
 			if !historyCollision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) == 0 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
 				return fmt.Errorf("collision requires actual POST AlreadyExists and automatic allowed B recovery")
@@ -319,10 +327,14 @@ func (c Case) validateScenario() error {
 	if historyCollision && (len(s.Steps) != 1 || s.Steps[0].Action != "history-collision-recovery") {
 		return fmt.Errorf("collision requires precreated conflict plus native Create AlreadyExists sequence")
 	}
-	if historyObject && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-object-recovery") {
+	historySourceAction := "update"
+	if (historyRead || historyObject) && n >= 528 {
+		historySourceAction = "prepare-history-source"
+	}
+	if historyObject && (len(s.Steps) != 2 || s.Steps[0].Action != historySourceAction || s.Steps[1].Action != "history-object-recovery") {
 		return fmt.Errorf("historical object fault requires actual protected A/B source and restoration")
 	}
-	if historyRead && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-read-recovery" || !strings.Contains(textValue(s.Source, "initial"), "API读取失败")) {
+	if historyRead && (len(s.Steps) != 2 || s.Steps[0].Action != historySourceAction || s.Steps[1].Action != "history-read-recovery" || !strings.Contains(textValue(s.Source, "initial"), "API读取失败")) {
 		return fmt.Errorf("historical read failure requires actual protected A/B stop then fault and restoration")
 	}
 	if historyGC && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-gc-list-error" || intValue(s.InitialSpec, "revisionHistoryLimit", -1) != 0) {

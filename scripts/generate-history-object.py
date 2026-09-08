@@ -25,6 +25,7 @@ def main():
             {'role':'frontend','versions':{'A':1,'B':2},'workers':{'A':1,'B':1},'ordinals':{'0':'A'}},
             {'role':'backend','versions':{'A':3},'workers':{'A':0},'ordinals':{'0':'A','1':'A','2':'A'}}]
         warmup = normal.step('establish-protected-A-and-eligible-B',b,stableSeconds=10,expect={'targets':targets})
+        if config['mode']=='Role': warmup['action']='prepare-history-source'
         fault = normal.step('unavailable-A-history-read-and-protected-recovery',action='history-object-recovery',historyFault={523:'missing',525:'corrupt-data',526:'missing-role',527:'foreign-owner',528:'missing',530:'corrupt-data',531:'missing-role',532:'foreign-owner'}[int(row['id'][4:])],stableSeconds=30,timeoutSeconds=420,expect={'noReplacement':True,'targets':targets})
         case = {'format':'rollout-runner/v3','id':row['id'],'baseline':normal.COMMIT,
                 'scenario':{'source':row,'profile':'controlled','initialSpec':a,'steps':[warmup,fault]}}

@@ -88,7 +88,7 @@ func (c Case) validateScenario() error {
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
-	numericBoundary := n >= 540 && n <= 565 && c.Format == "rollout-runner/v2"
+	numericBoundary := n >= 540 && n <= 572 && c.Format == "rollout-runner/v2"
 	historyCollision := (n == 533 || n == 534) && c.Format == "rollout-runner/v3"
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
@@ -309,7 +309,11 @@ func (c Case) validateScenario() error {
 	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), ordinals)) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
 	}
-	if numericBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "update" || s.Steps[0].StableSeconds < 30) {
+	boundarySteps := 1
+	if n == 567 || n == 569 {
+		boundarySteps = 2
+	}
+	if numericBoundary && (len(s.Steps) != boundarySteps || s.Steps[0].Action != "update" || s.Steps[0].StableSeconds < 30 || boundarySteps == 2 && (s.Steps[1].Action != "update" || s.Steps[1].StableSeconds < 30)) {
 		return fmt.Errorf("numeric boundary requires literal A-to-B request and stable allowed target")
 	}
 	if historyCollision && (len(s.Steps) != 1 || s.Steps[0].Action != "history-collision-recovery") {
@@ -379,7 +383,7 @@ func budget(m map[string]interface{}, k string, d int, sg bool) (int, error) {
 		v := d * p / 100
 		if k != "maxUnavailable" {
 			v = (d*p + 99) / 100
-		} else if sg && p > 0 {
+		} else if sg && d > 0 && p > 0 {
 			v = max(v, 1)
 		}
 		return v, nil

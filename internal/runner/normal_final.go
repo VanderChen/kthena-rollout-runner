@@ -49,10 +49,15 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 		}
 		matched := false
 		for _, candidate := range candidates {
-			if len(candidate.Roles) != len(byRole) {
+			if len(candidate.Roles) < len(byRole) {
 				continue
 			}
 			good := true
+			for name := range byRole {
+				if _, ok := candidate.Roles[name]; !ok {
+					good = false
+				}
+			}
 			for name, layout := range candidate.Roles {
 				if current, ok := l.Model.Roles[name]; ok {
 					layout.R = current.R
@@ -206,10 +211,10 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 	updated, _, _ := unstructured.NestedInt64(ms.Object, "status", "updatedReplicas")
 	current, _, _ := unstructured.NestedString(ms.Object, "status", "currentRevision")
 	target, _, _ := unstructured.NestedString(ms.Object, "status", "updateRevision")
-	if observed < e.current.GetGeneration() || replicas != int64(l.Model.N) || (!expect.NoFullPromotion && ready != int64(l.Model.N)) || current == "" || target == "" {
+	if observed < e.current.GetGeneration() || replicas != int64(l.Model.N) || (!expect.NoFullPromotion && ready != int64(l.Model.N)) || (current == "" && l.Model.N > 0) || target == "" {
 		return false, "ModelServing status not converged"
 	}
-	if allTarget && current != target {
+	if allTarget && current != target && activeTemplateChange(l, current) {
 		return false, "currentRevision not promoted"
 	}
 	if expect.NoFullPromotion && current == target {
@@ -228,7 +233,12 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 	}
 	updatedGroups := 0
 	for _, byRole := range groups {
-		matches := len(byRole) == len(l.Model.Roles)
+		matches := len(byRole) <= len(l.Model.Roles)
+		for name := range byRole {
+			if _, ok := l.Model.Roles[name]; !ok {
+				matches = false
+			}
+		}
 		for name, layout := range l.Model.Roles {
 			if len(byRole[name]) != layout.R {
 				matches = false
@@ -250,10 +260,40 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 			revisions[cr.GetName()] = true
 		}
 	}
-	if !revisions["model-"+current] || !revisions["model-"+target] {
+	if (current != "" && !revisions["model-"+current]) || !revisions["model-"+target] {
 		return false, "live ControllerRevision missing"
 	}
+	// With no instances in a changed dimension, the API target must still
+	// reference the requested template. Pod absence alone cannot prove preload.
+	if l.Model.N == 0 || !activeTemplateChange(l, current) {
+		layout, ok := l.RevisionLayouts[target]
+		if !ok || !sameTemplates(layout, l.Model) {
+			return false, "target history does not contain requested templates"
+		}
+	}
 	return true, ""
+}
+
+// No rollout of an instantiated dimension is required merely to preload a
+// template for N=0 or a Role with R=0. Active changes still require promotion.
+func activeTemplateChange(l *NormalLedger, current string) bool {
+	if l.Model.N == 0 {
+		return false
+	}
+	old, ok := l.RevisionLayouts[current]
+	if !ok || len(old.Roles) != len(l.Model.Roles) {
+		return true
+	}
+	for name, role := range l.Model.Roles {
+		if role.R == 0 {
+			continue
+		}
+		previous, exists := old.Roles[name]
+		if !exists || !sameRole(role, previous) {
+			return true
+		}
+	}
+	return false
 }
 
 // The explicit Role minimum must reach the scheduler as a Role constraint.

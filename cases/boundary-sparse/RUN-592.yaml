@@ -1,0 +1,168 @@
+"format": "rollout-runner/v3"
+"id": "RUN-592"
+"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"scenario":
+  "fixture": "sparse-boundary-A"
+  "source":
+    "group": "3.2 稀疏ordinal、partition与完成性边界"
+    "kind": "运行"
+    "config":
+      "coordination": "omitted"
+      "mode": "SG"
+      "n": 3
+      "recovery": "omitted"
+      "roles":
+        "f":
+          "r": 1
+          "w": 0
+      "top":
+        "p": 3
+        "s": 0
+        "u": 0
+    "initial": "组O={0,3,4}；A全Ready；实际数3"
+    "action": "将f模板A→B"
+    "expect": "admission按D≤P接收；runtime仍有ordinal3、4待更新但0/0无法推进：应稳定等待、不得删健康实例或误报全量完成；这是配置陷阱，不能算滚动成功"
+    "refs":
+      - "P07"
+      - "H15"
+    "note": "合法但不可推进；验收是安全停住并记录风险"
+    "id": "RUN-592"
+    "verification": "NOT_RUN_ON_BASELINE"
+    "legacyGroup": "稀疏ordinal与partition"
+    "section": "3.2"
+    "categoryPath":
+      - "3"
+      - "3.2"
+  "profile": "controlled"
+  "initialSpec":
+    "template":
+      "roles":
+        -
+          "name": "frontend"
+          "replicas": 1
+          "workerReplicas": 0
+          "entryTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "sleep 3600"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+    "replicas": 3
+    "schedulerName": "volcano"
+    "plugins":
+      -
+        "name": "headless-service"
+        "type": "BuiltIn"
+      -
+        "name": "ranktable"
+        "type": "BuiltIn"
+        "config":
+          "template": "production020-ranktable-template"
+    "rolloutStrategy":
+      "type": "ServingGroupRollingUpdate"
+      "rollingUpdateConfiguration":
+        "partition": 3
+        "maxSurge": 0
+        "maxUnavailable": 0
+  "steps":
+    -
+      "name": "actual-sparse-ordinal-boundary"
+      "action": "update"
+      "until": "settled"
+      "release": "none"
+      "holdSeconds": 0
+      "stableSeconds": 30
+      "expect":
+        "noReplacement": true
+        "noNewRevision": false
+        "targets":
+          -
+            "versions":
+              "A": 3
+            "ordinals":
+              "0": "A"
+              "3": "A"
+              "4": "A"
+            "scope": "SG"
+        "blockedByBudget": true
+      "spec":
+        "template":
+          "roles":
+            -
+              "name": "frontend"
+              "replicas": 1
+              "workerReplicas": 0
+              "entryTemplate":
+                "metadata":
+                  "annotations":
+                    "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                "spec":
+                  "terminationGracePeriodSeconds": 1
+                  "containers":
+                    -
+                      "name": "workload"
+                      "image": "busybox:1.36"
+                      "imagePullPolicy": "IfNotPresent"
+                      "command":
+                        - "sh"
+                        - "-c"
+                        - "sleep 3600"
+                      "env":
+                        -
+                          "name": "ROLLOUT_VERSION"
+                          "value": "B"
+                      "readinessProbe":
+                        "exec":
+                          "command":
+                            - "test"
+                            - "-f"
+                            - "/tmp/ready"
+                        "periodSeconds": 1
+                        "failureThreshold": 1
+                      "resources":
+                        "requests":
+                          "cpu": "5m"
+                          "memory": "4Mi"
+        "replicas": 3
+        "schedulerName": "volcano"
+        "plugins":
+          -
+            "name": "headless-service"
+            "type": "BuiltIn"
+          -
+            "name": "ranktable"
+            "type": "BuiltIn"
+            "config":
+              "template": "production020-ranktable-template"
+        "rolloutStrategy":
+          "type": "ServingGroupRollingUpdate"
+          "rollingUpdateConfiguration":
+            "partition": 3
+            "maxSurge": 0
+            "maxUnavailable": 0
+      "timeoutSeconds": 420

@@ -302,7 +302,7 @@ func (e *normalExecution) execute(ctx context.Context) error {
 	if err = e.wait(ctx, baseline); err != nil {
 		return fmt.Errorf("baseline: %w", err)
 	}
-	if s.Fixture == "sparse-history-A" {
+	if s.Fixture == "sparse-history-A" || s.Fixture == "sparse-boundary-A" {
 		if err = e.prepareSparseHistoryFixture(ctx); err != nil {
 			return fmt.Errorf("INCONCLUSIVE: sparse fixture: %w", err)
 		}

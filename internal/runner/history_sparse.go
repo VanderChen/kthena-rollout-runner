@@ -24,6 +24,10 @@ import (
 // keep it separate from the source scenario until this function has established
 // the exact sparse population and written a new observation boundary.
 func sparseHistoryPods(pods []corev1.Pod, owner string, expected map[string]types.UID) error {
+	return sparseSourcePods(pods, owner, expected, false)
+}
+
+func sparseSourcePods(pods []corev1.Pod, owner string, expected map[string]types.UID, servingGroup bool) error {
 	seen := map[string]bool{}
 	for i := range pods {
 		p := &pods[i]
@@ -32,17 +36,27 @@ func sparseHistoryPods(pods []corev1.Pod, owner string, expected map[string]type
 		}
 		role, ord := p.Labels[LabelRole], ordinal(p.Labels[LabelRoleID])
 		valid := role == "frontend" && (ord == 0 || ord == 3 || ord == 4) || role == "backend" && ord >= 0 && ord <= 2
-		if !valid || !podIsEntry(p) || !podReady(p) || podVersion(p) != "A" || ordinal(p.Labels[LabelGroup]) != 0 {
+		group := ordinal(p.Labels[LabelGroup])
+		if servingGroup {
+			valid = role == "frontend" && ord == 0 && (group == 0 || group == 3 || group == 4)
+		} else {
+			valid = valid && group == 0
+		}
+		if !valid || !podIsEntry(p) || !podReady(p) || podVersion(p) != "A" {
 			return fmt.Errorf("sparse fixture has unexpected member %s", p.Name)
 		}
-		key := fmt.Sprintf("%s/%d", role, ord)
+		key := fmt.Sprintf("%s/%d/%d", role, group, ord)
 		if seen[key] || expected != nil && expected[p.Name] != p.UID {
 			return fmt.Errorf("sparse fixture identity changed: %s", p.Name)
 		}
 		seen[key] = true
 	}
-	if len(seen) != 6 {
-		return fmt.Errorf("sparse fixture has %d members, expected frontend{0,3,4}/backend{0,1,2}", len(seen))
+	want := 6
+	if servingGroup {
+		want = 3
+	}
+	if len(seen) != want {
+		return fmt.Errorf("sparse fixture has %d members, expected %d in the declared sparse mode", len(seen), want)
 	}
 	return nil
 }
@@ -77,11 +91,38 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 	}
 	defer func() { e.dir, e.phase, e.waitDeadline = originalDir, originalPhase, time.Time{} }()
 	originalSpec := cloneMap(e.c.Scenario.InitialSpec)
+	initialModel, modelErr := readModel(originalSpec)
+	if modelErr != nil {
+		return modelErr
+	}
+	servingGroup := initialModel.Mode == "SG"
+	retainedCount := 6
+	if servingGroup {
+		retainedCount = 3
+	}
 	expanded := cloneMap(originalSpec)
+	if servingGroup {
+		expanded["replicas"] = float64(5)
+	}
 	for _, raw := range listValue(mapValue(expanded, "template"), "roles") {
 		role := raw.(map[string]interface{})
-		if textValue(role, "name") == "frontend" {
+		if !servingGroup && textValue(role, "name") == "frontend" {
 			role["replicas"] = float64(5)
+		}
+	}
+	// Expanding the zero-budget trap would itself be invalid. Use a finite
+	// legal preparation budget; restore the exact source request before its boundary.
+	if e.c.Scenario.Fixture == "sparse-boundary-A" {
+		if servingGroup && initialModel.U == 0 && initialModel.S == 0 {
+			cfg := mapValue(mapValue(expanded, "rolloutStrategy"), "rollingUpdateConfiguration")
+			cfg["maxUnavailable"] = float64(1)
+		} else if !servingGroup && initialModel.Roles["frontend"].U == 0 && initialModel.Roles["frontend"].S == 0 {
+			for _, raw := range listValue(mapValue(expanded, "template"), "roles") {
+				role := raw.(map[string]interface{})
+				if textValue(role, "name") == "frontend" {
+					role["maxUnavailable"] = float64(1)
+				}
+			}
 		}
 	}
 	e.phase = 0
@@ -98,6 +139,7 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 		return err
 	}
 	retained, deleted := map[string]types.UID{}, map[string]types.UID{}
+	deletedGroups := map[string]bool{}
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 		if !owned(pod, e.l.Owner) {
@@ -107,13 +149,19 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 			return fmt.Errorf("INCONCLUSIVE: expanded source A not Ready")
 		}
 		ord := ordinal(pod.Labels[LabelRoleID])
+		if servingGroup {
+			ord = ordinal(pod.Labels[LabelGroup])
+		}
 		if pod.Labels[LabelRole] == "frontend" && (ord == 1 || ord == 2) {
 			deleted[pod.Name] = pod.UID
+			if servingGroup {
+				deletedGroups[pod.Labels[LabelGroup]] = true
+			}
 		} else {
 			retained[pod.Name] = pod.UID
 		}
 	}
-	if len(deleted) != 2 || len(retained) != 6 {
+	if len(deleted) != 2 || len(retained) != retainedCount {
 		return fmt.Errorf("INCONCLUSIVE: expanded A fixture identity count")
 	}
 	e.phase = 1
@@ -168,7 +216,7 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 			return err
 		}
 		if gone {
-			if err = sparseHistoryPods(actual.Items, e.l.Owner, retained); err != nil {
+			if err = sparseSourcePods(actual.Items, e.l.Owner, retained, servingGroup); err != nil {
 				return fmt.Errorf("INCONCLUSIVE: %w", err)
 			}
 			if err = saveYAML(filepath.Join(e.dir, "old-absent-sparse-A.yaml"), actual); err != nil {
@@ -243,7 +291,7 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 	if err != nil {
 		return err
 	}
-	if err = sparseHistoryPods(pods.Items, e.l.Owner, retained); err != nil {
+	if err = sparseSourcePods(pods.Items, e.l.Owner, retained, servingGroup); err != nil {
 		return fmt.Errorf("INCONCLUSIVE: %w", err)
 	}
 	// Clean only the two deliberately removed preparation Role identities.
@@ -255,7 +303,11 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 	var cleanup []map[string]interface{}
 	for _, cm := range cms.Items {
 		ord := ordinal(cm.Labels[LabelRoleID])
-		if !ownedConfigMap(&cm, e.l.Owner) || cm.Labels[LabelRole] != "frontend" || (ord != 1 && ord != 2) || ordinal(cm.Labels[LabelGroup]) != 0 {
+		matches := cm.Labels[LabelRole] == "frontend" && (ord == 1 || ord == 2) && ordinal(cm.Labels[LabelGroup]) == 0
+		if servingGroup {
+			matches = deletedGroups[cm.Labels[LabelGroup]] && cm.Labels[LabelRole] == "frontend" && ord == 0
+		}
+		if !ownedConfigMap(&cm, e.l.Owner) || !matches {
 			continue
 		}
 		uid := cm.UID
@@ -273,7 +325,54 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 			return err
 		}
 	}
+	if servingGroup {
+		groups, err := e.r.dynamic.Resource(PGGVR).Namespace(e.namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		var receipts []map[string]interface{}
+		for i := range groups.Items {
+			pg := &groups.Items[i]
+			if !objectOwned(pg, e.l.Owner) || !deletedGroups[pg.GetName()] {
+				continue
+			}
+			actual, err := e.r.kube.CoreV1().Pods(e.namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			if err = sparseSourcePods(actual.Items, e.l.Owner, retained, true); err != nil {
+				return err
+			}
+			if err = e.locked(func() error {
+				for _, pod := range e.o.objects["pods"] {
+					if objectOwned(pod, e.l.Owner) && pod.GetLabels()[LabelGroup] == pg.GetName() {
+						return fmt.Errorf("INCONCLUSIVE: preparation PodGroup still has members")
+					}
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err = saveYAML(filepath.Join(e.dir, "orphan-preparation-podgroup-"+pg.GetName()+".yaml"), pg.Object); err != nil {
+				return err
+			}
+			uid := pg.GetUID()
+			options := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
+			sent := time.Now().UTC()
+			err = e.r.dynamic.Resource(PGGVR).Namespace(e.namespace).Delete(ctx, pg.GetName(), options)
+			receipts = append(receipts, map[string]interface{}{"name": pg.GetName(), "uid": uid, "options": options, "sent": sent, "received": time.Now().UTC(), "accepted": err == nil})
+			if saveErr := writeJSON(filepath.Join(e.dir, "preparation-podgroup-cleanup.json"), receipts); saveErr != nil {
+				return saveErr
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
 	guard := ScenarioExpectation{NoReplacement: true, NoNewRevision: true, Targets: []ScenarioTarget{{Role: "frontend", Versions: map[string]int{"A": 3}, Ordinals: map[string]string{"0": "A", "3": "A", "4": "A"}}, {Role: "backend", Versions: map[string]int{"A": 3}, Ordinals: map[string]string{"0": "A", "1": "A", "2": "A"}}}}
+	if servingGroup {
+		guard.Targets = []ScenarioTarget{{Scope: "SG", Versions: map[string]int{"A": 3}, Ordinals: map[string]string{"0": "A", "3": "A", "4": "A"}}}
+	}
 	if err = e.locked(func() error { return e.l.Transition(originalSpec, "sparse-source-A-established", guard, e.o.objects) }); err != nil {
 		return err
 	}
@@ -306,7 +405,11 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 					return fmt.Errorf("INCONCLUSIVE: unverified source Ready UID")
 				}
 				fresh.Released[uid] = true
-				if o.GetLabels()[LabelRole] == "frontend" && ordinal(o.GetLabels()[LabelRoleID]) >= sourceModel.Roles["frontend"].R {
+				above := o.GetLabels()[LabelRole] == "frontend" && ordinal(o.GetLabels()[LabelRoleID]) >= sourceModel.Roles["frontend"].R
+				if servingGroup {
+					above = ordinal(o.GetLabels()[LabelGroup]) >= sourceModel.N
+				}
+				if above {
 					if fresh.SourceAboveDesiredUIDs == nil {
 						fresh.SourceAboveDesiredUIDs = map[string]bool{}
 					}

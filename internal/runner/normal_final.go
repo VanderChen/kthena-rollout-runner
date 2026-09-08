@@ -42,7 +42,7 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 	allTarget := true
 	for group, byRole := range groups {
 		candidates := []NormalModel{l.Model}
-		if l.Model.Mode == "SG" && group < l.Model.P {
+		if l.Model.Mode == "SG" && (group < l.Model.P || expect.BlockedByBudget) {
 			for i := len(l.History) - 2; i >= 0; i-- {
 				candidates = append(candidates, l.History[i])
 			}
@@ -216,6 +216,31 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 	}
 	if allTarget && current != target && activeTemplateChange(l, current) {
 		return false, "currentRevision not promoted"
+	}
+	if expect.BlockedByBudget {
+		if current == target {
+			return false, "zero-budget sparse source falsely promoted"
+		}
+		eligible := 0
+		for _, u := range l.units(obj["pods"]) {
+			_, unavailable, surge, partition := l.scopeBudget(u)
+			if !l.unitTarget(u) && u.Ordinal >= partition {
+				if unavailable != 0 || surge != 0 {
+					return false, "sparse blocked expectation with a progress budget"
+				}
+				eligible++
+			}
+		}
+		progress := false
+		for _, raw := range listValue(mapValue(ms.Object, "status"), "conditions") {
+			condition := raw.(map[string]interface{})
+			if condition["type"] == "UpdateInProgress" && condition["status"] == "True" {
+				progress = true
+			}
+		}
+		if eligible != 2 || !progress {
+			return false, "zero-budget sparse source must retain two eligible old instances and report update in progress"
+		}
 	}
 	if expect.NoFullPromotion && current == target {
 		return false, "dependency canary incorrectly promoted to full completion"

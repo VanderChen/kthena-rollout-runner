@@ -1,0 +1,13 @@
+{
+  "format": "rollout-runner/category-verification-v1",
+  "category": "3",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "audits": [
+    {
+      "run": "boundary-numeric-r1",
+      "audit": "independent-boundary-audit/summary.json",
+      "sha256": "3e7e538961b4409c1ea754ab91d05bb877ebede264573a3ff8074fe7db49662a"
+    }
+  ]
+}

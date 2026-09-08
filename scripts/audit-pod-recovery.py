@@ -58,8 +58,14 @@ for result in summary['results']:
     assert controllerBefore['metadata']['uid']==controllerAfter['metadata']['uid'] and controllerBefore['status']['containerStatuses'][0]['restartCount']==controllerAfter['status']['containerStatuses'][0]['restartCount']
     rules=[r for r in trace if r.get('ruleID','').startswith(rulePrefix)]
     resume=min(r['at'] for r in rules if r['action']=='rule-cleared')
-    rows=[json.loads(l) for l in (p/'observations.jsonl').read_text().splitlines()]
-    assert [r['sequence'] for r in rows]==list(range(1,len(rows)+1)) and not any(r['event']=='GAP' for r in rows)
+    allRows=[json.loads(l) for l in (p/'observations.jsonl').read_text().splitlines()]
+    assert [r['sequence'] for r in allRows]==list(range(1,len(allRows)+1))
+    gaps=[r for r in allRows if r['event']=='GAP']
+    # A proven earlier safety failure is not erased by a later shutdown gap.
+    # Never infer through that gap or use a gapped stream to corroborate PASS.
+    firstGap=min((r['sequence'] for r in gaps),default=len(allRows)+1)
+    rows=[r for r in allRows if r['sequence']<firstGap]
+    if gaps: assert result['status']=='FAIL'
     deletedTarget=[r for r in rows if r['kind']=='pods' and r['event']=='DELETED' and r['object']['metadata']['uid']==target]
     assert len(deletedTarget)==1 and deletedTarget[0]['received']<resume
     actualBefore=yaml(p/'step-01-fault-pods-before.yaml')['items']
@@ -79,10 +85,10 @@ for result in summary['results']:
                 violations.append({'observationSequence':row['sequence'],'received':row['received'],'deletionUID':uid,'deletionName':obj['metadata']['name'],'unit':key,'completeReadyBefore':available,'completeReadyAfter':available-1,'minimum':minimum,'externalFaultAlreadyDeleted':target not in pods,'unitsBefore':states})
         if row['event']=='DELETED':pods.pop(uid,None)
         else:pods[uid]=obj
-    report={'id':ident,'rawStatus':result['status'],'rawError':result.get('error'),'watchRows':len(rows),'mode':mode,'scope':scope,'minimum':minimum,'budgetViolations':violations,'faultDeletedBeforeResume':True,'sameControllerProcess':True,'facilityErrors':[],'traceRulePrefix':rulePrefix}
+    report={'id':ident,'rawStatus':result['status'],'rawError':result.get('error'),'watchRows':len(allRows),'replayedPrefixRows':len(rows),'observationGaps':gaps,'mode':mode,'scope':scope,'minimum':minimum,'budgetViolations':violations,'faultDeletedBeforeResume':True,'sameControllerProcess':True,'facilityErrors':[],'traceRulePrefix':rulePrefix}
     if result['status']=='FAIL':
         assert all(v['externalFaultAlreadyDeleted'] for v in violations)
-        report.update(classification='KTHENA_BEHAVIOR_FAILURE',subtype='HEALTHY_INSTANCE_LOSS_EXCEEDS_BUDGET_AFTER_EXTERNAL_POD_LOSS',limitation='Observed external API/watch pause and resume schedule; cross-resource Watch delivery is not globally ordered. This is a live capacity semantic failure in that schedule, not a claim about an isolated unique internal code cause. Final convergence was not reached after the latched failure.')
+        report.update(classification='KTHENA_BEHAVIOR_FAILURE',subtype='HEALTHY_INSTANCE_LOSS_EXCEEDS_BUDGET_AFTER_EXTERNAL_POD_LOSS',limitation='Observed external API/watch pause and resume schedule; cross-resource Watch delivery is not globally ordered. This is a live capacity semantic failure in that schedule, not a claim about an isolated unique internal code cause. Final convergence was not reached after the latched failure. Any recorded later observation gap is preserved; only the continuous prefix before its first occurrence is used for this capacity proof.')
         if not violations:
             report.update(classification='PENDING_REVIEW',subtype='RAW_FAILURE_NOT_EXPLAINED_BY_INDEPENDENT_PHYSICAL_CAPACITY_REPLAY')
     else:

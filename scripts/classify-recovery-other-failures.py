@@ -16,6 +16,8 @@ runid = sys.argv[1]
 assert runid and '/' not in runid and '..' not in runid
 base = ROOT/'artifacts'/runid
 core = json.loads((base/'independent-recovery-audit/summary.json').read_text())
+trace=[json.loads(line) for line in (ROOT/'artifacts/environment-022'/(runid+'-control')/'proxy-trace.jsonl').read_text().splitlines()]
+responses={r['request']:r for r in trace if r['action']=='response'}
 out = base/'other-recovery-audit'; out.mkdir()
 parser = sys.argv[2] if len(sys.argv)>2 else '/private/tmp/runner022-yaml-json'
 G='modelserving.volcano.sh/group-name'; R='modelserving.volcano.sh/role'; I='modelserving.volcano.sh/role-id'
@@ -42,7 +44,7 @@ for item in core['cases']:
     rows=[json.loads(line) for line in (p/'observations.jsonl').read_text().splitlines()]
     assert [r['sequence'] for r in rows]==list(range(1,len(rows)+1))
     report={'id':ident,'rawStatus':item['rawStatus'],'rawError':item['rawError'],'classification':'PENDING_REVIEW','watchRows':len(rows),'capacityAudit':'independent-recovery-audit/'+ident+'.json'}
-    if ident=='RUN-345' and 'RECOVERY_DUPLICATE_CREATION' in item['rawError']:
+    if ident in ('RUN-345','RUN-381') and 'RECOVERY_DUPLICATE_CREATION' in item['rawError']:
         name=item['scope']['targetName']; old=item['scope']['targetUID']
         added=[r for r in rows if r['kind']=='pods' and r['event']=='ADDED' and r['object']['metadata']['name']==name and r['object']['metadata']['uid']!=old]
         assert len(added)==2 and all(owned(r['object'],owner) and version(r['object'])=='B' for r in added)
@@ -56,6 +58,39 @@ for item in core['cases']:
         receipts=[json.loads(x.read_text()) for x in p.glob('*-submit-B-write-*-receipt.json')]
         assert sum('error' not in r for r in receipts)==1
         report.update(classification='KTHENA_BEHAVIOR_FAILURE',subtype='RECOVERY_ROLLOUT_TARGET_RECREATED_TWICE',name=name,firstReplacementUID=firstUID,secondReplacementUID=secondUID,revision=revision,firstAdded=first['received'],firstDeleted=deleted[0]['received'],secondAdded=second['received'],normalizedSpecsEqual=True,limitation='Sequential creation/deletion/recreation of the same accepted B target, violating the source recovery/rollout deduplication requirement. This is not a claim of simultaneous duplicate Pods or a capacity violation; final convergence was not reached after the latched failure.')
+    elif 'PodGroup deletion exceeds released capacity' in item['rawError']:
+        group=re.search(r'PodGroup deletion exceeds released capacity: ([a-z0-9-]+)',item['rawError']).group(1)
+        pgDeleted=[r for r in rows if r['kind']=='podgroups' and r['event']=='DELETED' and r['object']['metadata']['name']==group]
+        assert len(pgDeleted)==1 and owned(pgDeleted[0]['object'],owner)
+        decision=pgDeleted[0];podState={}
+        for r in rows:
+            if r['sequence']>=decision['sequence']:break
+            assert r['event']!='GAP'
+            if r['kind']!='pods' or not owned(r['object'],owner):continue
+            uid=r['object']['metadata']['uid']
+            if r['event']=='DELETED':podState.pop(uid,None)
+            else:podState[uid]=r['object']
+        released=json.loads((p/'ledger.json').read_text())['released']
+        groups=collections.defaultdict(list)
+        for obj in podState.values():groups[obj['metadata']['labels'][G]].append(obj)
+        optimistic=[]
+        for name,pods in groups.items():
+            layout=collections.Counter((o['metadata']['labels'][R],o['metadata']['labels'].get('modelserving.volcano.sh/entry')=='true') for o in pods)
+            complete=layout=={('frontend',True):1,('frontend',False):1,('backend',True):1}
+            available=all(not o['metadata'].get('deletionTimestamp') and (released.get(o['metadata']['uid']) or any(c['type']=='Ready' and c['status']=='True' for c in o.get('status',{}).get('conditions',[]))) for o in pods)
+            if complete and available:optimistic.append(name)
+        assert group in optimistic and len(optimistic)-1<item['minimum']
+        targetPods=groups[group]
+        assert all(o['metadata']['uid'] not in item['scope']['recoveryUIDs'] for o in targetPods)
+        ns=item['scope']['namespace'];beforeCleanup=json.loads((p/'fault-proxy-final.json').read_text())['sequence']
+        accepted=[]
+        for request in trace:
+            response=responses.get(request.get('request'),{})
+            if request['action']=='request' and request.get('namespace')==ns and request.get('method')=='DELETE' and response.get('status')==200 and response['sequence']<=beforeCleanup:
+                if request.get('resource')=='podgroups' and request.get('name')==group or request.get('resource')=='pods' and request.get('name') in {o['metadata']['name'] for o in targetPods}:
+                    accepted.append({'request':request,'response':response})
+        assert any(pair['request']['resource']=='podgroups' for pair in accepted)
+        report.update(classification='KTHENA_BEHAVIOR_FAILURE',subtype='HEALTHY_SERVING_GROUP_DESTRUCTION_STARTED_WITHOUT_BUDGET',group=group,podGroupUID=decision['object']['metadata']['uid'],podGroupDeleted=decision['received'],optimisticReadyGroups=optimistic,minimum=item['minimum'],capturedHealthyPodUIDs=[o['metadata']['uid'] for o in targetPods],acceptedDeletesBeforeNamespaceCleanup=accepted,preCleanupProxySequence=beforeCleanup,limitation='The direct observation stops at deletion of the healthy ServingGroup PodGroup, an independent destructive lifecycle action outside the captured fault scope. Capacity is conservatively overestimated using every recorded release intent, including any later one. Successful controller Pod DELETEs before namespace cleanup are included when available; this report does not claim the direct Pod Watch observed their later readiness loss or final convergence.')
     elif 'STABILITY_VIOLATION' in item['rawError'] and 'unexpected ConfigMap' in item['rawError']:
         name=re.search(r'unexpected ConfigMap ([a-z0-9-]+)',item['rawError']).group(1)
         final=yaml(p/'final-resources.yaml')

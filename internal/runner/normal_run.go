@@ -299,6 +299,11 @@ func (e *normalExecution) execute(ctx context.Context) error {
 	if err = e.wait(ctx, baseline); err != nil {
 		return fmt.Errorf("baseline: %w", err)
 	}
+	if s.Fixture == "sparse-history-A" {
+		if err = e.prepareSparseHistoryFixture(ctx); err != nil {
+			return fmt.Errorf("INCONCLUSIVE: sparse fixture: %w", err)
+		}
+	}
 	if err = e.locked(func() error {
 		for _, ms := range e.o.objects["modelservings"] {
 			e.baselineStatus = cloneMap(mapValue(ms.Object, "status"))

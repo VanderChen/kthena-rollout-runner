@@ -15,6 +15,7 @@ import (
 const ProductionCommit = "538b2825c06bc1e8c5392d18f18f84faee9fca95"
 
 type Scenario struct {
+	Fixture     string                 `json:"fixture,omitempty"`
 	Source      map[string]interface{} `json:"source"`
 	Profile     string                 `json:"profile"`
 	InitialSpec map[string]interface{} `json:"initialSpec"`
@@ -85,12 +86,16 @@ func (c Case) validateScenario() error {
 	deletionReplay := (n == 449 || n == 452) && c.Format == "rollout-runner/v3"
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
-	historyCreate := n >= 463 && n <= 522 && (n-463)%10 < 5 && c.Format == "rollout-runner/v3"
+	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
 	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
+	sparseHistory := historyCreate && (n-463)%10 >= 5
+	if sparseHistory && s.Fixture != "sparse-history-A" || !sparseHistory && s.Fixture != "" {
+		return fmt.Errorf("scenario fixture is not enabled for this catalogue entry")
+	}
 	if s.Source["id"] != c.ID {
 		return fmt.Errorf("catalogue ID mismatch")
 	}
@@ -276,7 +281,11 @@ func (c Case) validateScenario() error {
 	if lostDeletion && (len(s.Steps) != 1 || s.Steps[0].Action != "drop-old-deletions") {
 		return fmt.Errorf("lost-deletion cases require one uninterrupted controller run")
 	}
-	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), "O={0,1,2}")) {
+	ordinals := "O={0,1,2}"
+	if sparseHistory {
+		ordinals = "O={0,3,4}"
+	}
+	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), ordinals)) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
 	}
 	if historyGC && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-gc-list-error" || intValue(s.InitialSpec, "revisionHistoryLimit", -1) != 0) {

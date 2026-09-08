@@ -20,8 +20,17 @@ import (
 	"kthena.local/rollout-runner/internal/faultproxy"
 )
 
-func historyTargets(model NormalModel, version string) ScenarioExpectation {
-	protected := min(model.Roles["frontend"].P, 3)
+func historyTargets(model NormalModel, version string, sparse ...bool) ScenarioExpectation {
+	initial := []int{0, 1, 2}
+	if len(sparse) > 0 && sparse[0] {
+		initial = []int{0, 3, 4}
+	}
+	protected := 0
+	for _, ord := range initial {
+		if ord < model.Roles["frontend"].P {
+			protected++
+		}
+	}
 	versions := map[string]int{}
 	ordinals := map[string]string{}
 	if protected > 0 {
@@ -30,8 +39,10 @@ func historyTargets(model NormalModel, version string) ScenarioExpectation {
 	if protected < 3 {
 		versions[version] = 3 - protected
 	}
-	for i := 0; i < protected; i++ {
-		ordinals[fmt.Sprint(i)] = "A"
+	for _, ord := range initial {
+		if ord < model.Roles["frontend"].P {
+			ordinals[fmt.Sprint(ord)] = "A"
+		}
 	}
 	return ScenarioExpectation{Targets: []ScenarioTarget{
 		{Role: "frontend", Versions: versions, Ordinals: ordinals},
@@ -221,7 +232,7 @@ func (e *normalExecution) historyCreateRecovery(ctx context.Context, p ScenarioS
 		return err
 	}
 	finishB := p
-	finishB.Action, finishB.Name, finishB.Expect = "observe", "B-allowed-target-after-history-recovery", historyTargets(e.l.Model, "B")
+	finishB.Action, finishB.Name, finishB.Expect = "observe", "B-allowed-target-after-history-recovery", historyTargets(e.l.Model, "B", e.c.Scenario.Fixture == "sparse-history-A")
 	finishB.StableSeconds = 10
 	if err := e.locked(func() error { return e.l.Transition(e.l.Model.Spec, finishB.Name, finishB.Expect, e.o.objects) }); err != nil {
 		return err
@@ -236,23 +247,41 @@ func (e *normalExecution) historyCreateRecovery(ctx context.Context, p ScenarioS
 	}
 	// Pin a real eligible Ready B before C. P=3 on {0,1,2} produces no
 	// eligible old termination, so that conditional trigger is explicitly absent.
-	eligible := e.l.Model.Roles["frontend"].P < 3
+	sparse := e.c.Scenario.Fixture == "sparse-history-A"
+	eligible := e.l.Model.Roles["frontend"].P < 3 || sparse
+	pinOrdinal := 2
+	if sparse {
+		pinOrdinal = -1
+		if err := e.locked(func() error {
+			for _, unit := range e.l.roleUnits(e.o.objects["pods"]) {
+				if unit.Role == "frontend" && unit.Ready && unit.Version == "B" && unit.Ordinal >= e.l.Model.Roles["frontend"].P {
+					pinOrdinal = max(pinOrdinal, unit.Ordinal)
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		if pinOrdinal < 0 {
+			return fmt.Errorf("INCONCLUSIVE: sparse B target has no actual eligible Ready instance to pin")
+		}
+	}
 	if eligible {
-		ordinal := 2
+		ordinal := pinOrdinal
 		pin := ScenarioStep{Action: "pin", Conditions: []ScenarioCondition{{Kind: "unit", Role: "frontend", Ordinal: &ordinal, Version: "B", Ready: &ready, Count: 1}}}
 		if err := e.specialAction(ctx, pin, prefix+"-before-C"); err != nil {
 			return err
 		}
 	}
-	if err := writeJSON(filepath.Join(e.dir, prefix+"-terminating-trigger.json"), map[string]interface{}{"eligible": eligible, "pinnedUIDs": e.pinned, "reason": "actual continuous ordinals and source partition"}); err != nil {
+	if err := writeJSON(filepath.Join(e.dir, prefix+"-terminating-trigger.json"), map[string]interface{}{"eligible": eligible, "pinnedUIDs": e.pinned, "reason": "actual source ordinals and partition", "fixture": e.c.Scenario.Fixture, "ordinal": pinOrdinal}); err != nil {
 		return err
 	}
 	next := p
 	next.Action, next.Name, next.Spec = "update", "C-after-allowed-B", historyVersionSpec(p.Spec, "C")
-	next.Expect = historyTargets(e.l.Model, "C")
+	next.Expect = historyTargets(e.l.Model, "C", e.c.Scenario.Fixture == "sparse-history-A")
 	if eligible {
 		next.Until, next.HoldSeconds, next.StableSeconds = "conditions", 10, 0
-		ordinal := 2
+		ordinal := pinOrdinal
 		next.Conditions = []ScenarioCondition{{Kind: "terminating", Role: "frontend", Ordinal: &ordinal, Version: "B", Count: 1}}
 	}
 	// Nested requests have their own phase number to preserve B request files.

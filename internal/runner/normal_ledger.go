@@ -53,36 +53,37 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
-	Recoveries           []*RecoveryRecord      `json:"recoveries,omitempty"`
-	PGScale              map[string]bool        `json:"podGroupScaleIntentUIDs"`
-	PGPhase              map[string]string      `json:"podGroupIntentPhase"`
-	BornRanktable        map[string]bool        `json:"ranktableAtPodCreation"`
-	Served               map[string]bool        `json:"previouslyReadyUIDs"`
-	GroupShrinkRemaining int                    `json:"groupShrinkRemaining"`
-	RoleShrinkRemaining  map[string]int         `json:"roleShrinkRemaining"`
-	RevisionLayouts      map[string]NormalModel `json:"-"`
-	PGCommitted          map[string]bool        `json:"podGroupCommittedUIDs"`
-	PGPods               map[string]bool        `json:"podGroupCommittedPodUIDs"`
-	RevisionData         map[string]string      `json:"revisionData"`
-	Base                 NormalModel            `json:"-"`
-	Owner                string                 `json:"owner"`
-	Profile              string                 `json:"profile"`
-	Phase                string                 `json:"phase"`
-	Model                NormalModel            `json:"-"`
-	History              []NormalModel          `json:"-"`
-	Released             map[string]bool        `json:"released"`
-	Committed            map[string]bool        `json:"committedUIDs"`
-	Protected            map[string]string      `json:"protectedUIDs"`
-	Starts               []NormalStart          `json:"starts"`
-	Violations           []string               `json:"violations"`
-	ScaleUIDs            map[string]bool        `json:"scaleUIDs"`
-	RoleScaleIntents     map[string]string      `json:"roleScaleIntentPodUIDs,omitempty"`
-	ScaleGroups          map[int]bool           `json:"scaleGroups"`
-	Ceiling              map[string]int         `json:"ceiling"`
-	Armed                bool                   `json:"armed"`
-	NoNewRevision        bool                   `json:"noNewRevision"`
-	Revisions            map[string]bool        `json:"revisions"`
-	Expected             ScenarioExpectation    `json:"-"`
+	SourceAboveDesiredUIDs map[string]bool        `json:"sourceAboveDesiredUIDs,omitempty"`
+	Recoveries             []*RecoveryRecord      `json:"recoveries,omitempty"`
+	PGScale                map[string]bool        `json:"podGroupScaleIntentUIDs"`
+	PGPhase                map[string]string      `json:"podGroupIntentPhase"`
+	BornRanktable          map[string]bool        `json:"ranktableAtPodCreation"`
+	Served                 map[string]bool        `json:"previouslyReadyUIDs"`
+	GroupShrinkRemaining   int                    `json:"groupShrinkRemaining"`
+	RoleShrinkRemaining    map[string]int         `json:"roleShrinkRemaining"`
+	RevisionLayouts        map[string]NormalModel `json:"-"`
+	PGCommitted            map[string]bool        `json:"podGroupCommittedUIDs"`
+	PGPods                 map[string]bool        `json:"podGroupCommittedPodUIDs"`
+	RevisionData           map[string]string      `json:"revisionData"`
+	Base                   NormalModel            `json:"-"`
+	Owner                  string                 `json:"owner"`
+	Profile                string                 `json:"profile"`
+	Phase                  string                 `json:"phase"`
+	Model                  NormalModel            `json:"-"`
+	History                []NormalModel          `json:"-"`
+	Released               map[string]bool        `json:"released"`
+	Committed              map[string]bool        `json:"committedUIDs"`
+	Protected              map[string]string      `json:"protectedUIDs"`
+	Starts                 []NormalStart          `json:"starts"`
+	Violations             []string               `json:"violations"`
+	ScaleUIDs              map[string]bool        `json:"scaleUIDs"`
+	RoleScaleIntents       map[string]string      `json:"roleScaleIntentPodUIDs,omitempty"`
+	ScaleGroups            map[int]bool           `json:"scaleGroups"`
+	Ceiling                map[string]int         `json:"ceiling"`
+	Armed                  bool                   `json:"armed"`
+	NoNewRevision          bool                   `json:"noNewRevision"`
+	Revisions              map[string]bool        `json:"revisions"`
+	Expected               ScenarioExpectation    `json:"-"`
 }
 
 func newNormalLedger(spec map[string]interface{}, owner, profile string) (*NormalLedger, error) {
@@ -495,7 +496,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !scale && !reservedEarlier && u.Ready && !l.unitTarget(u) {
 		_, _, _, partition := l.scopeBudget(u)
 		for _, other := range units {
-			if other.Scope != u.Scope || other.Ordinal <= u.Ordinal || other.Ordinal < partition || other.Ordinal >= d || !other.Active || l.unitTarget(other) {
+			if other.Scope != u.Scope || other.Ordinal <= u.Ordinal || other.Ordinal < partition || (other.Ordinal >= d && !l.isSourceAboveDesired(other)) || !other.Active || l.unitTarget(other) {
 				continue
 			}
 			available := true
@@ -971,4 +972,15 @@ func (l *NormalLedger) error() error {
 		return fmt.Errorf("%s", strings.Join(l.Violations, "; "))
 	}
 	return nil
+}
+
+// Only the exact initial sparse cohort extends ordering above desired replicas.
+// Later surge Pods at the same ordinals do not inherit that identity.
+func (l *NormalLedger) isSourceAboveDesired(unit NormalUnit) bool {
+	for _, p := range unit.Pods {
+		if l.SourceAboveDesiredUIDs[string(p.UID)] {
+			return true
+		}
+	}
+	return false
 }

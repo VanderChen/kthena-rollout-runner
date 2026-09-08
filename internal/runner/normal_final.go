@@ -169,10 +169,14 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 				return false, reason
 			}
 		}
-		for key, want := range map[string]string{"cpu": fmt.Sprintf("%dm", 5*minMembers), "memory": fmt.Sprintf("%dMi", 4*minMembers)} {
+		resources, err := gangFixtureResources(model, expectedGangRoles)
+		if err != nil {
+			return false, err.Error()
+		}
+		for key, want := range resources {
 			raw, _, _ := unstructured.NestedString(pg.Object, "spec", "minResources", key)
 			q, err := resource.ParseQuantity(raw)
-			if err != nil || q.Cmp(resource.MustParse(want)) != 0 {
+			if err != nil || q.Cmp(want) != 0 {
 				return false, "PG minResources: " + key
 			}
 		}

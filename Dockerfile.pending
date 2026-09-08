@@ -1,0 +1,4 @@
+FROM busybox:1.36
+COPY bin/rollout-runner-pending /usr/local/bin/rollout-runner
+COPY cases/pending-faults /cases/pending-faults
+ENTRYPOINT ["/usr/local/bin/rollout-runner"]

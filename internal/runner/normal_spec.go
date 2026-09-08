@@ -79,10 +79,11 @@ func (c Case) validateScenario() error {
 	graceRestart := n >= 431 && n <= 432 && c.Format == "rollout-runner/v3"
 	controllerRestart := n >= 435 && n <= 440 && c.Format == "rollout-runner/v3"
 	apiRetry := n >= 455 && n <= 462 && c.Format == "rollout-runner/v3"
+	eviction := n >= 433 && n <= 434 && c.Format == "rollout-runner/v3"
 	leaderSwitch := n >= 441 && n <= 442 && c.Format == "rollout-runner/v3"
 	pluginRetry := n >= 536 && n <= 539 && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -115,6 +116,10 @@ func (c Case) validateScenario() error {
 			}
 			if _, err := readModel(p.Spec); err != nil {
 				return fmt.Errorf("lost-deletion target: %w", err)
+			}
+		case "evict-ready-entry":
+			if !eviction || len(p.Spec) != 0 || p.Release != "one" {
+				return fmt.Errorf("invalid actual Eviction API action")
 			}
 		case "terminate-leader":
 			if !leaderSwitch || len(p.Spec) != 0 || p.Release != "one" {
@@ -220,6 +225,9 @@ func (c Case) validateScenario() error {
 		if terminations != 1 {
 			return fmt.Errorf("controller recovery cases require exactly one declared termination")
 		}
+	}
+	if eviction && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "evict-ready-entry") {
+		return fmt.Errorf("eviction requires actual A/B mixture followed by Eviction API")
 	}
 	if leaderSwitch && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "terminate-leader") {
 		return fmt.Errorf("leader switch requires actual A/B mixed rollout then elected leader deletion")

@@ -20,22 +20,23 @@ import (
 )
 
 type normalExecution struct {
-	readinessPod    *corev1.Pod
-	faultController *corev1.Pod
-	capacityPod     *corev1.Pod
-	templateCM      *corev1.ConfigMap
-	tableVersion    string
-	baselineStatus  map[string]interface{}
-	pinned          map[string]types.UID
-	r               *Runner
-	c               Case
-	o               *Observer
-	l               *NormalLedger
-	namespace, dir  string
-	current         *unstructured.Unstructured
-	res             *Result
-	phase           int
-	waitDeadline    time.Time
+	evictionTrackerUID string
+	readinessPod       *corev1.Pod
+	faultController    *corev1.Pod
+	capacityPod        *corev1.Pod
+	templateCM         *corev1.ConfigMap
+	tableVersion       string
+	baselineStatus     map[string]interface{}
+	pinned             map[string]types.UID
+	r                  *Runner
+	c                  Case
+	o                  *Observer
+	l                  *NormalLedger
+	namespace, dir     string
+	current            *unstructured.Unstructured
+	res                *Result
+	phase              int
+	waitDeadline       time.Time
 }
 
 func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
@@ -325,6 +326,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "evict-ready-entry":
+		return e.evictReadyEntry(ctx, p, prefix)
 	case "terminate-leader":
 		if err := e.terminateLeader(ctx, prefix); err != nil {
 			return err

@@ -413,6 +413,12 @@ func (e *normalExecution) pluginFacts(groups map[int]map[string][]NormalUnit) (b
 		if !objectOwned(cm, e.l.Owner) {
 			continue
 		}
+		if e.evictionTrackerUID != "" && string(cm.GetUID()) == e.evictionTrackerUID {
+			if !validEvictionTracker(cm, e.l.Owner, e.evictionTrackerUID) {
+				return false, "invalid actual eviction tracker ConfigMap"
+			}
+			continue
+		}
 		count, ok := wantedTables[cm.GetName()]
 		if !ok {
 			return false, "unexpected ConfigMap " + cm.GetName()

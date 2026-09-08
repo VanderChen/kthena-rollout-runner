@@ -33,6 +33,7 @@ type normalExecution struct {
 	current        *unstructured.Unstructured
 	res            *Result
 	phase          int
+	waitDeadline   time.Time
 }
 
 func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
@@ -294,8 +295,14 @@ func (e *normalExecution) execute(ctx context.Context) error {
 	}
 	for i, p := range s.Steps {
 		e.phase = i + 1
+		e.waitDeadline = time.Time{}
 		fmt.Printf("PHASE %s %02d %s\n", e.c.ID, e.phase, p.Name)
 		if err = e.step(ctx, p); err != nil {
+			if p.RequireLiveTerminating && e.resolvePriorRoleIntent(ctx, p) {
+				err = e.finishStep(ctx, p, fmt.Sprintf("step-%02d", e.phase))
+			}
+		}
+		if err != nil {
 			return fmt.Errorf("step %02d %s: %w", e.phase, p.Name, err)
 		}
 	}
@@ -441,6 +448,9 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 			return err
 		}
 	}
+	return e.finishStep(ctx, p, prefix)
+}
+func (e *normalExecution) finishStep(ctx context.Context, p ScenarioStep, prefix string) error {
 	if err := e.wait(ctx, p); err != nil {
 		return err
 	}
@@ -485,7 +495,10 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 	if p.TimeoutSeconds > 0 {
 		timeout = time.Duration(p.TimeoutSeconds) * time.Second
 	}
-	deadline := time.NewTimer(timeout)
+	if e.waitDeadline.IsZero() {
+		e.waitDeadline = time.Now().Add(timeout)
+	}
+	deadline := time.NewTimer(time.Until(e.waitDeadline))
 	defer deadline.Stop()
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
@@ -519,7 +532,7 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 			if time.Since(stableAt) >= time.Duration(p.StableSeconds+p.HoldSeconds)*time.Second {
 				e.res.Checkpoints++
 				return e.locked(func() error {
-					return writeJSON(filepath.Join(e.dir, fmt.Sprintf("checkpoint-%03d.json", e.res.Checkpoints)), map[string]interface{}{"phase": p.Name, "stableSince": stableAt.UTC(), "completed": time.Now().UTC(), "holdSeconds": p.HoldSeconds, "stableSeconds": p.StableSeconds, "metrics": e.l.Metrics(e.o.objects["pods"]), "starts": e.l.Starts})
+					return writeJSON(filepath.Join(e.dir, fmt.Sprintf("checkpoint-%03d.json", e.res.Checkpoints)), map[string]interface{}{"phase": p.Name, "stableSince": stableAt.UTC(), "completed": time.Now().UTC(), "elapsedStableNanos": time.Since(stableAt).Nanoseconds(), "holdSeconds": p.HoldSeconds, "stableSeconds": p.StableSeconds, "metrics": e.l.Metrics(e.o.objects["pods"]), "starts": e.l.Starts})
 				})
 			}
 		} else if !stableAt.IsZero() {

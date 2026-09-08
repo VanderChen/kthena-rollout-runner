@@ -190,6 +190,21 @@ class CorrectionTests(unittest.TestCase):
         root=self.case();(root/'attempt-1/checkpoint-003.json').unlink()
         with self.assertRaises(FileNotFoundError):REPORT.verify_new_execution(root)
 
+    def test_legacy_clock_difference_requires_verified_monotonic_binary(self):
+        root=self.case();self.change(root,'checkpoint-003.json',lambda x:x.update(completed=at(49.999872)))
+        with self.assertRaisesRegex(ValueError,'30 second stability'):
+            REPORT.verify_new_execution(root)
+        with self.assertRaisesRegex(ValueError,'30 second stability'):
+            REPORT.verify_new_execution(root,verified_binary='unknown')
+        proof=REPORT.verify_new_execution(root,verified_binary=REPORT.FIX_BINARY)
+        self.assertEqual(proof['completion']['clockEvidence']['monotonicMinimumSeconds'],30)
+        self.assertAlmostEqual(proof['completion']['clockEvidence']['wallSeconds'],29.999872)
+
+    def test_larger_clock_gap_still_fails_closed(self):
+        root=self.case();self.change(root,'checkpoint-003.json',lambda x:x.update(completed=at(49.99)))
+        with self.assertRaisesRegex(ValueError,'30 second stability'):
+            REPORT.verify_new_execution(root,verified_binary=REPORT.FIX_BINARY)
+
     def test_lost_actual_after_trigger_is_rejected(self):
         root=self.case();self.change(root,'step-02-trigger-after.yaml',lambda x:x.update(items=[]))
         with self.assertRaisesRegex(ValueError,'no original eligible A'):REPORT.verify_new_execution(root)

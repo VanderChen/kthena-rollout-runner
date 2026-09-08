@@ -141,7 +141,7 @@ def verify_original_conflict(root):
                 rawStatus='FAIL', rawWatchRows=len(e['events']), evidenceSHA256={str(x.relative_to(root)): digest(x) for x in paths})
 
 
-def verify_new_execution(root):
+def verify_new_execution(root, verified_binary=None):
     e = case_evidence(root)
     r, p = e['result'], e['directory']
     require(r['status'] in {'PASS', 'FAIL'}, 'write fix: rerun remains inconclusive')
@@ -234,7 +234,13 @@ def verify_new_execution(root):
         require([c['phase'] for c in checkpoints] == ['baseline', 'observe-natural-rollout-start', 'separate-scale-during-natural-rollout'],
                 'write fix: missing scenario stages')
         final_cp = checkpoints[-1]
-        require(final_cp['stableSeconds'] == 30 and (stamp(final_cp['completed']) - stamp(final_cp['stableSince'])).total_seconds() >= 30
+        wall_seconds = (stamp(final_cp['completed']) - stamp(final_cp['stableSince'])).total_seconds()
+        # The pinned r11 binary gates completion with Go's monotonic time.Since.
+        # Its serialized UTC timestamps can differ slightly under clock slew.
+        # Accept this legacy evidence only after independent binary verification;
+        # keep the discrepancy explicit. New runners also serialize elapsed nanos.
+        monotonic_guard = verified_binary == FIX_BINARY and 29.999 <= wall_seconds < 30
+        require(final_cp['stableSeconds'] == 30 and (wall_seconds >= 30 or monotonic_guard)
                 and stamp(final_cp['stableSince']) > stamp(after['at']), 'write fix: final 30 second stability missing')
         final_n, final_r = (1, 8) if r['id'] == 'RUN-247' else (3, 6)
         protected = {u for u, o in baseline.items() if o['metadata']['labels'][ROLE] == 'backend' or (r['id'] == 'RUN-257' and ordinal(o) == 0)}
@@ -279,6 +285,10 @@ def verify_new_execution(root):
         check_final(at_start if at_start is not None else live)
         require(live == final, 'write fix: final snapshot differs from Watch')
         completion = dict(rawStatus='PASS', finalReadyPods=len(final), protectedUIDs=sorted(protected), finalStable=final_cp)
+        if monotonic_guard:
+            completion['clockEvidence'] = dict(wallSeconds=wall_seconds, monotonicMinimumSeconds=30,
+                verifiedBinarySHA256=verified_binary, runtimeCommit=FIX_COMMIT,
+                basis='Pinned binary completes only after time.Since(stableAt) >= 30 seconds; UTC subtraction differs by less than 1ms. Raw checkpoint unchanged.')
         paths.extend(p / f'checkpoint-{i:03d}.json' for i in (1, 2, 3))
     paths.extend([p / 'result.json', p / 'observations.jsonl', p / 'step-01-request-time.json', p / 'step-02-request-time.json'])
     return dict(rawWatchRows=len(e['events']), commonEligibleOriginalAUIDs=sorted(old_sets[0] & old_sets[1]),
@@ -307,7 +317,7 @@ def verify(directories, original_suite, a301, a183, fixes, candidate):
     for row in extra['results']:
         old = original[row['id']]
         review = verify_original_conflict(pathlib.Path(old['artifacts']))
-        proof = verify_new_execution(pathlib.Path(row['artifacts']))
+        proof = verify_new_execution(pathlib.Path(row['artifacts']), verified_binary=extra['binarySHA256'])
         row['provenance'] = identities[1]
         row['writeCorrectionEvidence'] = proof
         corrections.append(dict(caseID=row['id'], originalResult=dict(old, provenance=identities[0]), originalReview=review, acceptedResult=row,

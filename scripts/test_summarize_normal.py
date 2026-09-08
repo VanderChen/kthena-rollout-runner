@@ -309,6 +309,24 @@ class BoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'intent outside'):
             REPORTER.verify_restore_boundary(root)
 
+    def test_prior_intent_cannot_be_reported_as_post_restore_failure(self):
+        root=self.fixture();p=root/'controller.log'
+        p.write_text(p.read_text().replace('21.02Z','21.00Z'))
+        self.assertEqual(REPORTER.restore_deletion_evidence(root)['relation'], 'BEFORE_REQUEST')
+        with self.assertRaisesRegex(ValueError,'prior or overlapping'):
+            REPORTER.verify_restore_post_response_failure(root)
+
+    def test_overlap_cannot_be_reported_as_post_restore_failure(self):
+        with self.assertRaisesRegex(ValueError,'prior or overlapping'):
+            REPORTER.verify_restore_post_response_failure(self.fixture())
+
+    def test_post_response_new_action_remains_failure(self):
+        root=self.fixture();p=root/'controller.log'
+        p.write_text(p.read_text().replace('21.02Z','21.04Z'))
+        evidence=REPORTER.verify_restore_post_response_failure(root)
+        self.assertEqual(evidence['relation'],'AFTER_RESPONSE')
+        self.assertEqual(evidence['rawStatus'],'FAIL')
+
     def test_wrong_owner_is_rejected(self):
         root=self.fixture()
         def change(es):

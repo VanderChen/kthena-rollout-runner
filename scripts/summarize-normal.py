@@ -332,12 +332,8 @@ def pod_version(obj):
                 for e in c.get('env', []) if e['name'] == 'ROLLOUT_VERSION')
 
 
-def verify_restore_boundary(root):
-    """Diagnose one ambiguous intent, never turn a raw failure into PASS.
-
-    Deliberately independent of case ID: RUN-193's real trace must fail this
-    temporal check even though it reports the same availability error.
-    """
+def restore_deletion_evidence(root):
+    """Read the exact intent/UID/request evidence without conflating either side."""
     evidence = rapid_restore_evidence(root)
     result, events, request = (evidence[k] for k in ('result', 'events', 'request'))
     violation = 'restore-before-deletion-finishes: BUDGET_VIOLATION: model-0/frontend ready=1 delete=model-0/frontend/frontend-0 minimum=2'
@@ -377,14 +373,26 @@ def verify_restore_boundary(root):
              'message="Role frontend/frontend-0 in ServingGroup model-0 is now Deleting"' in line]
     require(len(lines) == 1, 'boundary: missing or ambiguous RoleDeleting log')
     intent = lines[0].split()[0]
-    require(observation_time(request['sent']) < observation_time(intent) < observation_time(request['received']),
-            'boundary: deletion intent outside restore request interval')
     evidence['paths'].append(log_path)
-    return dict(classification='OBSERVATION_BOUNDARY_UNRESOLVED', rawStatus='FAIL', targetUID=uid,
+    relation = ('BEFORE_REQUEST' if observation_time(intent) < observation_time(request['sent']) else
+                'AFTER_RESPONSE' if observation_time(intent) > observation_time(request['received']) else 'REQUEST_INTERVAL')
+    return dict(relation=relation, rawStatus='FAIL', targetUID=uid,
                 ownerUID=evidence['owner'], request=request, intentLogTime=intent,
                 firstPodDeletionTime=deletion['received'], terminatingUIDs=evidence['common'],
                 artifactSHA256={str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in evidence['paths']},
-                limitation='The API request overlaps an observed deletion intent. Causality is unresolved; this is not PASS or proof that the deletion was correct.')
+                limitation='Intent timing is evidence only. Prior and overlapping actions cannot be treated as new post-response actions; this is not a PASS result.')
+
+
+def verify_restore_boundary(root):
+    evidence = restore_deletion_evidence(root)
+    require(evidence['relation'] == 'REQUEST_INTERVAL', 'boundary: deletion intent outside restore request interval')
+    return dict(evidence, classification='OBSERVATION_BOUNDARY_UNRESOLVED')
+
+
+def verify_restore_post_response_failure(root):
+    evidence = restore_deletion_evidence(root)
+    require(evidence['relation'] == 'AFTER_RESPONSE', 'restore failure: a prior or overlapping intent is not a new action after restore')
+    return dict(evidence, classification='KTHENA_BEHAVIOR_FAILURE', limitation='New healthy deletion began after the accepted restore; original failure retained.')
 
 
 def verify_restore_completion(root):
@@ -461,13 +469,7 @@ def verify_with_addenda(directories, original_suite_path, addendum_301, addendum
     elif 'BUDGET_VIOLATION: model-0/frontend ready=1 delete=model-0/frontend/frontend-0 minimum=2' in replacement.get('error', ''):
         # A second ambiguous result is not acceptance and never triggers a blind
         # retry-until-green loop. Other failures retain their raw verdict.
-        try:
-            verify_restore_boundary(addendum_183 / 'RUN-183')
-        except ValueError as exc:
-            require(str(exc) == 'boundary: deletion intent outside restore request interval',
-                    'RUN-183 failed addendum needs manual evidence review: ' + str(exc))
-        else:
-            raise ValueError('RUN-183 addendum still has an unresolved observation boundary')
+        replacement['restoreFailureEvidence'] = verify_restore_post_response_failure(addendum_183 / 'RUN-183')
     report['results'] = [replacement if r['id'] == 'RUN-183' else r for r in report['results']]
     report['counts'] = dict(collections.Counter(r['status'] for r in report['results']))
     report['shards'] += additional['shards']

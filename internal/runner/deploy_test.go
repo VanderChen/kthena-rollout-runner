@@ -17,7 +17,7 @@ import (
 // Exercise the real startup path with checked-in Job arguments. A missing
 // kubeconfig stops before any API call, after case and run-ID validation.
 func TestAddendumJobsReachClientConfiguration(t *testing.T) {
-	for _, name := range []string{"normal-301-addendum.yaml", "normal-183-boundary-addendum.yaml", "normal-write-conflict-addendum.yaml"} {
+	for _, name := range []string{"normal-301-addendum.yaml", "normal-183-boundary-addendum.yaml", "normal-write-conflict-addendum.yaml", "normal-183-intent-addendum.yaml"} {
 		t.Run(name, func(t *testing.T) {
 			data, err := os.ReadFile(filepath.Join("../../deploy", name))
 			if err != nil {

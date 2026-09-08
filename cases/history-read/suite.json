@@ -1,0 +1,90 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "developmentScope": "RUN-524/529; actual P1 A/B stop then exact A revision GET errors, protected entry deletion, bounded 30-second safety observation and automatic historical A/W1 recovery",
+  "cases": [
+    {
+      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=API读取失败",
+      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
+      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
+      "refs": [
+        "H07",
+        "L05"
+      ],
+      "note": "",
+      "id": "RUN-524",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.2",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.2"
+      ]
+    },
+    {
+      "group": "2.3.2 历史缺失、损坏、归属冲突与读取失败",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "已到P=1的A/B停点；ordinal0受保护A；A历史状态=API读取失败",
+      "action": "删除protected ordinal0的f entry；观察失败边界，再恢复正确归属的原A历史/读取能力",
+      "expect": "历史未知时不伪造带A标签的B Pod、不据hash差异授权删除其他健康Pod；可诊断重试；历史恢复后按A/W=1补齐并保留保护语义",
+      "refs": [
+        "H07",
+        "L05"
+      ],
+      "note": "",
+      "id": "RUN-529",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "ControllerRevision与混合历史",
+      "section": "2.3.2",
+      "categoryPath": [
+        "2",
+        "2.3",
+        "2.3.2"
+      ]
+    }
+  ],
+  "inputs": {
+    "RUN-524": "4d173442ad13d4d28d8e6a83c3b7836927479315485ea5f68eb4e9fdaddb7e98",
+    "RUN-529": "5240e2c328466491bd6f616083cdc98fa09b3ff379545fda62558dfcf7824be5"
+  }
+}

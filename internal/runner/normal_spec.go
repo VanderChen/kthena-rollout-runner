@@ -87,8 +87,9 @@ func (c Case) validateScenario() error {
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
+	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -119,6 +120,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "history-read-recovery":
+			if !historyRead || !p.Expect.NoReplacement || !p.Expect.NoNewRevision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) != 0 {
+				return fmt.Errorf("history read recovery requires a bounded exact A read fault and protected restoration")
+			}
 		case "history-gc-list-error":
 			if !historyGC || !p.Expect.NoReplacement || !p.Expect.NoNewRevision || p.StableSeconds < 30 || p.Release != "none" || p.TimeoutSeconds < 600 {
 				return fmt.Errorf("history GC requires retained live references through the actual audit and retry window")
@@ -287,6 +292,9 @@ func (c Case) validateScenario() error {
 	}
 	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), ordinals)) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
+	}
+	if historyRead && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-read-recovery" || !strings.Contains(textValue(s.Source, "initial"), "API读取失败")) {
+		return fmt.Errorf("historical read failure requires actual protected A/B stop then fault and restoration")
 	}
 	if historyGC && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-gc-list-error" || intValue(s.InitialSpec, "revisionHistoryLimit", -1) != 0) {
 		return fmt.Errorf("history GC requires limit zero, actual frontend B/backend A, then an exact live-reference List fault")

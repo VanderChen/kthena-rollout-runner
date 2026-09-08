@@ -1,0 +1,4251 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "developmentScope": "97 real admission requests, atomic stored spec/generation/UID and retained histories; six actual in-flight sources continue under their last accepted spec; explicit invalid types, missing fields, duplicate graphs and null merge-patches retained",
+  "cases": [
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "u": 0
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M100",
+        "B04",
+        "L01",
+        "P01",
+        "D04",
+        "D03"
+      ],
+      "note": "",
+      "id": "DENY-001",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "u": 0
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M101",
+        "B04",
+        "L01",
+        "P01",
+        "D04",
+        "D03"
+      ],
+      "note": "",
+      "id": "DENY-002",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 1,
+          "u": 0
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M101",
+        "B04",
+        "L01",
+        "P02",
+        "D04",
+        "D03"
+      ],
+      "note": "",
+      "id": "DENY-003",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "s": 0,
+          "u": 0
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M110",
+        "B05",
+        "L01",
+        "P01",
+        "D04",
+        "D03"
+      ],
+      "note": "",
+      "id": "DENY-004",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 0
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M111",
+        "B05",
+        "L01",
+        "P01",
+        "D04",
+        "D03"
+      ],
+      "note": "",
+      "id": "DENY-005",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 0,
+          "u": 0
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M111",
+        "B05",
+        "L01",
+        "P02",
+        "D04",
+        "D03"
+      ],
+      "note": "",
+      "id": "DENY-006",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "r": 3,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M100",
+        "B04",
+        "L01",
+        "P01",
+        "D05",
+        "C-OFF"
+      ],
+      "note": "",
+      "id": "DENY-007",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M101",
+        "B04",
+        "L01",
+        "P01",
+        "D05",
+        "C-OFF"
+      ],
+      "note": "",
+      "id": "DENY-008",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M101",
+        "B04",
+        "L01",
+        "P02",
+        "D05",
+        "C-OFF"
+      ],
+      "note": "",
+      "id": "DENY-009",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "r": 3,
+            "s": 0,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M110",
+        "B05",
+        "L01",
+        "P01",
+        "D05",
+        "C-OFF"
+      ],
+      "note": "",
+      "id": "DENY-010",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M111",
+        "B05",
+        "L01",
+        "P01",
+        "D05",
+        "C-OFF"
+      ],
+      "note": "",
+      "id": "DENY-011",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 0,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中预算并将f模板A→B",
+      "expect": "拒绝0/0预算；旧Spec和Pod UID保持",
+      "refs": [
+        "M111",
+        "B05",
+        "L01",
+        "P02",
+        "D05",
+        "C-OFF"
+      ],
+      "note": "",
+      "id": "DENY-012",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.1 预算不可推进拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": "20%",
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有A全Ready，当前预算为1/0/0",
+      "action": "提交表中百分比预算并将f模板A→B",
+      "expect": "拒绝：Role正百分比向下到0，且无surge；旧Spec/UID保持",
+      "refs": [
+        "V04",
+        "H12"
+      ],
+      "note": "",
+      "id": "DENY-013",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "预算不可推进",
+      "section": "3.4.1",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.1"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": -1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=-1不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-014",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": "101%"
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=\"101%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-015",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": "1.5%"
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=\"1.5%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-016",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": "25"
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=\"25\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-017",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0.5
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=0.5不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-018",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": -1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=-1不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-019",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": "101%",
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=\"101%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-020",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": "1.5%",
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=\"1.5%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-021",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": "25",
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=\"25\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-022",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0.5,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=0.5不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-023",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": -1,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=-1不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-024",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": "101%",
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=\"101%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-025",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": "1.5%",
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=\"1.5%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-026",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": "25",
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=\"25\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-027",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0.5,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=0.5不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-028",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": -1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=-1不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-029",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": "101%",
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=\"101%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-030",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": "1.5%",
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=\"1.5%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-031",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": "25",
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=\"25\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-032",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0.5,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "U=0.5不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-033",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": -1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=-1不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-034",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": "101%",
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=\"101%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-035",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": "1.5%",
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=\"1.5%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-036",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": "25",
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=\"25\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-037",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0.5,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "S=0.5不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-038",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": -1,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=-1不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-039",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": "101%",
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=\"101%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-040",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": "1.5%",
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=\"1.5%\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-041",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": "25",
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=\"25\"不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-042",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.2 数值与字段类型拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0.5,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready，原预算1/1/0",
+      "action": "提交表中非法字段，不修改业务模板",
+      "expect": "P=0.5不符合非负整数/0%…100%整数百分比的有效字段约束；schema或webhook拒绝，存储spec与UID不变",
+      "refs": [
+        "V11"
+      ],
+      "note": "",
+      "id": "DENY-043",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "数值与字段类型拒绝",
+      "section": "3.4.2",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.2"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        },
+        "top": {}
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交Role顶层空预算配置",
+      "expect": "Role mode禁止顶层rollingUpdateConfiguration，即使{}；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-044",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "s": 0,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交SG内联S=0配置",
+      "expect": "SG mode禁止Role maxSurge，即使0；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-045",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "p": 0,
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交SG内联P=0配置",
+      "expect": "SG mode禁止Role partition，即使0；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-046",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "50%"
+        },
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交SG显式coordination配置",
+      "expect": "coordination只可用于Role mode；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-047",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "50%"
+        },
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "strategyForm": "configuration-only",
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交省略type并写coordination配置",
+      "expect": "type默认SG，不因coordination自动切Role；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-048",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 0,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交Role+SG恢复配置",
+      "expect": "Role mode与ServingGroupRecreate不兼容；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-049",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 4,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交Role U>R配置",
+      "expect": "Role U=4超过R=3；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-050",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 0,
+            "s": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交Role R=0且U省略配置",
+      "expect": "API默认U=1超过R=0；需显式合法U=0；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-051",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        },
+        "typeOverride": ""
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交显式type空串配置",
+      "expect": "type空串不是省略，不满足枚举；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-052",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        },
+        "typeOverride": "UnknownRollingUpdate"
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交未知type配置",
+      "expect": "未知枚举；拒绝且旧spec/UID保持",
+      "refs": [
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "Z03"
+      ],
+      "note": "",
+      "id": "DENY-053",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A/B部分更新进行中",
+      "action": "仅删除rolloutStrategy.type，保留Role S/P",
+      "expect": "type默认回SG，遗留Role S/P不兼容；整次提交拒绝，不部分应用",
+      "refs": [
+        "D11",
+        "T15"
+      ],
+      "note": "",
+      "id": "DENY-054",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.3 字段归属与兼容性拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A/B滚动中，仍有eligible旧A",
+      "action": "仅把S从1改0，保持U=0/P=0",
+      "expect": "0/0不可推进，拒绝且保留原0/1/0策略",
+      "refs": [
+        "L12"
+      ],
+      "note": "",
+      "id": "DENY-055",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "字段归属与兼容性拒绝",
+      "section": "3.4.3",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.3"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {},
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交不含maxSkew的coordination对象",
+      "expect": "maxSkew必填；空对象不代表默认启用；拒绝且旧spec/UID保持",
+      "refs": [
+        "C000",
+        "C001",
+        "C100",
+        "C101"
+      ],
+      "note": "",
+      "id": "DENY-056",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          }
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交不含maxSkew的coordination对象",
+      "expect": "maxSkew必填；空对象不代表默认启用；拒绝且旧spec/UID保持",
+      "refs": [
+        "C000",
+        "C001",
+        "C100",
+        "C101"
+      ],
+      "note": "",
+      "id": "DENY-057",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "roles": [
+            "f",
+            "b"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交不含maxSkew的coordination对象",
+      "expect": "maxSkew必填；空对象不代表默认启用；拒绝且旧spec/UID保持",
+      "refs": [
+        "C000",
+        "C001",
+        "C100",
+        "C101"
+      ],
+      "note": "",
+      "id": "DENY-058",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "roles": [
+            "f",
+            "b"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交不含maxSkew的coordination对象",
+      "expect": "maxSkew必填；空对象不代表默认启用；拒绝且旧spec/UID保持",
+      "refs": [
+        "C000",
+        "C001",
+        "C100",
+        "C101"
+      ],
+      "note": "",
+      "id": "DENY-059",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": 1
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交表中maxSkew",
+      "expect": "必须为(0%,100%]整数百分比字符串；拒绝且旧spec/UID保持",
+      "refs": [
+        "C-R15",
+        "C-R16"
+      ],
+      "note": "",
+      "id": "DENY-060",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "0%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交表中maxSkew",
+      "expect": "必须为(0%,100%]整数百分比字符串；拒绝且旧spec/UID保持",
+      "refs": [
+        "C-R15",
+        "C-R16"
+      ],
+      "note": "",
+      "id": "DENY-061",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "101%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交表中maxSkew",
+      "expect": "必须为(0%,100%]整数百分比字符串；拒绝且旧spec/UID保持",
+      "refs": [
+        "C-R15",
+        "C-R16"
+      ],
+      "note": "",
+      "id": "DENY-062",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "1.5%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交表中maxSkew",
+      "expect": "必须为(0%,100%]整数百分比字符串；拒绝且旧spec/UID保持",
+      "refs": [
+        "C-R15",
+        "C-R16"
+      ],
+      "note": "",
+      "id": "DENY-063",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "25"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交表中maxSkew",
+      "expect": "必须为(0%,100%]整数百分比字符串；拒绝且旧spec/UID保持",
+      "refs": [
+        "C-R15",
+        "C-R16"
+      ],
+      "note": "",
+      "id": "DENY-064",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "50%",
+          "roles": [
+            "f"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交参与集合只有1个Role图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-065",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "50%",
+          "roles": [
+            "f",
+            "f",
+            "b"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交重复参与Role图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-066",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "maxSkew": "50%",
+          "roles": [
+            "f",
+            "ghost"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交未知参与Role图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-067",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "f"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交自环图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-068",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "b": [
+              "f"
+            ],
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交两节点环图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-069",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "b": [
+              "c"
+            ],
+            "c": [
+              "f"
+            ],
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "c": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交三节点环图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-070",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "ghost"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交未知依赖端点图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-071",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "x"
+            ]
+          },
+          "maxSkew": "50%",
+          "roles": [
+            "f",
+            "b"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "x": {
+            "r": 3,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交集合外依赖端点图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-072",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "x": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%",
+          "roles": [
+            "f",
+            "b"
+          ]
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "x": {
+            "r": 3,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交集合外依赖发起者图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-073",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b",
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交重复dependsOn图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-074",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": [
+            {
+              "dependsOn": [
+                "b"
+              ],
+              "role": "f"
+            },
+            {
+              "dependsOn": [
+                "b"
+              ],
+              "role": "f"
+            }
+          ],
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交重复dependency owner图配置",
+      "expect": "静态图校验拒绝，不进入滚动；旧spec/UID保持",
+      "refs": [
+        "C-A07"
+      ],
+      "note": "",
+      "id": "DENY-075",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 1,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 1,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "单副本依赖A已经创建并Ready",
+      "action": "仅将f、b模板A→B，replicas仍1",
+      "expect": "update需要同时保留旧依赖及稳定目标槽；R=1不足，即使S=1也拒绝；不能用create成功证明update可行",
+      "refs": [
+        "C-A01"
+      ],
+      "note": "",
+      "id": "DENY-076",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 3,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "连续A全Ready",
+      "action": "提交b P=3并同时将f、b模板A→B",
+      "expect": "必要dependency完全保护、没有目标容量，拒绝且不删旧Pod",
+      "refs": [
+        "C-A05"
+      ],
+      "note": "",
+      "id": "DENY-077",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 2,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "f、b A→B进行中，旧f仍存在",
+      "action": "把b R从2缩至1且维持模板B",
+      "expect": "active update移除必要稳定目标槽，拒绝；已有动作仍按上次合法spec继续",
+      "refs": [
+        "C-A06"
+      ],
+      "note": "",
+      "id": "DENY-078",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.4 Coordination拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": {
+          "dependencies": {
+            "f": [
+              "b"
+            ]
+          },
+          "maxSkew": "50%"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "p": 0,
+            "r": 2,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 0
+          }
+        }
+      },
+      "initial": "f、b A→B进行中，旧f仍存在",
+      "action": "把b P提高至2且维持模板B",
+      "expect": "active update消除dependency目标范围，拒绝；不能只校验模板发生变化的请求",
+      "refs": [
+        "C-A06"
+      ],
+      "note": "",
+      "id": "DENY-079",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "Coordination拒绝",
+      "section": "3.4.4",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.4"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "以完整Update请求省略f.workerReplicas（非保留旧字段的apply）",
+      "expect": "workerReplicas为必填，无默认0；schema拒绝且原spec不变",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-080",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "omitWorkerTemplateFor": [
+          "f"
+        ],
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交f W=1但不含workerTemplate的完整spec",
+      "expect": "worker数>0必须提供workerTemplate；拒绝且原spec不变",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-081",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "eviction": {
+          "level": "SG"
+        },
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交evictionStrategy={protectionLevel:ServingGroup}，省略minAvailable",
+      "expect": "eviction结构/数值校验拒绝；不能用rollout预算补全其缺失字段",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-082",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "eviction": {
+          "level": "SG",
+          "min": 4
+        },
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交ServingGroup保护minAvailable=4，N保持3",
+      "expect": "eviction结构/数值校验拒绝；不能用rollout预算补全其缺失字段",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-083",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "gangPolicy": {
+          "minRoleReplicas": {
+            "f": 1
+          }
+        },
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready；gangPolicy.minRoleReplicas={f:1}",
+      "action": "仅将已存在的gangPolicy.minRoleReplicas.f从1改0",
+      "expect": "immutable校验拒绝，不借滚动升级绕过；原spec与健康UID保持",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-084",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "gangPolicy": {
+          "minRoleReplicas": {
+            "f": 1
+          }
+        },
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready；gangPolicy.minRoleReplicas={f:1}",
+      "action": "用merge patch将已有gangPolicy设为null",
+      "expect": "immutable校验拒绝，不借滚动升级绕过；原spec与健康UID保持",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-085",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "networkTopology": {},
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready；创建时显式networkTopology:{}",
+      "action": "用merge patch将已有networkTopology从{}设为null",
+      "expect": "immutable校验拒绝，不借滚动升级绕过；原spec与健康UID保持",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-086",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "以完整Update请求省略f.workerReplicas（非保留旧字段的apply）",
+      "expect": "workerReplicas为必填，无默认0；schema拒绝且原spec不变",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-087",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "omitWorkerTemplateFor": [
+          "f"
+        ],
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 1
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交f W=1但不含workerTemplate的完整spec",
+      "expect": "worker数>0必须提供workerTemplate；拒绝且原spec不变",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-088",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "eviction": {
+          "level": "SG"
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交evictionStrategy={protectionLevel:ServingGroup}，省略minAvailable",
+      "expect": "eviction结构/数值校验拒绝；不能用rollout预算补全其缺失字段",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-089",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "eviction": {
+          "level": "SG",
+          "min": 2
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "已有合法A全Ready",
+      "action": "提交ServingGroup保护minAvailable=2，N保持1",
+      "expect": "eviction结构/数值校验拒绝；不能用rollout预算补全其缺失字段",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-090",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "gangPolicy": {
+          "minRoleReplicas": {
+            "f": 1
+          }
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；gangPolicy.minRoleReplicas={f:1}",
+      "action": "仅将已存在的gangPolicy.minRoleReplicas.f从1改0",
+      "expect": "immutable校验拒绝，不借滚动升级绕过；原spec与健康UID保持",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-091",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "gangPolicy": {
+          "minRoleReplicas": {
+            "f": 1
+          }
+        },
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；gangPolicy.minRoleReplicas={f:1}",
+      "action": "用merge patch将已有gangPolicy设为null",
+      "expect": "immutable校验拒绝，不借滚动升级绕过；原spec与健康UID保持",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-092",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.5 结构及不可变配置拒绝",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "networkTopology": {},
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 0,
+            "r": 3,
+            "s": 1,
+            "u": 1,
+            "w": 0
+          }
+        }
+      },
+      "initial": "A全Ready；创建时显式networkTopology:{}",
+      "action": "用merge patch将已有networkTopology从{}设为null",
+      "expect": "immutable校验拒绝，不借滚动升级绕过；原spec与健康UID保持",
+      "refs": [
+        "X07",
+        "E02"
+      ],
+      "note": "",
+      "id": "DENY-093",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "结构及不可变配置拒绝",
+      "section": "3.4.5",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.5"
+      ]
+    },
+    {
+      "group": "3.4.6 扩缩容使配置失效",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "u": 0,
+          "s": 0,
+          "p": 3
+        }
+      },
+      "initial": "A全Ready；提交B后全保护停驻，稳定30秒",
+      "action": "仅改N:3→4，U/S/P仍0/0/3",
+      "expect": "扩容使D>P且U=S=0，拒绝此次Update；存储副本数仍3，原3个A UID保持且不创建第4个实例；目标B仍合法停驻，稳定30秒",
+      "refs": [
+        "P07",
+        "P11",
+        "B01"
+      ],
+      "note": "新增规划；拒绝后保留已接收spec及历史在途账本，继续观测原灰度/滚动；NOT_RUN_ON_BASELINE。",
+      "id": "DENY-094",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "subgroup": "扩缩容使配置失效",
+      "executionProfile": "HOLD_READY",
+      "legacyGroup": "滚动中扩缩容与partition灰度",
+      "section": "3.4.6",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.6"
+      ]
+    },
+    {
+      "group": "3.4.6 扩缩容使配置失效",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 3,
+            "w": 0,
+            "u": 0,
+            "s": 0,
+            "p": 3
+          }
+        }
+      },
+      "initial": "A全Ready；提交B后全保护停驻，稳定30秒",
+      "action": "仅改f.R:3→4，U/S/P仍0/0/3",
+      "expect": "扩容使D>P且U=S=0，拒绝此次Update；存储副本数仍3，原3个A UID保持且不创建第4个实例；目标B仍合法停驻，稳定30秒",
+      "refs": [
+        "P07",
+        "P11",
+        "B01"
+      ],
+      "note": "新增规划；拒绝后保留已接收spec及历史在途账本，继续观测原灰度/滚动；NOT_RUN_ON_BASELINE。",
+      "id": "DENY-095",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "subgroup": "扩缩容使配置失效",
+      "executionProfile": "HOLD_READY",
+      "legacyGroup": "滚动中扩缩容与partition灰度",
+      "section": "3.4.6",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.6"
+      ]
+    },
+    {
+      "group": "3.4.6 扩缩容使配置失效",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 3,
+            "w": 0,
+            "u": 2,
+            "s": 0,
+            "p": 1
+          }
+        }
+      },
+      "initial": "A全Ready；提交f模板B后，新f2/f1完整但NotReady，b仍Ready A",
+      "action": "仅改f.R:3→1，f.U仍为整数2",
+      "expect": "拒绝U=2>新R=1；存储f.R仍3，原在途替换不能因被拒请求清空或停止恢复；按原配置放行后应A{0}+B{1,2}，b UID保持",
+      "refs": [
+        "T05",
+        "B01"
+      ],
+      "note": "新增规划；拒绝后保留已接收spec及历史在途账本，继续观测原灰度/滚动；NOT_RUN_ON_BASELINE。",
+      "id": "DENY-096",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "subgroup": "扩缩容使配置失效",
+      "executionProfile": "HOLD_READY",
+      "legacyGroup": "滚动中扩缩容与partition灰度",
+      "section": "3.4.6",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.6"
+      ]
+    },
+    {
+      "group": "3.4.6 扩缩容使配置失效",
+      "kind": "拒绝",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 1,
+            "w": 0
+          },
+          "f": {
+            "r": 5,
+            "w": 0,
+            "u": "20%",
+            "s": 0,
+            "p": 1
+          }
+        }
+      },
+      "initial": "A全Ready；提交f模板B后，新f4完整但NotReady，f0/1/2/3及b仍Ready A",
+      "action": "仅改f.R:5→3，U/S/P仍为\"20%\"/0/1",
+      "expect": "新R下U向下取整为0且S=0、R>P，拒绝Update；存储R仍5，按原U=1持续记账；放行后达到A{0}+B{1,2,3,4}，b UID保持；不能套用SG的正百分比clamp",
+      "refs": [
+        "P11",
+        "T05",
+        "B01"
+      ],
+      "note": "新增规划；拒绝后保留已接收spec及历史在途账本，继续观测原灰度/滚动；NOT_RUN_ON_BASELINE。",
+      "id": "DENY-097",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "subgroup": "扩缩容使配置失效",
+      "executionProfile": "HOLD_READY",
+      "legacyGroup": "滚动中扩缩容与partition灰度",
+      "section": "3.4.6",
+      "categoryPath": [
+        "3",
+        "3.4",
+        "3.4.6"
+      ]
+    }
+  ],
+  "inputs": {
+    "DENY-001": "3716e2eb7a0a3076411cab24d21c080924023fd88276c76b858717a47c923d28",
+    "DENY-002": "1c04312c34c16e619ce6ca55160b9d22540e0b4dcc4db567c973d0d4258aee17",
+    "DENY-003": "4c8ab716f60fcacc1cccf27d46ef537d9236713315bb5c7ebd7de1276947859d",
+    "DENY-004": "8c3dc6801357fb2018c64c352a2bf5e5b0d41e1030345ef495c732aa67282ffa",
+    "DENY-005": "afa60e6ff824535cd8fa92718d8df3909bf3c0a8f976b2b23bcd8ef291865251",
+    "DENY-006": "bddb9c2a9601af671dff832316e0e3069be07c678861fe573f7c1fecbbc5fc4d",
+    "DENY-007": "f54d02457ab49ee531a2da17265ea12fa2b3f1311a2957f7be45349b4922dab1",
+    "DENY-008": "dab25320e864c789f2acce9ba2224800e84be654cf9fc8763353c7151d529fb0",
+    "DENY-009": "40f4345fbe7b7219b46a8545adb0375d721035f76e416b342af0a6f95be91e32",
+    "DENY-010": "54e3de58799b02714b8bdb7f934c6cf435aaae287702c40c7b7d400e38d9e635",
+    "DENY-011": "0af6577885c7e0b3b77c74fa3d74a5e8bb44dd08069b558ccfd77fbf425a6f4b",
+    "DENY-012": "e7518171284dd724bc97fe66641b16d029edbbd36246ae188a4bf22c17524e11",
+    "DENY-013": "a26e7e52a0a90587f99724db5318c5139716b58dcfe46213ac9ef48caf4da422",
+    "DENY-014": "d0a3bb2ccd44699156bad9db2c1723165ca7198b241969c6fcf4d3ba04e1623b",
+    "DENY-015": "6658704b98f7c6a58bf550c0b104fed49e5c1242c3f240ac55e4b5229d68ac6e",
+    "DENY-016": "5f25ead72c3d7d1981c2691c3b2a2eb33df61f31cf65ea1c1051e5a2a121b344",
+    "DENY-017": "b8dfb9df4d6a55226f5bfc785eb2a2b41c42c46a8bc3f4beaef25fb37b7a4877",
+    "DENY-018": "fef0bf9a570351d74f598fa0d9c7e71d307836c2c626e294fc7256ad8362a9fc",
+    "DENY-019": "25ad8ddebd9902aebfcec10a9f22ada5179ce7d32fdd23b573531a88681d45e0",
+    "DENY-020": "390e303aad87d4f6e2c42fe6aef73bfc2c8a46b059cfc17c99d53b4f044b981f",
+    "DENY-021": "5c1c1860059d3e6a604653a1e18f0272ac644e9fffa31251c4934f0485efb5a7",
+    "DENY-022": "0935cb88b978adb5c14426ed5a4e0105f8075cf864376c63c32fb1ba3023c580",
+    "DENY-023": "68a7b61c14044c361424b9fab4b6525d12fabd442e168a80aa72c566c4fbe427",
+    "DENY-024": "faf7a0cdb7323f1f183b62781f6f5857cfdb9145dec2342be23816d85eccef96",
+    "DENY-025": "e8e5a025adca1fe74b036a4de7d1d961d0111dc9fc876757af0c8845a3abc655",
+    "DENY-026": "c774f7254f12cbd62b9fc984bb177778bf23df3518a0bdd3094e4bc2d1b39af9",
+    "DENY-027": "ea3ebef38758c3e1f7bf48d1d4227337235e6d4efa3aa6d85d715ff55779724c",
+    "DENY-028": "434768d6e72a5bd546869fffca2482ddac2e0655749219331c3caf54fe855221",
+    "DENY-029": "716261e114e17c238b4d9ca0e3f48686c98b5edf34faf1542438d8bc3044e3c4",
+    "DENY-030": "07decc715d0d5434c71cef835e0e9cb3a07f0a84a04aa830e23b7a38668d9fa2",
+    "DENY-031": "1b357bf87cedfd311dd941d4c7e2cda462ca19d006fd2c98ca1b79bcb2b39f89",
+    "DENY-032": "f05b3a95ff1f5692e74d4dd52802c7d7f0833650a434987af75f1f6ffa1a51e5",
+    "DENY-033": "1bf557641b9f921af8234a97c836887df57a04d8a4cdb10d83b7a19a4ae542ac",
+    "DENY-034": "619b4926606e7c3fbf696d207141a5545d284e2a80bb00fc464fe0b8b25ac7e5",
+    "DENY-035": "bc947c6f223a3b96faa20e404ac144b833bae4e7711263179385c7d321929028",
+    "DENY-036": "d638192fc7c0812c2bec2947894bf1b07bde77a4bec02b63ab71202f263b7570",
+    "DENY-037": "2aefdc66bd0dc9ded88a8051e846047485dedd2ec606ec779845ad81bdc2fb92",
+    "DENY-038": "e2c70039d3627ce3470526d63444abb6d01e6999ee3b243fdd327eba3a33159b",
+    "DENY-039": "252b6aa5ad514c134edb8c901c6a21d35c9794fc3fc202b2c051a8552a52d1e2",
+    "DENY-040": "f0c03fd4dfca94d561979b57663ac1fa18c38b2d553983c8dd0899f7c2853508",
+    "DENY-041": "41c8fe5aeb4f45147c9ea14465f986f5c5862e7923e7d582f9c46f01e9cde4d4",
+    "DENY-042": "d92f2e8aa63875f344bde2193456baf2f16e1befc2e8f5ebbce69259bc24211c",
+    "DENY-043": "c30b48a5a61f6df080730ef468a4befa8c821ad11385aaae29589b42140d8084",
+    "DENY-044": "f74b1fb34e1ea7b617566b8fca759f05aa68ed96592d363716a39c00378d0833",
+    "DENY-045": "f8d96962e5db6675625b663d6c23498d542754edf4530d2464c05e54a3a33802",
+    "DENY-046": "0174cd2829db10bd5fbd1fed5eb44c6b85831751c1625405d7c09b9656518b72",
+    "DENY-047": "8b49785056ff39bde39e11b6720d9587dbdc14d22e067ce78ffb062dd30b3f29",
+    "DENY-048": "7c27162aa13890c045c6766155debf40a2b9c3d6598442e75e99dce2eced4669",
+    "DENY-049": "41e1a05b40f571507072a134240f226bff25fd5a1baba6b72585533a2a6d743c",
+    "DENY-050": "a963f65dcfff10bc6ad49cf9a6f16db532e89f9f8c6ec85c022fa32518909e1e",
+    "DENY-051": "ca82d72ad62a6a2fa4279cde1628f572eeb87c6a67795f42e5bb9824db549c5e",
+    "DENY-052": "fa63e6dc6aac901c917300f283933fe2d48c5262499f3b2e3e179942e9ec078c",
+    "DENY-053": "7c43dc90d37f14039e2c0765c9b800509559832a210574313e983dcdd6f291c8",
+    "DENY-054": "33f39c054d35a029d7867baaf8b4b16dfc9b9112740770ae1460863224d61bce",
+    "DENY-055": "1c38764dd10436c99197ea1b9a6730aa8f6d8d7a409f30d61ae60f37e8289980",
+    "DENY-056": "7081d86d9c6832e9fdfe0ffa0c4242eadcafd065793d3837d7a571a6d853c173",
+    "DENY-057": "fb538ffcaa35b9ed12127e3dc8bab4c922c77b9d1d2a112dcb8b678ebfdfa6f1",
+    "DENY-058": "ffa34dc9cc7cab1ace28c690d7001fafbe250833f83d835c140c6bb8d214c791",
+    "DENY-059": "6047428ffeb2f8ec85a0ece0506097feaf5f0b668a0322a21869591df5ce6e6b",
+    "DENY-060": "c6c59e91c87cecf7cea0f8520fd7af5c26b110de0e55a180690c293a5f14720f",
+    "DENY-061": "06bf8df389d46b0c3dc22bdaaf5fe80a6d09a873f7017c0e32707416e45775fb",
+    "DENY-062": "9b02b35feb75600b5ded9e8f063216f64387497293b746903b8333dab46496f9",
+    "DENY-063": "ca7ea05e75da515e6be409156e5b5d75d63bccd480ab547aa8b89cf9711f9253",
+    "DENY-064": "12a750d4fbb5a3009ee1b58de9238bb2e904cedc6779ba0114ac35103589bc0f",
+    "DENY-065": "b1ee4bf756a7bc79bcc3741fcf151292c88d7415249a15a674c15dac182396a5",
+    "DENY-066": "8038025eddfff8c1ae7ec5148a4d39076d6e9a2ca20e920e4fe1e7972d2cae96",
+    "DENY-067": "28bddc83a429a870b8d84e1ffead6e79cd2b7e5420a86f48260fd845f69659f6",
+    "DENY-068": "d15cab9ec4cd3f8f6abb28754755095e5e289008096fe26386c78f25123cf266",
+    "DENY-069": "c4334abd6da1c4df04b4b823ef048e610e8e2a26e881b2265a51d3da3aa858ac",
+    "DENY-070": "795b94bd72e315bb9415251ef68619c202e8ea42172ee3282c8496a54b7f7c5d",
+    "DENY-071": "36d032fd5a691b601655b97d05f70f26e071b665ff2b3ccf5294718fa51ad301",
+    "DENY-072": "5eab40b7a219d2ee9d0ddd251e3579e279698b8ef2c12b2fbd41ceb401e59e54",
+    "DENY-073": "7d33758e0a9dd4fd3be4c399a8fe15961b94ae60638729da2daa9ac1c815e781",
+    "DENY-074": "bad6ae01732cac1ab5cd6b076ba62802e31fe5de0a62ed96a75a7bce41dc4841",
+    "DENY-075": "1ea1540f04d9e567818ee42042ce80c17f55fbf32708c26fc705d1796950c681",
+    "DENY-076": "9a016a384a2825f3e2bf7339e2784f6dcb4557f9f4e0f85b562bca245d7447ac",
+    "DENY-077": "f40acb5e80382b749299e4ea3efe5f1c4dc5ca7f099d296d302903a5980ef1e1",
+    "DENY-078": "ae8b675a376d03abf3d79f1e94e7c7f401e590c2ae5d8471f21a3d17a4e2e0d1",
+    "DENY-079": "e98cfa40409a14f71a954ba995957ddb7edfe059ded82b1c20496909afe2f6fd",
+    "DENY-080": "4483f217a9f1a1dc6b569d96fb808171050a4c1cc1554f051e9e84417974236f",
+    "DENY-081": "3bee167f749d836f39f4e0f19652bd5bcb500a75e245f5e4446d9ad380b9a72e",
+    "DENY-082": "cbe1d8ac5bd015ed9553cf52cdc7b6f5f33241107757e55cfc51d9da4666e0f3",
+    "DENY-083": "b6289898ea8d983b14b251d6588716e695e44358a69952effb9f6e71135420a9",
+    "DENY-084": "47373cb3eae4a60b7e3f31aed308a9d2fcc59b93c0c9b0c1de1335266dced511",
+    "DENY-085": "1e7d792a4ddefdbe1262c1d50529116bab290dc0e7184a7e325b2dd63daa87c6",
+    "DENY-086": "8aff4241250f84e6153ad5f6eba63af32bcbe92486e0717588a67f26f8dced6c",
+    "DENY-087": "00d2be2781dd3f83f1e3d0c0b4ed9c686dffd4bdf486bb28eec48f42cc78d561",
+    "DENY-088": "ffac10bd089888592378e35b3464d9746909a45f32b13762f85c710a0362555b",
+    "DENY-089": "37b0d054015c8071e4a52a768f8dacdc119f80d59b0ff6d5dd6822f0cbc8e874",
+    "DENY-090": "6d4ee65c1d8e8b5557489c5c10cf7c576ad40718155ce89360ea40347cc26b1d",
+    "DENY-091": "7cb2f51dac0f07d2a5910548a00fd8e26088ffcb174cefecf5bc88cc9c760890",
+    "DENY-092": "63e5a0d65d8b77f69c94bf2c48237232995d4526d75a2242875635ec00038bd6",
+    "DENY-093": "29a0670015ad7fdc5934f25dee9bfb9d3f5954707e3c8dcef31b3c33638a8527",
+    "DENY-094": "5fe002fe1ac42c2336a96437ddee3152e62b03e83f162db1ea997b775aebe5d5",
+    "DENY-095": "3d720b43bebd6146aa640ad7dbe53389d245d79f061ba9849afaf012e40d6005",
+    "DENY-096": "3df333ce21edbf0bccef75b095eb2fd669402fb6d621c4b8952f6bcfa912734b",
+    "DENY-097": "860316bdc6b5385e26a72f5bad6a16483b879f95bc8d86f541e265cbdf83f1da"
+  }
+}

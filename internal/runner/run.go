@@ -117,7 +117,7 @@ func Run(ctx context.Context, opt Options) error {
 		return err
 	}
 	for _, c := range cases {
-		if c.Format == "rollout-runner/v3" {
+		if c.Format == "rollout-runner/v3" || c.Format == "rollout-runner/v4" {
 			if err = r.preflightRecovery(ctx); err != nil {
 				return err
 			}
@@ -244,7 +244,7 @@ func (r *Runner) preflight(ctx context.Context) error {
 		provenance["goBuildInfo"] = info
 	}
 	inputs := map[string]string{}
-	paths, err := filepath.Glob(filepath.Join(r.opt.CaseDir, "RUN-*.yaml"))
+	paths, err := casePaths(r.opt.CaseDir)
 	if err != nil {
 		return err
 	}

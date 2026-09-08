@@ -51,8 +51,21 @@ type Expectation struct {
 	InitialStarts  int      `json:"initialStarts"`
 }
 
+func casePaths(dir string) ([]string, error) {
+	var paths []string
+	for _, pattern := range []string{"RUN-*.yaml", "DENY-*.yaml"} {
+		found, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, found...)
+	}
+	sort.Strings(paths)
+	return paths, nil
+}
+
 func LoadCases(dir string) ([]Case, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "RUN-*.yaml"))
+	paths, err := casePaths(dir)
 	if err != nil {
 		return nil, err
 	}

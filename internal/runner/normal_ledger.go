@@ -6,6 +6,7 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -53,6 +54,8 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	RejectedSpec           map[string]interface{} `json:"acceptedSpecAfterRejection,omitempty"`
+	RejectedGeneration     int64                  `json:"acceptedGenerationAfterRejection,omitempty"`
 	HistoryFixtureData     map[string]string      `json:"injectedHistoryDataByUID,omitempty"`
 	SourceAboveDesiredUIDs map[string]bool        `json:"sourceAboveDesiredUIDs,omitempty"`
 	Recoveries             []*RecoveryRecord      `json:"recoveries,omitempty"`
@@ -664,6 +667,11 @@ func (l *NormalLedger) unitTarget(u NormalUnit) bool {
 	return true
 }
 func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	if kind == "modelservings" && l.RejectedSpec != nil && o.GetName() == "model" && o.GetGeneration() >= l.RejectedGeneration {
+		if string(o.GetUID()) != l.Owner || event == "DELETED" || o.GetGeneration() != l.RejectedGeneration || !reflect.DeepEqual(o.Object["spec"], l.RejectedSpec) {
+			l.fail("REJECTION_ATOMICITY: stored ModelServing changed after rejected request")
+		}
+	}
 	l.recoveryAfter(kind, event, o)
 	if kind == "controllerrevisions" && event != "DELETED" && objectOwned(o, l.Owner) {
 		data, _ := json.Marshal(o.Object["data"])

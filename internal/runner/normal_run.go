@@ -20,6 +20,9 @@ import (
 )
 
 type normalExecution struct {
+	rejectionExpected  *unstructured.Unstructured
+	rejectionChecked   time.Time
+	rejectionProbes    int
 	historyReferences  bool
 	historyProbe       int
 	historyChecked     time.Time
@@ -250,7 +253,7 @@ func (e *normalExecution) snapshot(name string) error {
 }
 func (e *normalExecution) execute(ctx context.Context) error {
 	s := e.c.Scenario
-	if e.c.Format == "rollout-runner/v3" {
+	if e.c.Format == "rollout-runner/v3" || e.c.Format == "rollout-runner/v4" {
 		controller, err := e.recoveryController(ctx)
 		if err != nil {
 			return err
@@ -334,6 +337,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "reject-update", "reject-merge-patch":
+		return e.rejectRequest(ctx, p, prefix)
 	case "prepare-history-source":
 		return e.prepareHistorySource(ctx, p, prefix)
 	case "history-collision-recovery":
@@ -569,6 +574,12 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 	var releaseAfter time.Time
 	lastReason := ""
 	for {
+		if e.rejectionExpected != nil && time.Since(e.rejectionChecked) >= time.Second {
+			if err := e.probeRejectedSpec(ctx); err != nil {
+				return err
+			}
+			e.rejectionChecked = time.Now()
+		}
 		if e.historyReferences && time.Since(e.historyChecked) >= time.Second {
 			if err := e.verifyHistoryReferences(ctx); err != nil {
 				return err

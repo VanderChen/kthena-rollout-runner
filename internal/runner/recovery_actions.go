@@ -377,7 +377,7 @@ func (e *normalExecution) recoveryController(ctx context.Context) (*corev1.Pod, 
 }
 
 func (e *normalExecution) finalizeRecoveryEvidence() {
-	if e.c.Format != "rollout-runner/v3" {
+	if e.c.Format != "rollout-runner/v3" && e.c.Format != "rollout-runner/v4" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

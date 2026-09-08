@@ -73,7 +73,12 @@ func (r *Runner) testedCommit() string {
 	return Baseline
 }
 func (c Case) validateScenario() error {
-	n, err := strconv.Atoi(strings.TrimPrefix(c.ID, "RUN-"))
+	prefix := "RUN-"
+	if strings.HasPrefix(c.ID, "DENY-") {
+		prefix = "DENY-"
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(c.ID, prefix))
+	rejection := prefix == "DENY-" && n >= 1 && n <= 97 && c.Format == "rollout-runner/v4"
 	normal := n >= 61 && n <= 303 && c.Format == "rollout-runner/v2"
 	recovery := n >= 304 && n <= 388 && c.Format == "rollout-runner/v3"
 	restart := n >= 389 && n <= 400 && c.Format == "rollout-runner/v3"
@@ -93,7 +98,7 @@ func (c Case) validateScenario() error {
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -127,6 +132,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "reject-update", "reject-merge-patch":
+			if !rejection || p.Release != "none" || !p.Expect.NoNewRevision || (p.Action == "reject-update" && (len(p.Spec) == 0 || len(p.Patch) != 0)) || (p.Action == "reject-merge-patch" && (len(p.Patch) == 0 || len(p.Spec) != 0)) {
+				return fmt.Errorf("rejection requires an actual raw API request and retained accepted history")
+			}
 		case "prepare-history-source":
 			if !(historyRead || historyObject) || n < 528 || p.Name != "establish-protected-A-and-eligible-B" || p.StableSeconds != 10 || p.Release != "one" {
 				return fmt.Errorf("source preparation only applies to the five Role historical source cases")
@@ -267,6 +276,34 @@ func (c Case) validateScenario() error {
 			if cond.Count < 1 {
 				return fmt.Errorf("condition requires positive count")
 			}
+		}
+	}
+	if rejection {
+		active := n == 54 || n == 55 || n == 78 || n == 79 || n == 96 || n == 97
+		index := 0
+		if active || n == 94 || n == 95 {
+			index = 1
+		}
+		want := index + 1
+		if active {
+			want++
+		}
+		if len(s.Steps) != want || (index == 1 && s.Steps[0].Action != "update") {
+			return fmt.Errorf("rejection source/action sequence is incomplete")
+		}
+		p := s.Steps[index]
+		method := "reject-update"
+		if n == 85 || n == 86 || n == 92 || n == 93 {
+			method = "reject-merge-patch"
+		}
+		if p.Action != method || p.Expect.NoReplacement == active || p.StableSeconds < 30 && !active || p.StableSeconds < 10 || !active && p.Until != "settled" || active && (p.Until != "conditions" || len(p.Conditions) == 0) {
+			return fmt.Errorf("rejection request or atomic observation is missing")
+		}
+		if active && (s.Steps[2].Action != "observe" || s.Steps[2].Release != "one" || s.Steps[2].Until != "settled" || s.Steps[2].StableSeconds < 30 || s.Steps[2].Expect.NoReplacement) {
+			return fmt.Errorf("in-flight rejection must continue the last accepted rollout")
+		}
+		if textValue(s.Source, "kind") != "拒绝" {
+			return fmt.Errorf("rejection source mismatch")
 		}
 	}
 	if recovery && (len(s.Steps) != 1 || s.Steps[0].Action != "recover-pod") {

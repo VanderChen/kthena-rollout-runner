@@ -57,8 +57,8 @@ func (e *normalExecution) holdInitialSync(ctx context.Context, p ScenarioStep, p
 	if err = saveYAML(filepath.Join(e.dir, prefix+"-controller-terminated.yaml"), before); err != nil {
 		return err
 	}
-	// Install the global startup rule first so it takes precedence over the
-	// temporary namespace barriers. Established ordinary Watches remain live.
+	// Only the new process startup request is held. No Watch frames are
+	// queued on the old process when its declared replacement closes streams.
 	id := fmt.Sprintf("%s-%s-initial", e.r.opt.RunID, strings.ToLower(e.c.ID))
 	ids := []string{id}
 	resumed := false
@@ -78,20 +78,10 @@ func (e *normalExecution) holdInitialSync(ctx context.Context, p ScenarioStep, p
 	if !reflect.DeepEqual(installed.Rule, rule) {
 		return fmt.Errorf("INCONCLUSIVE: initial-sync rule acknowledgement mismatch")
 	}
-	barriers, err := e.recoveryPause(ctx, prefix)
-	ids = append(ids, barriers...)
-	if err != nil {
-		return err
-	}
-	// Submit the real B request while the original process still serves actual
-	// admission. All original A members remain protected until cache recovery.
 	guard := ScenarioExpectation{NoReplacement: true, NoNewRevision: true}
-	ready := true
-	held := ScenarioStep{Name: "B-accepted-with-original-A-retained", Action: "update", Spec: p.Spec, Until: "conditions", Conditions: []ScenarioCondition{{Kind: "unit", Version: "A", Ready: &ready, Count: 3}}, Release: "none", TimeoutSeconds: p.TimeoutSeconds, Expect: guard}
-	if e.l.Model.Mode == "Role" {
-		held.Conditions[0].Role = "frontend"
-	}
-	if err = e.step(ctx, held); err != nil {
+	if err = e.locked(func() error {
+		return e.l.Transition(e.l.Model.Spec, "A-retained-during-controller-replacement", guard, e.o.objects)
+	}); err != nil {
 		return err
 	}
 	zero := int64(0)
@@ -136,11 +126,18 @@ func (e *normalExecution) holdInitialSync(ctx context.Context, p ScenarioStep, p
 	if err = saveYAML(filepath.Join(e.dir, prefix+"-controller-replacement.yaml"), replacement); err != nil {
 		return err
 	}
-	// Restore all other APIs, leaving only the selected informer unsynced.
-	for _, barrier := range barriers {
-		if err = e.r.faultControl(ctx, "DELETE", "/v1/rules/"+barrier, nil, nil); err != nil {
-			return err
-		}
+	// The new process serves actual admission independently of its blocked
+	// controller informer. Warm up that endpoint with real dry-run updates.
+	if err = e.awaitInitialSyncAdmission(ctx, prefix); err != nil {
+		return err
+	}
+	ready := true
+	held := ScenarioStep{Name: "B-accepted-while-informer-unsynced", Action: "update", Spec: p.Spec, Until: "conditions", Conditions: []ScenarioCondition{{Kind: "unit", Version: "A", Ready: &ready, Count: 3}}, Release: "none", TimeoutSeconds: p.TimeoutSeconds, Expect: guard}
+	if e.l.Model.Mode == "Role" {
+		held.Conditions[0].Role = "frontend"
+	}
+	if err = e.step(ctx, held); err != nil {
+		return err
 	}
 	held.Name = "actual-selected-informer-unsynced-with-A-retained"
 	held.HoldSeconds = 10
@@ -215,4 +212,40 @@ func (e *normalExecution) holdInitialSync(ctx context.Context, p ScenarioStep, p
 		return fmt.Errorf("CONTROLLER_STATE: Deployment changed during initial-sync scenario")
 	}
 	return saveYAML(filepath.Join(e.dir, prefix+"-controller-deployment.yaml"), after)
+}
+
+// Dry-run the unchanged live A object: admission health checking must not
+// submit B or advance the generation before the recorded scenario request.
+func (e *normalExecution) awaitInitialSyncAdmission(ctx context.Context, prefix string) (result error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	var attempts []map[string]interface{}
+	defer func() {
+		result = errors.Join(result, writeJSON(filepath.Join(e.dir, prefix+"-admission-warmup.json"), attempts))
+	}()
+	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
+	for {
+		current, err := api.Get(ctx, "model", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		sent := time.Now().UTC()
+		response, err := api.Update(ctx, current, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+		attempt := map[string]interface{}{"sent": sent, "received": time.Now().UTC(), "accepted": err == nil, "requestUID": current.GetUID(), "dryRun": "All", "requestGeneration": current.GetGeneration()}
+		if err != nil {
+			attempt["error"] = err.Error()
+		} else {
+			attempt["responseUID"] = response.GetUID()
+			attempt["responseGeneration"] = response.GetGeneration()
+		}
+		attempts = append(attempts, attempt)
+		if err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("INCONCLUSIVE: replacement actual admission did not become ready: %w", err)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }

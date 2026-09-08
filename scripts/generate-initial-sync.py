@@ -31,7 +31,7 @@ def main():
                 'scenario':{'source':row,'profile':'controlled','initialSpec':a,'steps':[step]}}
         (out/(row['id']+'.yaml')).write_text(normal.yaml(case)+'\n')
     manifest = {'format':'rollout-runner/suite-v1','controllerCommit':normal.COMMIT,'sourceSHA256':recovery.SOURCE_SHA,
-                'developmentScope':'RUN-450/451/453/454; accept B behind temporary namespace barrier with actual admission alive, replace controller once, block selected global informer initial List/WatchList for 10 seconds, retain all A UIDs, then restore synchronization and finish B',
+                'developmentScope':'RUN-450/451/453/454; block selected global informer initial List/WatchList, replace controller once while A is healthy, submit real B when new admission is available, hold unsynced for 10 seconds, retain all A UIDs, then restore synchronization and finish B',
                 'cases':rows,'inputs':{r['id']:hashlib.sha256((out/(r['id']+'.yaml')).read_bytes()).hexdigest() for r in rows}}
     (out/'suite.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
     print('Generated four initial informer sync scenarios.')

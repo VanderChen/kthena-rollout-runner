@@ -2,7 +2,7 @@
   "format": "rollout-runner/suite-v1",
   "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
   "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
-  "developmentScope": "RUN-450/451/453/454; accept B behind temporary namespace barrier with actual admission alive, replace controller once, block selected global informer initial List/WatchList for 10 seconds, retain all A UIDs, then restore synchronization and finish B",
+  "developmentScope": "RUN-450/451/453/454; block selected global informer initial List/WatchList, replace controller once while A is healthy, submit real B when new admission is available, hold unsynced for 10 seconds, retain all A UIDs, then restore synchronization and finish B",
   "cases": [
     {
       "group": "2.2.2 Watch、事件与缓存故障",

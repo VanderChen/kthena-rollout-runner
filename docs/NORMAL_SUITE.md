@@ -188,3 +188,32 @@ python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
 
 当前只完成报告校验实现及原始183正例/193反例检查，补测等待完整303结束；不能将
 另一个已完成用例的证据读取器检查称为183补测通过。Kthena源码和运行Go二进制不变。
+
+### API写入冲突与RUN-247补充执行
+
+r10的RUN-247在自然滚动中提交R=6→8时收到资源版本冲突，服务端仍保持R=6、
+generation=2；这个结果属于runner写入未完成，不能作为Kthena行为失败或场景PASS。
+原始FAIL和所有证据保留。r11对Update最多执行五次，只重试API Conflict；每次重新
+读取resourceVersion，验证原UID和spec未变，并重新执行真实触发窗口检查。
+遇到外部spec变化、UID替换、非冲突错误或窗口消失会停止，不重复清空场景账本。
+
+每次写入分别保存`step-NN-write-NN-current.yaml`、`-request.yaml`和`-receipt.json`，
+包括实际API错误状态。触发快照按写入尝试分开保存；既有`step-NN-request.yaml`、
+`-request-time.json`和触发前后证明对应最后成功的请求，失败尝试不会被覆盖。
+
+Go测试覆盖状态推进后的版本刷新、重新核查触发、UID/spec变化拒绝、窗口消失及
+重试上限。`go test ./...`、`go test -race ./...`和`go vet ./...`已通过。
+独立Kind组件测试使用一个临时ConfigMap，实际取得API409后刷新版本成功，并按
+原UID删除夹具；它不改变Kthena controller，也不代替RUN-247完整场景复测：
+
+```sh
+RUNNER_CONFLICT_KUBECONFIG=/path/to/kubeconfig \
+RUNNER_CONFLICT_ARTIFACTS=/absolute/new/artifacts/directory \
+go test -tags=kind ./internal/runner -run '^TestScenarioUpdateKindConflict$' -count=1 -v
+```
+
+正在运行的完整303项以及301/183补测继续使用原r10镜像。它们全部结束后，必须以
+修正后的runner独立完成RUN-247（以及后续确认受同一runner问题影响的用例），保持
+相同production控制器和用例输入。最终报告需逐项保留新旧runner镜像/二进制身份及
+原始失败；上述仅含301/183的报告不再足以完成第一类验收。完整复测与新增汇总门禁
+当前待完成，不能将ConfigMap组件验证记为RUN-247通过。

@@ -340,26 +340,63 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 			if err != nil {
 				return err
 			}
-			if err = e.liveOverlap(ctx, originalModel, prefix+"-trigger-before"); err != nil {
-				return err
-			}
 		}
-		var requestAt time.Time
+		var requestAt, receivedAt time.Time
 		if err = saveYAML(filepath.Join(e.dir, prefix+"-request.yaml"), next.Object); err != nil {
 			return err
 		}
 		if p.Action == "update" {
-			requestAt = time.Now().UTC()
-			next, err = api.Update(ctx, next, metav1.UpdateOptions{})
+			beforeAttempt := func(attemptPrefix string) error {
+				if p.RequireLiveTerminating {
+					if _, err := e.liveTerminating(ctx, attemptPrefix+"-terminating-before", terminatingUIDs, false); err != nil {
+						return err
+					}
+				}
+				if interleave {
+					return e.liveOverlap(ctx, originalModel, attemptPrefix+"-trigger-before")
+				}
+				return nil
+			}
+			write, writeErr := updateScenario(ctx, api, current, next, e.dir, prefix, beforeAttempt)
+			if writeErr != nil {
+				return writeErr
+			}
+			next, requestAt, receivedAt = write.Object, write.Sent, write.Received
+			if err = saveYAML(filepath.Join(e.dir, prefix+"-request.yaml"), write.Request.Object); err != nil {
+				return err
+			}
+			// Canonical evidence always describes the successful request. Failed
+			// write attempts and their actual trigger proofs remain separate.
+			var suffixes []string
+			if p.RequireLiveTerminating {
+				suffixes = append(suffixes, "-terminating-before.yaml", "-terminating-before-proof.json")
+			}
+			if interleave {
+				suffixes = append(suffixes, "-trigger-before.yaml", "-trigger-before-proof.json")
+			}
+			for _, suffix := range suffixes {
+				data, readErr := os.ReadFile(filepath.Join(e.dir, write.Prefix+suffix))
+				if readErr != nil {
+					return readErr
+				}
+				if err = os.WriteFile(filepath.Join(e.dir, prefix+suffix), data, 0644); err != nil {
+					return err
+				}
+			}
 		} else {
+			if interleave {
+				if err = e.liveOverlap(ctx, originalModel, prefix+"-trigger-before"); err != nil {
+					return err
+				}
+			}
 			if err = saveYAML(filepath.Join(e.dir, prefix+"-merge-patch.yaml"), p.Patch); err != nil {
 				return err
 			}
 			b, _ := json.Marshal(p.Patch)
 			requestAt = time.Now().UTC()
 			next, err = api.Patch(ctx, "model", types.MergePatchType, b, metav1.PatchOptions{})
+			receivedAt = time.Now().UTC()
 		}
-		receivedAt := time.Now().UTC()
 		if err != nil {
 			return err
 		}

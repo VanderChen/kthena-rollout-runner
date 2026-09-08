@@ -53,6 +53,7 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	HistoryFixtureData     map[string]string      `json:"injectedHistoryDataByUID,omitempty"`
 	SourceAboveDesiredUIDs map[string]bool        `json:"sourceAboveDesiredUIDs,omitempty"`
 	Recoveries             []*RecoveryRecord      `json:"recoveries,omitempty"`
 	PGScale                map[string]bool        `json:"podGroupScaleIntentUIDs"`
@@ -671,22 +672,24 @@ func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, o
 			l.fail("HISTORY_MUTATED: " + o.GetName())
 		}
 		l.RevisionData[uid] = string(data)
-		spec := cloneMap(l.Model.Spec)
-		spec["template"] = map[string]interface{}{"roles": mapValue(o.Object, "data")["data"]}
-		if m, err := readModel(spec); err == nil {
-			known := false
-			for _, h := range l.History {
-				if sameTemplates(h, m) {
-					known = true
-					break
+		if expected, injected := l.HistoryFixtureData[uid]; !injected || expected != string(data) {
+			spec := cloneMap(l.Model.Spec)
+			spec["template"] = map[string]interface{}{"roles": mapValue(o.Object, "data")["data"]}
+			if m, err := readModel(spec); err == nil {
+				known := false
+				for _, h := range l.History {
+					if sameTemplates(h, m) {
+						known = true
+						break
+					}
 				}
+				if !known {
+					l.fail("UNEXPECTED_HISTORY_TEMPLATE: " + o.GetName())
+				}
+				l.RevisionLayouts[o.GetLabels()["modelserving.volcano.sh/revision"]] = m
+			} else {
+				l.fail("INVALID_HISTORY: " + o.GetName())
 			}
-			if !known {
-				l.fail("UNEXPECTED_HISTORY_TEMPLATE: " + o.GetName())
-			}
-			l.RevisionLayouts[o.GetLabels()["modelserving.volcano.sh/revision"]] = m
-		} else {
-			l.fail("INVALID_HISTORY: " + o.GetName())
 		}
 	}
 	if kind == "pods" && event != "DELETED" {

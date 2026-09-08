@@ -72,27 +72,38 @@ func (e *normalExecution) historyReadRecovery(ctx context.Context, p ScenarioSte
 	if err = writeJSON(filepath.Join(e.dir, prefix+"-fault-scope.json"), scope); err != nil {
 		return err
 	}
-	e.historyReferences = true
-	if err = e.verifyHistoryReferences(ctx); err != nil {
-		return err
+	objectFault := p.HistoryFault != ""
+	e.historyReferences = !objectFault
+	if !objectFault {
+		if err = e.verifyHistoryReferences(ctx); err != nil {
+			return err
+		}
 	}
 	id := fmt.Sprintf("%s-%s-history-read", e.r.opt.RunID, strings.ToLower(e.c.ID))
-	cleared := false
+	cleared := objectFault
+	var objectFixture *historyObjectFault
 	defer func() {
 		if !cleared {
 			result = errors.Join(result, e.resumeRecovery([]string{id}, prefix+"-cleanup"))
 		}
 	}()
-	rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: "controllerrevisions", Name: historyName, Methods: []string{"GET"}, Mode: "error", StatusCode: 503, Count: -1, DurationSeconds: 180}
-	var installed faultproxy.RuleStatus
-	if err = e.r.faultControl(ctx, "POST", "/v1/rules", rule, &installed); err != nil {
-		return err
-	}
-	if err = writeJSON(filepath.Join(e.dir, prefix+"-read-installed.json"), installed); err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(rule, installed.Rule) {
-		return fmt.Errorf("INCONCLUSIVE: historical read rule changed")
+	if objectFault {
+		objectFixture, err = e.installHistoryObjectFault(ctx, history, p.HistoryFault, prefix)
+		if err != nil {
+			return err
+		}
+	} else {
+		rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: "controllerrevisions", Name: historyName, Methods: []string{"GET"}, Mode: "error", StatusCode: 503, Count: -1, DurationSeconds: 180}
+		var installed faultproxy.RuleStatus
+		if err = e.r.faultControl(ctx, "POST", "/v1/rules", rule, &installed); err != nil {
+			return err
+		}
+		if err = writeJSON(filepath.Join(e.dir, prefix+"-read-installed.json"), installed); err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(rule, installed.Rule) {
+			return fmt.Errorf("INCONCLUSIVE: historical read rule changed")
+		}
 	}
 	options := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &target.UID}}
 	sent := time.Now().UTC()
@@ -103,15 +114,17 @@ func (e *normalExecution) historyReadRecovery(ctx context.Context, p ScenarioSte
 	if err != nil {
 		return err
 	}
-	if err = e.waitFaultState(ctx, prefix+"-actual-read-error", []string{id}, func(state faultproxy.State) bool {
-		for _, r := range state.Rules {
-			if r.ID == id {
-				return r.Hits > 0
+	if !objectFault {
+		if err = e.waitFaultState(ctx, prefix+"-actual-read-error", []string{id}, func(state faultproxy.State) bool {
+			for _, r := range state.Rules {
+				if r.ID == id {
+					return r.Hits > 0
+				}
 			}
+			return false
+		}); err != nil {
+			return err
 		}
-		return false
-	}); err != nil {
-		return err
 	}
 	// No readiness release is needed while history is unknown. The armed ledger
 	// continues checking all new Pod versions, old healthy UIDs and budgets.
@@ -123,15 +136,17 @@ func (e *normalExecution) historyReadRecovery(ctx context.Context, p ScenarioSte
 	if err = e.snapshot(prefix + "-unknown-boundary"); err != nil {
 		return err
 	}
-	if err = e.waitFaultState(ctx, prefix+"-before-read-clear", []string{id}, func(state faultproxy.State) bool {
-		for _, r := range state.Rules {
-			if r.ID == id {
-				return r.Hits >= 2
+	if !objectFault {
+		if err = e.waitFaultState(ctx, prefix+"-before-read-clear", []string{id}, func(state faultproxy.State) bool {
+			for _, r := range state.Rules {
+				if r.ID == id {
+					return r.Hits >= 2
+				}
 			}
+			return false
+		}); err != nil {
+			return err
 		}
-		return false
-	}); err != nil {
-		return err
 	}
 	controller, err := e.recoveryController(ctx)
 	if err != nil {
@@ -146,17 +161,27 @@ func (e *normalExecution) historyReadRecovery(ctx context.Context, p ScenarioSte
 	}
 	diagnostic := false
 	for _, line := range strings.Split(string(logs), "\n") {
-		if strings.Contains(line, e.namespace) && strings.Contains(line, strings.TrimPrefix(historyName, "model-")) && (strings.Contains(line, "injected external controller API failure") || strings.Contains(line, "failed to get ControllerRevision")) {
+		if strings.Contains(line, e.namespace) && strings.Contains(line, strings.TrimPrefix(historyName, "model-")) && (strings.Contains(line, "injected external controller API failure") || strings.Contains(line, "failed to get ControllerRevision") || objectFault && (strings.Contains(line, "Cannot resolve") || strings.Contains(line, "not found") || strings.Contains(line, "failed to parse") || strings.Contains(line, "no Role") || strings.Contains(line, "failed to read") || strings.Contains(line, "not controlled"))) {
 			diagnostic = true
 		}
 	}
 	if !diagnostic {
 		return fmt.Errorf("INCONCLUSIVE: actual historical read failure lacks scoped controller diagnostic")
 	}
-	if err = e.resumeRecovery([]string{id}, prefix+"-read"); err != nil {
-		return err
+	if objectFault {
+		restored, restoreErr := e.restoreHistoryObject(ctx, objectFixture, prefix)
+		if restoreErr != nil {
+			return restoreErr
+		}
+		if err = saveYAML(filepath.Join(e.dir, prefix+"-restored-A-history-before-recovery.yaml"), restored); err != nil {
+			return err
+		}
+	} else {
+		if err = e.resumeRecovery([]string{id}, prefix+"-read"); err != nil {
+			return err
+		}
+		cleared = true
 	}
-	cleared = true
 	e.waitDeadline = time.Time{}
 	p.Name = "protected-A-history-read-restored"
 	if err = e.finishStep(ctx, p, prefix+"-recovered"); err != nil {
@@ -166,7 +191,7 @@ func (e *normalExecution) historyReadRecovery(ctx context.Context, p ScenarioSte
 	if err != nil {
 		return err
 	}
-	if current.UID != history.UID || !reflect.DeepEqual(current.Data, history.Data) {
+	if (!objectFault && current.UID != history.UID) || !reflect.DeepEqual(current.Data, history.Data) {
 		return e.historyFailure("HISTORY_CHANGED_DURING_READ_FAILURE: " + historyName)
 	}
 	return saveYAML(filepath.Join(e.dir, prefix+"-restored-A-history.yaml"), current)

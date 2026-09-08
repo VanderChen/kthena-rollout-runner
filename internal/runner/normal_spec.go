@@ -22,6 +22,7 @@ type Scenario struct {
 	Steps       []ScenarioStep         `json:"steps"`
 }
 type ScenarioStep struct {
+	HistoryFault           string                 `json:"historyFault,omitempty"`
 	ContainerRestart       *PodFaultAction        `json:"containerRestart,omitempty"`
 	PodFault               *PodFaultAction        `json:"podFault,omitempty"`
 	RequireLiveTerminating bool                   `json:"requireLiveTerminating,omitempty"`
@@ -87,9 +88,10 @@ func (c Case) validateScenario() error {
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
+	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -110,6 +112,9 @@ func (c Case) validateScenario() error {
 		return fmt.Errorf("missing executable steps")
 	}
 	for _, p := range s.Steps {
+		if p.HistoryFault != "" && p.Action != "history-object-recovery" {
+			return fmt.Errorf("historical object fixture attached to unrelated action")
+		}
 		if p.ContainerRestart != nil && p.Action != "restart-container" && p.Action != "restart-container-grace" {
 			return fmt.Errorf("container restart attached to unrelated action")
 		}
@@ -120,6 +125,11 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "history-object-recovery":
+			want := map[int]string{523: "missing", 525: "corrupt-data", 526: "missing-role", 527: "foreign-owner", 528: "missing", 530: "corrupt-data", 531: "missing-role", 532: "foreign-owner"}[n]
+			if !historyObject || p.HistoryFault != want || !p.Expect.NoReplacement || p.Expect.NoNewRevision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) != 0 {
+				return fmt.Errorf("invalid exact historical object recovery fixture")
+			}
 		case "history-read-recovery":
 			if !historyRead || !p.Expect.NoReplacement || !p.Expect.NoNewRevision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) != 0 {
 				return fmt.Errorf("history read recovery requires a bounded exact A read fault and protected restoration")
@@ -292,6 +302,9 @@ func (c Case) validateScenario() error {
 	}
 	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), ordinals)) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
+	}
+	if historyObject && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-object-recovery") {
+		return fmt.Errorf("historical object fault requires actual protected A/B source and restoration")
 	}
 	if historyRead && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-read-recovery" || !strings.Contains(textValue(s.Source, "initial"), "API读取失败")) {
 		return fmt.Errorf("historical read failure requires actual protected A/B stop then fault and restoration")

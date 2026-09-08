@@ -10,6 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
+
+	"kthena.local/rollout-runner/internal/faultproxy"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +45,27 @@ func sparseHistoryPods(pods []corev1.Pod, owner string, expected map[string]type
 		return fmt.Errorf("sparse fixture has %d members, expected frontend{0,3,4}/backend{0,1,2}", len(seen))
 	}
 	return nil
+}
+
+// The preparation barrier rejects mutations but never queues informer events.
+// A new controller therefore starts from the actual sparse R=3 snapshot without
+// replaying a previous R=5 scale-down decision after the barrier is released.
+func (e *normalExecution) sparseMutationBarrier(ctx context.Context) ([]string, error) {
+	resources := []struct{ resource, subresource string }{{"modelservings", ""}, {"modelservings", "status"}, {"pods", ""}, {"pods", "status"}, {"controllerrevisions", ""}, {"services", ""}, {"configmaps", ""}, {"podgroups", ""}, {"podgroups", "status"}}
+	var ids []string
+	for i, resource := range resources {
+		id := fmt.Sprintf("%s-%s-sparse-%d", e.r.opt.RunID, strings.ToLower(e.c.ID), i)
+		rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: resource.resource, Subresource: resource.subresource, Mode: "error", Methods: []string{"POST", "PUT", "PATCH", "DELETE"}, StatusCode: 503, Count: -1, DurationSeconds: 180}
+		ids = append(ids, id)
+		var installed faultproxy.RuleStatus
+		if err := e.r.faultControl(ctx, "POST", "/v1/rules", rule, &installed); err != nil {
+			return ids, err
+		}
+		if err := writeJSON(filepath.Join(e.dir, fmt.Sprintf("sparse-fault-rule-%d.json", i)), installed); err != nil {
+			return ids, err
+		}
+	}
+	return ids, e.waitFaultState(ctx, "sparse-mutation-barrier", ids, func(s faultproxy.State) bool { return s.InFlightAllowed == 0 })
 }
 
 func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (result error) {
@@ -93,7 +117,7 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 		return fmt.Errorf("INCONCLUSIVE: expanded A fixture identity count")
 	}
 	e.phase = 1
-	ids, err := e.recoveryPause(ctx, "sparse")
+	ids, err := e.sparseMutationBarrier(ctx)
 	resumed := false
 	defer func() {
 		if !resumed {
@@ -182,65 +206,39 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 	}); err != nil {
 		return err
 	}
-	if err = e.resumeRecovery(ids, "sparse"); err != nil {
+	// All source reads/events remain live. Keep mutation failures in place
+	// until the old process is gone and its replacement has read the real R=3
+	// population. No hold rule or pending write is released into the new process.
+	state, err := e.r.faultState(ctx)
+	if err != nil {
 		return err
 	}
-	resumed = true
-	// A controller replacement must never close a stream with queued fixture
-	// events. Check every rule's delivered counters and a real published source
-	// generation, then retain that fully drained state before terminating it.
-	flushCtx, flushCancel := context.WithTimeout(ctx, 30*time.Second)
-	defer flushCancel()
-	var stableSince time.Time
-	for {
-		state, err := e.r.faultState(flushCtx)
-		if err != nil {
-			return err
-		}
-		if len(state.Errors) > 0 {
-			return fmt.Errorf("INCONCLUSIVE: sparse fixture proxy errors")
-		}
-		ready := true
-		for _, id := range ids {
-			found := false
-			for _, r := range state.Rules {
-				if r.ID == id {
-					found = true
-					ready = ready && !r.Active && r.Hits == r.Released
-				}
-			}
-			ready = ready && found
-		}
-		ms, err := api.Get(flushCtx, "model", metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		ready = ready && ms.GetUID() == e.current.GetUID() && intValue(mapValue(ms.Object, "status"), "observedGeneration", -1) >= int(e.current.GetGeneration())
-		if ready {
-			if stableSince.IsZero() {
-				stableSince = time.Now()
-			}
-			if time.Since(stableSince) >= 2*time.Second {
-				if err = writeJSON(filepath.Join(e.dir, "fully-delivered-before-restart.json"), state); err != nil {
-					return err
-				}
-				if err = saveYAML(filepath.Join(e.dir, "source-generation-before-restart.yaml"), ms.Object); err != nil {
-					return err
-				}
-				break
-			}
-		} else {
-			stableSince = time.Time{}
-		}
-		select {
-		case <-flushCtx.Done():
-			return fmt.Errorf("INCONCLUSIVE: fixture events/source generation not fully delivered before restart")
-		case <-time.After(100 * time.Millisecond):
-		}
+	if err = writeJSON(filepath.Join(e.dir, "mutation-barrier-before-restart.json"), state); err != nil {
+		return err
+	}
+	if err = saveYAML(filepath.Join(e.dir, "source-generation-before-restart.yaml"), e.current.Object); err != nil {
+		return err
 	}
 	if err = e.terminateController(ctx, "fixture-restart"); err != nil {
 		return err
 	}
+	if err = e.waitFaultState(ctx, "mutation-barrier-after-restart", ids, func(s faultproxy.State) bool {
+		hits := 0
+		for _, rule := range s.Rules {
+			for _, id := range ids {
+				if rule.ID == id {
+					hits += rule.Hits
+				}
+			}
+		}
+		return hits > 0 && s.InFlightAllowed == 0
+	}); err != nil {
+		return err
+	}
+	if err = e.resumeRecovery(ids, "sparse"); err != nil {
+		return err
+	}
+	resumed = true
 	pods, err = e.r.kube.CoreV1().Pods(e.namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -327,7 +325,7 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 		if !reflect.DeepEqual(e.current.Object["spec"], ms.Object["spec"]) {
 			return fmt.Errorf("INCONCLUSIVE: source spec changed at boundary")
 		}
-		if err = writeJSON(filepath.Join(originalDir, "source-boundary.json"), map[string]interface{}{"at": time.Now().UTC(), "lastPreparationSequence": e.o.seq, "generation": ms.GetGeneration(), "retainedUIDs": retained, "deletedPreparationUIDs": deleted, "frontendOrdinals": []int{0, 3, 4}, "preparationControllerRestart": true}); err != nil {
+		if err = writeJSON(filepath.Join(originalDir, "source-boundary.json"), map[string]interface{}{"at": time.Now().UTC(), "lastPreparationSequence": e.o.seq, "generation": ms.GetGeneration(), "retainedUIDs": retained, "deletedPreparationUIDs": deleted, "frontendOrdinals": []int{0, 3, 4}, "preparationControllerRestart": true, "fixtureBarrier": "mutation-errors-until-fresh-initial-sync"}); err != nil {
 			return err
 		}
 		e.l, e.o.normal, e.current = fresh, fresh, ms

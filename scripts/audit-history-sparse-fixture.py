@@ -35,12 +35,24 @@ def audit(p,rows):
         assert receipt['accepted'] and removed[receipt['name']]==receipt['uid']==receipt['options']['preconditions']['uid']
         assert receipt['options']['gracePeriodSeconds']==0 and m.ts(receipt['received'])<m.ts(boundary['at'])
         assert any(r['kind']=='pods' and r['event']=='DELETED' and r['object']['metadata']['uid']==receipt['uid'] and r['sequence']<=boundary['lastPreparationSequence'] for r in rows)
-    rules=m.read(q/'fully-delivered-before-restart.json');assert not rules['errors']
     selected=[m.read(q/('sparse-fault-rule-%d.json'%i))['id'] for i in range(9)]
-    for rid in selected:
-        rule=next(r for r in rules['rules'] if r['id']==rid);assert not rule['active'] and rule['hits']==rule['released']
-    assert sum(r['hits'] for r in rules['rules'] if r['id'] in selected)>0, 'fixture pause never intercepted actual controller traffic'
-    gen=m.yaml(q/'source-generation-before-restart.yaml');assert gen['status']['observedGeneration']>=3
+    if boundary.get('fixtureBarrier')=='mutation-errors-until-fresh-initial-sync':
+        before_restart=m.read(q/'mutation-barrier-before-restart.json');after_restart=m.read(q/'mutation-barrier-after-restart.json');rules=m.read(q/'sparse-resume.json')
+        for state in (before_restart,after_restart,rules):
+            assert not state['errors']
+            for rid in selected:
+                r=next(r for r in state['rules'] if r['id']==rid)
+                assert r['mode']=='error' and r['statusCode']==503 and set(r['methods'])=={'POST','PUT','PATCH','DELETE'} and not r['released']
+                assert r['active']==(state is not rules)
+        assert sum(r['hits'] for r in after_restart['rules'] if r['id'] in selected)>0
+        assert after_restart['inFlightAllowed']==0
+        gen=m.yaml(q/'source-generation-before-restart.yaml');assert gen['metadata']['generation']==3
+    else:
+        rules=m.read(q/'fully-delivered-before-restart.json');assert not rules['errors']
+        for rid in selected:
+            rule=next(r for r in rules['rules'] if r['id']==rid);assert not rule['active'] and rule['hits']==rule['released']
+        assert sum(r['hits'] for r in rules['rules'] if r['id'] in selected)>0, 'fixture pause never intercepted actual controller traffic'
+        gen=m.yaml(q/'source-generation-before-restart.yaml');assert gen['status']['observedGeneration']>=3
     before=m.yaml(q/'fixture-restart-controller-terminated.yaml');after=m.yaml(q/'fixture-restart-controller-replacement.yaml')
     receipt=m.read(q/'fixture-restart-controller-delete.json')
     assert receipt['accepted'] and receipt['uid']==before['metadata']['uid']==receipt['options']['preconditions']['uid']

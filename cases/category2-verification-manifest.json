@@ -1,0 +1,133 @@
+{
+  "format": "rollout-runner/category-verification-v1",
+  "category": "2",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "audits": [
+    {
+      "run": "pod-recovery-84-final",
+      "audit": "summary.json",
+      "sha256": "69dc46dc2c72be9054c963e54ec1dd2736936fafce774838402cbd454eaa5cf6"
+    },
+    {
+      "run": "recovery-extra-r1",
+      "audit": "independent-extra-audit/summary.json",
+      "sha256": "63b51d4d438b661001e087b93a4e5db27034fd49d44c9252c0cdf4ec2de903ee"
+    },
+    {
+      "run": "midrollout-fault-r1",
+      "audit": "independent-midrollout-audit/summary.json",
+      "sha256": "bd4991037c5f8af4a47b3945f0446bedd7df0b1c09d6cdc50700b4be77714650"
+    },
+    {
+      "run": "pending-fault-r1",
+      "audit": "independent-pending-audit/summary.json",
+      "sha256": "3854e5d072158eef5dc1b25bf361be8dfac9ed6de771c78cf9a2add744d846f9"
+    },
+    {
+      "run": "controller-fault-r1",
+      "audit": "independent-controller-audit/summary.json",
+      "sha256": "29521e8f4a3b724f635bef06db46b256753e33ebd40e5bec1a027fd55c527bd8"
+    },
+    {
+      "run": "grace-fault-r1",
+      "audit": "independent-grace-audit/summary.json",
+      "sha256": "1813625745b85b4053559f943db709c5d3ea6d951dfdafe273a3863aa030a883"
+    },
+    {
+      "run": "api-retry-r1",
+      "audit": "independent-api-audit/summary.json",
+      "sha256": "0f09948ddf137920c194192aae76a0bb362ed31771ffd7efb9af641de52b86b7"
+    },
+    {
+      "run": "api-delete-r3",
+      "audit": "independent-api-audit/summary.json",
+      "sha256": "0ee9411ad17b2acb465f2d3648cc0189b9dcc667898ed332f97575cd3b1d0727"
+    },
+    {
+      "run": "lost-deletion-r1",
+      "audit": "independent-lost-deletion-audit/summary.json",
+      "sha256": "c0ec398b69d7e4f240500899c67f431468b5688307d26f7889268158e1416038"
+    },
+    {
+      "run": "plugin-retry-r1",
+      "audit": "independent-plugin-audit/summary.json",
+      "sha256": "a1b428a68f749c0faa7ef073b85bd291c3d343f157c9e15ce0d7998fa9cff614"
+    },
+    {
+      "run": "leader-switch-r1",
+      "audit": "independent-leader-audit/summary.json",
+      "sha256": "8dc4a9b8c36a459374d7530393c09ebac0846bdd490fcc6af2efc3ab2bdc24bb"
+    },
+    {
+      "run": "leader-switch-r2",
+      "audit": "independent-leader-audit/summary.json",
+      "sha256": "fbc259f7f63d432e25a122677cff71b53d55c1d3d01a0f62b171abdb2cfc6f90"
+    },
+    {
+      "run": "eviction-r1",
+      "audit": "independent-eviction-audit/summary.json",
+      "sha256": "505978d44f34b6e525a66c8592b759e7e3b35301b8ac592c1c7276f7fe6618a7"
+    },
+    {
+      "run": "initial-sync-r2",
+      "audit": "independent-initial-sync-audit/summary.json",
+      "sha256": "ab70ec92f0df68b4caa0038e1d6a727132d9ecc86634c7e1f2eeda6aba00d957"
+    },
+    {
+      "run": "deletion-replay-r1",
+      "audit": "independent-deletion-replay-audit/summary.json",
+      "sha256": "504bc539a4fcd82192f71660a2600f1ead8f6a63a2541ebec4cd72b84cac6cc0"
+    },
+    {
+      "run": "history-create-r1",
+      "audit": "independent-history-audit/summary.json",
+      "sha256": "cea63a5f174e21fed6e550b0a721211dc3da8608d3130e18d3a141a739124623"
+    },
+    {
+      "run": "history-gc-r1",
+      "audit": "independent-history-gc-audit/summary.json",
+      "sha256": "f625123a4e797aaaee8e88c5de2f4c90354819c620ad5db53399efd264a8352f"
+    },
+    {
+      "run": "history-create-r2",
+      "audit": "independent-history-audit/summary.json",
+      "sha256": "86c0167cc344e8c82d494a7056961740f3df0983fa9ace3190e38d33eab6cf51"
+    },
+    {
+      "run": "history-read-r1",
+      "audit": "independent-history-read-audit-final/summary.json",
+      "sha256": "1ab7562ffed17e8e687a02c81220b45f6876056d82284f69a3af74da01d1f084"
+    },
+    {
+      "run": "history-object-r1",
+      "audit": "independent-history-object-audit-final/summary.json",
+      "sha256": "30c8b04a59497223dc69cc0e04087e2a0e87118daf705cd5ab105732e67c26b7"
+    },
+    {
+      "run": "history-sparse-r3",
+      "audit": "independent-history-audit-verified/summary.json",
+      "sha256": "8715144dd909f636bad37937e5dac606bdf65d15520758759390309df2e10013"
+    },
+    {
+      "run": "history-collision-r1",
+      "audit": "independent-history-collision-audit-final/summary.json",
+      "sha256": "d63032471ed96dec6f5a955a141a865c17db28695ab1f51f4c23eba19204f607"
+    },
+    {
+      "run": "history-sparse-r5",
+      "audit": "independent-history-audit/summary.json",
+      "sha256": "bcc46e9458b8b56913103f5096748a52c1b61186a865f0365c9abed1866ce3da"
+    },
+    {
+      "run": "history-source-r1",
+      "audit": "independent-history-source-audit-r2/summary.json",
+      "sha256": "50e92aa70685679adef9650eebe22a693edf267a8dd766d8490613dcb6c00d49"
+    },
+    {
+      "run": "history-create-r3",
+      "audit": "independent-history-audit/summary.json",
+      "sha256": "73edc69fb40bf137e4828bc80ca4af142ce7a6bf9df310f968cf3008f97355a5"
+    }
+  ]
+}

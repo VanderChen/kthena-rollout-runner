@@ -325,6 +325,8 @@ def plan(row):
         elif n==302:co['roles']=['frontend','extra']
         elif n==303:co['dependencies']=[{'role':'frontend','dependsOn':['backend']}]
         steps.append(step('change-coordination-without-resetting-progress',s,stableSeconds=30))
+        if n==301:
+            steps[-1]['expect']['noNewRevision']=True
     else:raise ValueError(f'{row["id"]}: no explicit executable mapping yet')
     # Explicit stage outcomes supplement the continuous UID/budget ledger.
     # Percentage expansion keeps an already-issued B below the new partition.

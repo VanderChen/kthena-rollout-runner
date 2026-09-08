@@ -9,7 +9,7 @@
 目录基线；`--controller-commit` 单独记录本次实际被测版本。runner不调用controller
 内部预算、模板比较或协调函数。
 
-当前正在进行开发smoke。配置存在不表示Kind通过；完整303项同候选验收结果另行记录。
+当前r10完整303项Kind验证仍在运行。配置存在不表示Kind通过；完整验收结果另行记录。
 
 | 目录范围 | 能力 |
 | --- | --- |
@@ -112,3 +112,36 @@ python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
 汇总器拒绝遗漏、重复、未执行、不同候选/输入、清理失败、未结束的Job以及退出码与
 结果矛盾的分片。失败仍保留FAIL；INCONCLUSIVE和TRIGGER_MISSED独立计数。
 脚本退出0表示303项证据汇总检查完成，不表示全部用例通过。
+
+### RUN-301断言补充执行
+
+核查中发现RUN-301移除coordination的阶段缺少`noNewRevision`断言，已补齐；反例测试
+证明旧配置会漏过冗余历史，新配置会拒绝。变更仅增加该断言，实际API动作、模板、
+时序以及其他302项输入不变。r10二进制已经支持此断言，因此补测使用同一个r10镜像，
+将修正后的RUN-301输入通过ConfigMap挂载；无需修改Kthena，也不覆盖在跑Job的输入。
+
+完整r10结束后再执行补测，避免共享控制器/调度资源相互影响：
+
+```sh
+kubectl --kubeconfig /private/tmp/runner-normal-022.kubeconfig create configmap \
+  rollout-normal-r10-301-input --namespace rollout-runner \
+  --from-file=RUN-301.yaml=cases/normal/RUN-301.yaml
+kubectl --kubeconfig /private/tmp/runner-normal-022.kubeconfig apply \
+  -f deploy/normal-301-addendum.yaml
+```
+
+两个Job均结束、完整证据导出后，使用变更前已冻结的r10 suite与独立补测目录汇总：
+
+```sh
+python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
+  --original-suite artifacts/environment-022/r10-frozen-suite.json \
+  --addendum-301 artifacts/normal-r10-301-addendum artifacts/normal-r10-303
+```
+
+此入口只允许RUN-301新增上述断言，校验原始输入可由修正输入仅删除该断言精确还原，
+其余302项和原目录不变；仍校验全部Job终态、镜像/二进制/控制器身份、完整303项覆盖、
+原始结果和实际输入哈希。报告保留初次RUN-301结果及证据，明确记录304次执行与303个
+独立用例，RUN-301验收取补测的原始状态。补测失败仍报告FAIL，缺失补测不能按新输入验收。
+
+报告器的拒绝与结果保留逻辑用`python3 -B -m unittest discover -s scripts -p 'test_*.py'`
+验证；这些合成测试不作为Kind执行证据。补测尚未运行，当前不得宣称该新增断言已完成Kind验证。

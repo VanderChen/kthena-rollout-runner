@@ -115,6 +115,46 @@ func TestNormalCatalogueIsExecutable(t *testing.T) {
 		}
 	}
 }
+func TestNormalCoordinationRemovalRejectsRedundantRevision(t *testing.T) {
+	c := normalCase(t, "RUN-301")
+	l, objects := normalFixture(t, c.ID)
+	rollout, removeCoordination := c.Scenario.Steps[0], c.Scenario.Steps[1]
+	if err := l.Transition(rollout.Spec, rollout.Name, rollout.Expect, objects); err != nil {
+		t.Fatal(err)
+	}
+	revision := func(uid string) *unstructured.Unstructured {
+		return &unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": "apps/v1", "kind": "ControllerRevision",
+			"metadata": map[string]interface{}{
+				"name": "model-" + uid, "uid": uid,
+				"labels":          map[string]interface{}{"modelserving.volcano.sh/revision": uid},
+				"ownerReferences": []interface{}{map[string]interface{}{"uid": "owner", "controller": true}},
+			},
+			"data":     map[string]interface{}{"data": listValue(mapValue(cloneMap(rollout.Spec), "template"), "roles")},
+			"revision": int64(1),
+		}}
+	}
+	known := revision("known-B")
+	objects["controllerrevisions"][string(known.GetUID())] = known
+	l.After("controllerrevisions", "ADDED", known, objects)
+	if err := l.error(); err != nil {
+		t.Fatalf("the real A to B template change must allow its history: %v", err)
+	}
+	if err := l.Transition(removeCoordination.Spec, removeCoordination.Name, removeCoordination.Expect, objects); err != nil {
+		t.Fatal(err)
+	}
+	// Updating metadata of the same immutable history is legal. Creating a
+	// second template identity just for removing coordination is not.
+	known.Object["revision"] = int64(2)
+	l.After("controllerrevisions", "MODIFIED", known, objects)
+	if err := l.error(); err != nil {
+		t.Fatalf("existing immutable B history must remain usable: %v", err)
+	}
+	redundant := revision("redundant-B")
+	l.After("controllerrevisions", "ADDED", redundant, objects)
+	requireNormalViolation(t, l, "UNEXPECTED_REVISION")
+}
+
 func TestNormalBudgetRetainsDeletedGap(t *testing.T) {
 	l, o := normalFixture(t, "RUN-062")
 	s := normalCase(t, "RUN-062").Scenario.Steps[0]

@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: rollout-normal-r10-183-boundary-addendum
+  name: rollout-normal-r10-183-addendum
   namespace: rollout-runner
 spec:
   backoffLimit: 0
@@ -19,7 +19,7 @@ spec:
             - --select=RUN-183
             - --artifacts=/artifacts
             - --phase-timeout=420s
-            - --run-id=normal-r10-183-boundary-addendum
+            - --run-id=normal-r10-183-addendum
             - --controller-image=kthena-controller-manager:normal-022-538b2825
             - --controller-commit=538b2825c06bc1e8c5392d18f18f84faee9fca95
           resources:

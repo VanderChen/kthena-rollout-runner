@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: rollout-normal-r11-write-conflict-addendum
+  name: rollout-normal-r11-write-fix
   namespace: rollout-runner
 spec:
   backoffLimit: 0
@@ -19,7 +19,7 @@ spec:
             - --select=RUN-247,RUN-255,RUN-257
             - --artifacts=/artifacts
             - --phase-timeout=420s
-            - --run-id=normal-r11-write-conflict-addendum
+            - --run-id=normal-r11-write-fix
             - --controller-image=kthena-controller-manager:normal-022-538b2825
             - --controller-commit=538b2825c06bc1e8c5392d18f18f84faee9fca95
           resources:

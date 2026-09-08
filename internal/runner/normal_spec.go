@@ -97,6 +97,7 @@ func (c Case) validateScenario() error {
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
 	sparseBoundary := n >= 574 && n <= 603 && c.Format == "rollout-runner/v3"
 	numericBoundary := n >= 540 && n <= 572 && c.Format == "rollout-runner/v2"
+	identityBoundary := n == 611 && c.Format == "rollout-runner/v3"
 	completionBoundary := n >= 604 && n <= 609 && c.Format == "rollout-runner/v3"
 	dependencyBoundary := n == 573 && c.Format == "rollout-runner/v3"
 	equalCollision := n == 610 && c.Format == "rollout-runner/v3"
@@ -104,7 +105,7 @@ func (c Case) validateScenario() error {
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -155,6 +156,13 @@ func (c Case) validateScenario() error {
 			model, err := readModel(p.Spec)
 			if err != nil || model.Mode != "Role" || model.N != 1 || model.Roles["frontend"].R != 3 || model.Roles["frontend"].W != 1 || model.Roles["frontend"].P != 1 {
 				return fmt.Errorf("invalid mixed historical source")
+			}
+		case "new-identity-boundary":
+			if !identityBoundary || p.Release != "one" || p.StableSeconds < 30 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
+				return fmt.Errorf("new identity requires actual old owner residue and new owned population")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return err
 			}
 		case "sparse-completion-boundary":
 			if !p.Expect.RequireCompleted || !completionBoundary || p.Release != "none" || p.StableSeconds < 30 || !p.Expect.NoReplacement || !p.Expect.NoNewRevision {
@@ -310,6 +318,9 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("condition requires positive count")
 			}
 		}
+	}
+	if identityBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "new-identity-boundary") {
+		return fmt.Errorf("identity boundary cannot skip real old-owner residues")
 	}
 	if completionBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "sparse-completion-boundary") {
 		return fmt.Errorf("sparse completion cannot skip automatic promotion before restart")

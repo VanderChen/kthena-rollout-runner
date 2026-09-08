@@ -189,7 +189,17 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 func (r *Runner) cleanupNormalNamespace(ns string, uid types.UID) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	// Finalizers belong only to Pods in the exact namespace this attempt created.
+	actualNS, err := r.kube.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if actualNS.UID != uid {
+		return fmt.Errorf("refusing cleanup of a different namespace UID")
+	}
+	// Finalizers belong only to objects in the exact namespace this attempt created.
 	list, err := r.kube.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 	if err == nil {
 		for _, p := range list.Items {
@@ -200,6 +210,42 @@ func (r *Runner) cleanupNormalNamespace(ns string, uid types.UID) error {
 						return e
 					}
 				}
+			}
+		}
+	}
+	histories, err := r.kube.AppsV1().ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if err == nil {
+		for _, history := range histories.Items {
+			for attempt := 0; attempt < 5; attempt++ {
+				actual, getErr := r.kube.AppsV1().ControllerRevisions(ns).Get(ctx, history.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(getErr) {
+					break
+				}
+				if getErr != nil {
+					return getErr
+				}
+				if actual.UID != history.UID {
+					return fmt.Errorf("history UID changed during fixture cleanup")
+				}
+				hasHold := false
+				for _, f := range actual.Finalizers {
+					hasHold = hasHold || f == "rollout-runner/hold"
+				}
+				if !hasHold {
+					break
+				}
+				actual.Finalizers = removeString(actual.Finalizers, "rollout-runner/hold")
+				_, updateErr := r.kube.AppsV1().ControllerRevisions(ns).Update(ctx, actual, metav1.UpdateOptions{})
+				if apierrors.IsConflict(updateErr) && attempt < 4 {
+					continue
+				}
+				if updateErr != nil && !apierrors.IsNotFound(updateErr) {
+					return updateErr
+				}
+				break
 			}
 		}
 	}
@@ -345,6 +391,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 		return e.rejectRequest(ctx, p, prefix)
 	case "prepare-history-source":
 		return e.prepareHistorySource(ctx, p, prefix)
+	case "new-identity-boundary":
+		return e.identityBoundary(ctx, p, prefix)
 	case "sparse-completion-boundary":
 		return e.sparseCompletionBoundary(ctx, p, prefix)
 	case "stable-dependency-boundary":

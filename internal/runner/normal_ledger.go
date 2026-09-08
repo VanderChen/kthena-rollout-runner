@@ -54,6 +54,7 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	ForeignResidueUIDs     map[string]string      `json:"foreignResidueUIDs,omitempty"`
 	RejectedSpec           map[string]interface{} `json:"acceptedSpecAfterRejection,omitempty"`
 	RejectedGeneration     int64                  `json:"acceptedGenerationAfterRejection,omitempty"`
 	HistoryFixtureData     map[string]string      `json:"injectedHistoryDataByUID,omitempty"`
@@ -667,6 +668,9 @@ func (l *NormalLedger) unitTarget(u NormalUnit) bool {
 	return true
 }
 func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	if oldOwner, ok := l.ForeignResidueUIDs[string(o.GetUID())]; ok && oldOwner != l.Owner && objectOwned(o, l.Owner) {
+		l.fail("FOREIGN_OWNER_ADOPTED: " + kind + "/" + o.GetName())
+	}
 	if kind == "modelservings" && l.RejectedSpec != nil && o.GetName() == "model" && o.GetGeneration() >= l.RejectedGeneration {
 		if string(o.GetUID()) != l.Owner || event == "DELETED" || o.GetGeneration() != l.RejectedGeneration || !reflect.DeepEqual(o.Object["spec"], l.RejectedSpec) {
 			l.fail("REJECTION_ATOMICITY: stored ModelServing changed after rejected request")

@@ -327,6 +327,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	switch p.Action {
 	case "drop-old-deletions":
 		return e.dropOldDeletions(ctx, p, prefix)
+	case "retry-plugin-error":
+		return e.retryPluginError(ctx, p, prefix)
 	case "retry-api-error":
 		return e.retryAPIError(ctx, p, prefix)
 	case "resume-after-grace":

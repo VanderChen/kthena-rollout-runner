@@ -1,11 +1,11 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: rollout-normal-r11-247-conflict-addendum
+  name: rollout-normal-r11-write-conflict-addendum
   namespace: rollout-runner
 spec:
   backoffLimit: 0
-  activeDeadlineSeconds: 1800
+  activeDeadlineSeconds: 7200
   template:
     spec:
       serviceAccountName: rollout-runner
@@ -16,10 +16,10 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --cases=/cases/normal
-            - --select=RUN-247
+            - --select=RUN-247,RUN-255,RUN-257
             - --artifacts=/artifacts
             - --phase-timeout=420s
-            - --run-id=normal-r11-247-conflict-addendum
+            - --run-id=normal-r11-write-conflict-addendum
             - --controller-image=kthena-controller-manager:normal-022-538b2825
             - --controller-commit=538b2825c06bc1e8c5392d18f18f84faee9fca95
           resources:

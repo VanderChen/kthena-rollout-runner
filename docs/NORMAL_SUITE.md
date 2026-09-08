@@ -213,7 +213,11 @@ go test -tags=kind ./internal/runner -run '^TestScenarioUpdateKindConflict$' -co
 ```
 
 正在运行的完整303项以及301/183补测继续使用原r10镜像。它们全部结束后，必须以
-修正后的runner独立完成RUN-247（以及后续确认受同一runner问题影响的用例），保持
+修正后的runner独立完成RUN-247、255、257（以及后续确认受同一runner问题影响的用例），保持
 相同production控制器和用例输入。最终报告需逐项保留新旧runner镜像/二进制身份及
 原始失败；上述仅含301/183的报告不再足以完成第一类验收。完整复测与新增汇总门禁
 当前待完成，不能将ConfigMap组件验证记为RUN-247通过。
+
+已准备的复测清单为`deploy/normal-write-conflict-addendum.yaml`，当前选择247/255/257，
+Job/run ID为`rollout-normal-r11-write-conflict-addendum`/`normal-r11-write-conflict-addendum`。
+三项须分别用实际证据核查，不将共同错误字符串当作复测结果。该Job尚未创建。

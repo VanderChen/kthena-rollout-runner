@@ -325,6 +325,13 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "terminate-leader":
+		if err := e.terminateLeader(ctx, prefix); err != nil {
+			return err
+		}
+		if err := e.locked(func() error { e.l.Phase = p.Name; e.l.Expected = p.Expect; return nil }); err != nil {
+			return err
+		}
 	case "drop-old-deletions":
 		return e.dropOldDeletions(ctx, p, prefix)
 	case "retry-plugin-error":

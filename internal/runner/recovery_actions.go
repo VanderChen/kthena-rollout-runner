@@ -349,6 +349,9 @@ func (e *normalExecution) recoverPod(ctx context.Context, p ScenarioStep, prefix
 }
 
 func (e *normalExecution) recoveryController(ctx context.Context) (*corev1.Pod, error) {
+	if e.c.ID == "RUN-441" || e.c.ID == "RUN-442" {
+		return e.electedController(ctx)
+	}
 	pods, err := e.r.kube.CoreV1().Pods("kthena-system").List(ctx, metav1.ListOptions{LabelSelector: "app.kubernetes.io/component=kthena-controller-manager,app.kubernetes.io/instance=kthena,app.kubernetes.io/name=workload"})
 	if err != nil {
 		return nil, err

@@ -23,7 +23,8 @@ def final_pods(state, owner, baseline, partition, version):
     pods = m.mine(state, 'pods', owner)
     assert len(pods) == 6 and all(m.ready(o) for o in pods.values())
     front = frontend(state, owner); assert len(front) == 3
-    expected = collections.Counter(['A']*partition + [version]*(3-partition))
+    protected = sum(o['metadata']['labels'][m.R]=='frontend' and int(o['metadata']['labels'][m.I].rsplit('-',1)[1])<partition for o in baseline.values())
+    expected = collections.Counter(['A']*protected + [version]*(3-protected))
     assert collections.Counter(m.version(o) for o in front.values()) == expected
     for uid, o in pods.items():
         lab = o['metadata']['labels']; assert lab.get(m.E) == 'true'
@@ -34,27 +35,35 @@ def final_pods(state, owner, baseline, partition, version):
 
 def audit_case(p, trace):
     case = m.yaml(p/'case.yaml'); result = m.read(p/'result.json'); original = m.yaml(p/'before-server.yaml'); owner = original['metadata']['uid']
-    n = int(case['id'][4:]); assert 463 <= n <= 522 and (n-463)%10 < 5 and result['status'] == 'PASS'
+    n = int(case['id'][4:]); assert 463 <= n <= 522 and result['status'] == 'PASS'
+    sparse = (n-463)%10 >= 5
+    assert case['scenario'].get('fixture','') == ('sparse-history-A' if sparse else '')
+    if sparse: original = m.yaml(p/'source-initial-server.yaml')
     sourcepath = ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json'
     raw = sourcepath.read_bytes(); assert hashlib.sha256(raw).hexdigest() == '757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5'
     assert case['scenario']['source'] == next(r for r in json.loads(raw)['cases'] if r['id'] == case['id'])
     source = case['scenario']['source']; config = source['config']; partition = config['roles']['f']['p']; minimum = 3-config['roles']['f']['u']
-    assert 'O={0,1,2}' in source['initial']
+    assert ('O={0,3,4}' if sparse else 'O={0,1,2}') in source['initial']
     initial = m.yaml(p/'before.yaml')['spec']; requested = m.yaml(p/'step-01-request.yaml')['spec']; bserver = m.yaml(p/'step-01-server.yaml'); cserver = m.yaml(p/'step-02-server.yaml')
     limit = config.get('revisionHistoryLimit', 'omitted')
     for request in (initial, requested, m.yaml(p/'step-02-request.yaml')['spec']):
         assert request.get('revisionHistoryLimit', 'omitted') == limit
     for server in (original, bserver, cserver):
         assert server['spec']['revisionHistoryLimit'] == (10 if limit == 'omitted' else limit)
-    assert bserver['metadata']['generation'] == 2 and cserver['metadata']['generation'] == 3
+    assert bserver['metadata']['generation'] == original['metadata']['generation']+1 and cserver['metadata']['generation'] == original['metadata']['generation']+2
     b = {r['name']:r for r in bserver['spec']['template']['roles']}; c = {r['name']:r for r in cserver['spec']['template']['roles']}
     assert b['backend'] == c['backend']
     assert m.version(b['frontend']['entryTemplate']) == 'B' and m.version(c['frontend']['entryTemplate']) == 'C'
     rows = [json.loads(line) for line in (p/'observations.jsonl').read_text().splitlines()]
     assert [r['sequence'] for r in rows] == list(range(1,len(rows)+1)) and not any(r['event'] == 'GAP' for r in rows)
+    preparation = None
+    if sparse:
+        loader = importlib.util.spec_from_file_location('sparse_fixture',ROOT/'scripts/audit-history-sparse-fixture.py')
+        fixture = importlib.util.module_from_spec(loader); loader.loader.exec_module(fixture)
+        preparation = fixture.audit(p,rows)
     baseline = m.yaml(p/'baseline-resources.yaml'); basepods = m.mine(baseline,'pods',owner); basecr = m.mine(baseline,'controllerrevisions',owner)
     assert len(basepods) == 6 and len(basecr) == 1 and all(m.ready(o) and m.version(o) == 'A' for o in basepods.values())
-    assert {int(o['metadata']['labels'][m.I].rsplit('-',1)[1]) for o in frontend(baseline,owner).values()} == {0,1,2}
+    assert {int(o['metadata']['labels'][m.I].rsplit('-',1)[1]) for o in frontend(baseline,owner).values()} == ({0,3,4} if sparse else {0,1,2})
     installed = m.read(p/'step-01-create-installed.json'); rid = installed['id']
     assert installed['resource'] == 'controllerrevisions' and installed['namespace'] == result['namespace'] and installed['ownerUID'] == owner and installed['methods'] == ['POST']
     assert installed['mode'] == 'error' and installed['statusCode'] == 503 and installed['count'] == -1
@@ -99,7 +108,7 @@ def audit_case(p, trace):
             if row['event'] == 'ADDED': revisioncreates[o['metadata']['name']] = o
         if kind == 'pods' and m.owned(o,owner):
             if row['event'] == 'ADDED': createdpods.append(o)
-            if prev and m.ready(prev) and (row['event'] == 'DELETED' or o['metadata'].get('deletionTimestamp')):
+            if (not sparse or row['sequence'] > preparation['lastPreparationSequence']) and prev and m.ready(prev) and (row['event'] == 'DELETED' or o['metadata'].get('deletionTimestamp')):
                 if o['metadata']['labels'][m.R] == 'frontend':
                     available = sum(m.ready(pod) for pod in frontend(state,owner).values()); assert available-1 >= minimum
                     deletions.append({'sequence':row['sequence'],'uid':uid,'readyBefore':available,'minimum':minimum})
@@ -130,8 +139,8 @@ def audit_case(p, trace):
             roles = {r['name']:r for r in cr['data']['data']}; assert m.version(roles[o['metadata']['labels'][m.R]]['entryTemplate']) == m.version(o)
             if o['metadata'].get('deletionTimestamp') and 'rollout-runner/hold' in o['metadata'].get('finalizers',[]): terminating.add(o['metadata']['uid'])
     trigger = m.read(p/'step-01-terminating-trigger.json')
-    assert trigger['eligible'] == (partition < 3)
-    if partition < 3:
+    assert trigger['eligible'] == (partition < 3 or sparse)
+    if partition < 3 or sparse:
         pinned = set(trigger['pinnedUIDs'].values()); assert len(pinned) == 1 and pinned <= terminating
         holdcp = next(cp for cp in checkpoints if cp['phase'] == 'C-after-allowed-B'); assert holdcp['elapsedStableNanos'] >= 10_000_000_000
         for uid in pinned:
@@ -154,7 +163,7 @@ def audit_case(p, trace):
     cms = m.mine(final,'configmaps',owner); assert len(cms) == 6
     for cm in cms.values(): assert sum(all(o['metadata']['labels'].get(k)==cm['metadata']['labels'].get(k) for k in (m.G,m.R,m.I)) for o in finalpods.values()) == 1
     proxy = m.read(p/'fault-proxy-final.json'); assert not proxy['errors'] and not any(r['active'] for r in proxy['rules'])
-    return {'id':case['id'],'classification':'PASS','watchRows':len(rows),'actualFailedCRCreates':len(injected),'persistenceBeforeTemplateMutations':persistence,'historyProbes':len(probes),'terminatingReferenceUIDs':sorted(terminating),'heldNanos':held['elapsedStableNanos'],'finalStableNanos':finalcp['elapsedStableNanos'],'healthyDeletionChecks':deletions,'limitRequest':limit,'sourcePartition':partition,'controllerReplacementUID':replacement['metadata']['uid'],'limitation':'References are checked using direct API reads throughout waits, with complete independent Watch for immutable Data, actual fault interval and stable final state. A pinned terminating Pod may share its revision with other live Pods. All-protected P=3 has no eligible old termination. No datastore internals are asserted.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-01-before-create-clear.json']}}
+    return {'id':case['id'],'classification':'PASS','sparsePreparation':preparation,'watchRows':len(rows),'actualFailedCRCreates':len(injected),'persistenceBeforeTemplateMutations':persistence,'historyProbes':len(probes),'terminatingReferenceUIDs':sorted(terminating),'heldNanos':held['elapsedStableNanos'],'finalStableNanos':finalcp['elapsedStableNanos'],'healthyDeletionChecks':deletions,'limitRequest':limit,'sourcePartition':partition,'controllerReplacementUID':replacement['metadata']['uid'],'limitation':'References are checked using direct API reads throughout waits, with complete independent Watch for immutable Data, actual fault interval and stable final state. A pinned terminating Pod may share its revision with other live Pods. All-protected P=3 has no eligible old termination. No datastore internals are asserted.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ['result.json','observations.jsonl','final-resources.yaml','step-01-before-create-clear.json']}}
 
 
 def audit_old_surge_failure(p, trace):

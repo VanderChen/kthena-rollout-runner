@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -143,7 +145,7 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 		cleanup, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		cleanupOK := true
-		for _, suffix := range []string{"-error", "-drop", "-hold", "-replay"} {
+		for _, suffix := range []string{"-error", "-drop", "-hold", "-replay", "-gc-list"} {
 			req, err := http.NewRequestWithContext(cleanup, "DELETE", os.Getenv("RUNNER_PROXY_CONTROL_URL")+"/v1/rules/"+id+suffix, nil)
 			if err == nil {
 				req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(secret)))
@@ -266,6 +268,39 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 		t.Fatal("recovered List lost existing object")
 	}
 	proof["collectionOnlyFailureAndRecovery"] = map[string]interface{}{"resource": "configmaps", "namespace": ns, "originalUIDPreserved": created.UID, "getAndWatchAndOtherNamespaceUnaffected": true}
+	if os.Getenv("RUNNER_PROXY_LIST_FILTER") == "true" {
+		zero := int64(0)
+		selector := "rollout-runner/proxy-probe=" + id
+		rule := Rule{ID: id + "-gc-list", Namespace: ns, Resource: "configmaps", Methods: []string{"GET"}, CollectionOnly: true, Mode: "error", StatusCode: 503, Count: 1, DurationSeconds: 30, LabelSelector: selector, ListLimit: &zero}
+		admin("POST", "/v1/rules", rule, 201)
+		paged, err := proxied.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{LabelSelector: selector, Limit: 500})
+		if err != nil || len(paged.Items) == 0 {
+			t.Fatal("paged observation consumed reference-list fault", err)
+		}
+		if _, err = proxied.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{LabelSelector: "rollout-runner/proxy-probe=other"}); err != nil {
+			t.Fatal("different selector consumed reference-list fault", err)
+		}
+		if _, err = proxied.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{LabelSelector: selector}); !apierrors.IsServiceUnavailable(err) {
+			t.Fatal("exact actual unpaged List must fail once", err)
+		}
+		recovered, err := proxied.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{LabelSelector: selector})
+		if err != nil || len(recovered.Items) != len(paged.Items) {
+			t.Fatal("filtered List did not recover automatically", err)
+		}
+		before, after := map[types.UID]bool{}, map[types.UID]bool{}
+		for _, item := range paged.Items {
+			before[item.UID] = true
+		}
+		for _, item := range recovered.Items {
+			after[item.UID] = true
+		}
+		if !reflect.DeepEqual(before, after) {
+			t.Fatal("filtered List lost original live identities")
+		}
+		save("gc-list-paged.json", paged)
+		save("gc-list-recovered.json", recovered)
+		proof["exactListFilter"] = map[string]interface{}{"selector": selector, "pagedLimit": 500, "failedLimit": 0, "originalUIDs": before, "recoveredUIDs": after}
+	}
 	finalized := makeCM(ns, "old")
 	finalized.Finalizers = []string{"rollout-runner/proxy-probe"}
 	old, err := direct.CoreV1().ConfigMaps(ns).Create(ctx, finalized, metav1.CreateOptions{})

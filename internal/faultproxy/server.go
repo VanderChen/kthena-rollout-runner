@@ -41,6 +41,7 @@ type Record struct {
 	Detail           string    `json:"detail,omitempty"`
 	LabelSelector    string    `json:"labelSelector,omitempty"`
 	ObjectGeneration int64     `json:"objectGeneration,omitempty"`
+	ListLimit        *int64    `json:"listLimit,omitempty"`
 }
 
 type State struct {
@@ -144,7 +145,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	x := requestContext{id: s.requests.Add(1), meta: metadata(r)}
 	r = r.WithContext(context.WithValue(r.Context(), contextKey{}, x))
-	s.record(Record{Request: x.id, Action: "request", Method: r.Method, Path: r.URL.Path, Namespace: x.meta.Namespace, Resource: x.meta.Resource, Name: x.meta.Name, LabelSelector: r.URL.Query().Get("labelSelector"), Detail: fmt.Sprintf("watch=%t initialEvents=%t", x.meta.Watch, x.meta.InitialEvents)})
+	s.record(Record{Request: x.id, Action: "request", Method: r.Method, Path: r.URL.Path, Namespace: x.meta.Namespace, Resource: x.meta.Resource, Name: x.meta.Name, LabelSelector: x.meta.LabelSelector, ListLimit: x.meta.ListLimit, Detail: fmt.Sprintf("watch=%t initialEvents=%t", x.meta.Watch, x.meta.InitialEvents)})
 	// Read an object only for explicitly selected HTTP fault identity checks.
 	var body []byte
 	needIdentity := false
@@ -203,7 +204,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if selected.Namespace != "" && x.meta.Namespace == "" {
 			detail = "global-list-watch-reconnect-guard"
 		}
-		s.recordLocked(Record{Request: x.id, Action: mode + "-request", RuleID: selected.ID, Method: r.Method, Path: r.URL.Path, Namespace: x.meta.Namespace, Resource: x.meta.Resource, Name: object.Name, UID: object.UID, ObjectGeneration: object.Generation, LabelSelector: r.URL.Query().Get("labelSelector"), Status: status, Detail: detail})
+		s.recordLocked(Record{Request: x.id, Action: mode + "-request", RuleID: selected.ID, Method: r.Method, Path: r.URL.Path, Namespace: x.meta.Namespace, Resource: x.meta.Resource, Name: object.Name, UID: object.UID, ObjectGeneration: object.Generation, LabelSelector: x.meta.LabelSelector, ListLimit: x.meta.ListLimit, Status: status, Detail: detail})
 		s.mu.Unlock()
 		if mode == "error" {
 			writeStatus(w, status, "injected external controller API failure")

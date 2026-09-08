@@ -9,6 +9,7 @@ package faultproxy
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -29,6 +30,8 @@ type Rule struct {
 	InitialSync     bool     `json:"initialSync,omitempty"`
 	CollectionOnly  bool     `json:"collectionOnly,omitempty"`
 	Generation      int64    `json:"generation,omitempty"`
+	LabelSelector   string   `json:"labelSelector,omitempty"`
+	ListLimit       *int64   `json:"listLimit,omitempty"`
 }
 
 type RuleStatus struct {
@@ -49,10 +52,13 @@ type RuleStatus struct {
 type requestMeta struct {
 	Method, Path, Namespace, Resource, Name, Subresource string
 	Watch, InitialEvents                                 bool
+	LabelSelector                                        string
+	ListLimit                                            *int64
 }
 
 func metadata(r *http.Request) requestMeta {
 	m := requestMeta{Method: r.Method, Path: r.URL.Path, Watch: r.URL.Query().Get("watch") == "true" || r.URL.Query().Get("watch") == "1", InitialEvents: r.URL.Query().Get("sendInitialEvents") == "true"}
+	m.LabelSelector = r.URL.Query().Get("labelSelector")
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	start := 0
 	if len(parts) >= 3 && parts[0] == "api" {
@@ -75,6 +81,15 @@ func metadata(r *http.Request) requestMeta {
 	if len(parts) > start+2 {
 		m.Subresource = parts[start+2]
 	}
+	if m.Method == http.MethodGet && m.Name == "" && !m.Watch {
+		limit := r.URL.Query().Get("limit")
+		if limit == "" {
+			limit = "0"
+		}
+		if value, err := strconv.ParseInt(limit, 10, 64); err == nil && value >= 0 {
+			m.ListLimit = &value
+		}
+	}
 	return m
 }
 
@@ -96,6 +111,9 @@ func (r Rule) validate() error {
 	}
 	if r.Generation < 0 || r.Generation > 0 && (r.Mode != "error" || r.InitialSync || r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodPut || r.Name == "" || r.OwnerUID == "") {
 		return fmt.Errorf("generation filter requires an exact owned object PUT")
+	}
+	if (r.LabelSelector != "" || r.ListLimit != nil) && (!r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodGet || r.ListLimit != nil && *r.ListLimit < 0) {
+		return fmt.Errorf("selector and limit filters require a collection-only GET error and nonnegative limit")
 	}
 	switch r.Mode {
 	case "error":
@@ -135,6 +153,9 @@ func has(values []string, value string) bool {
 }
 
 func (r Rule) matchesRequest(m requestMeta) bool {
+	if r.LabelSelector != "" && r.LabelSelector != m.LabelSelector || r.ListLimit != nil && (m.ListLimit == nil || *r.ListLimit != *m.ListLimit) {
+		return false
+	}
 	if r.CollectionOnly && (m.Name != "" || m.Watch) {
 		return false
 	}

@@ -1,0 +1,92 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "sourceSHA256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+  "developmentScope": "RUN-449/452; pause controller API, accept B and concurrently delete both old protected entry/worker UIDs, resume and restore protected A, replay captured real old DELETED frames in reversed order twice, retain new A UIDs and finish eligible B",
+  "cases": [
+    {
+      "group": "2.2.2 Watch、事件与缓存故障",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 1,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "A全Ready；P=1；准备原ordinal0 entry及worker UID",
+      "action": "暂停controller；提交B并同时删除受保护ordinal0的entry+worker；恢复controller，再注入这两个旧UID的重复乱序删除事件",
+      "expect": "按历史A恢复受保护实例；重复旧UID事件不能再删新UID；eligible部分完成B，最后无Deleting残留",
+      "refs": [
+        "L06",
+        "L16",
+        "H11"
+      ],
+      "note": "",
+      "id": "RUN-449",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "运行故障与自动恢复",
+      "section": "2.2.2",
+      "categoryPath": [
+        "2",
+        "2.2",
+        "2.2.2"
+      ]
+    },
+    {
+      "group": "2.2.2 Watch、事件与缓存故障",
+      "kind": "运行",
+      "config": {
+        "coordination": "omitted",
+        "mode": "Role",
+        "n": 1,
+        "recovery": "omitted",
+        "roles": {
+          "b": {
+            "r": 3,
+            "w": 0
+          },
+          "f": {
+            "p": 1,
+            "r": 3,
+            "s": 1,
+            "u": 0,
+            "w": 1
+          }
+        }
+      },
+      "initial": "A全Ready；P=1；准备原ordinal0 entry及worker UID",
+      "action": "暂停controller；提交B并同时删除受保护ordinal0的entry+worker；恢复controller，再注入这两个旧UID的重复乱序删除事件",
+      "expect": "按历史A恢复受保护实例；重复旧UID事件不能再删新UID；eligible部分完成B，最后无Deleting残留",
+      "refs": [
+        "L06",
+        "L16",
+        "H11"
+      ],
+      "note": "",
+      "id": "RUN-452",
+      "verification": "NOT_RUN_ON_BASELINE",
+      "legacyGroup": "运行故障与自动恢复",
+      "section": "2.2.2",
+      "categoryPath": [
+        "2",
+        "2.2",
+        "2.2.2"
+      ]
+    }
+  ],
+  "inputs": {
+    "RUN-449": "f31977a8d74ed83643ce56728b401ceb1b45f3247d9314bdfbde2b9d291592c3",
+    "RUN-452": "7fdcb44980bed3688e569ef4cb32600d812ec7c23238e1c07d3a3e875b0930be"
+  }
+}

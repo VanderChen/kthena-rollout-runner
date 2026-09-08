@@ -64,6 +64,8 @@ func (s *Server) watch(ctx context.Context, cancel context.CancelFunc, upstream 
 	defer cancel()
 	defer upstream.Close()
 	defer out.Close()
+	stream := s.openReplayStream(request)
+	defer s.closeReplayStream(request.id, stream)
 	frames := make(chan watchFrame, 16)
 	errors := make(chan error, 1)
 	go func() {
@@ -109,6 +111,10 @@ func (s *Server) watch(ctx context.Context, cancel context.CancelFunc, upstream 
 		select {
 		case <-ctx.Done():
 			return
+		case command := <-stream.commands:
+			if err := s.writeReplay(out, request, command); err != nil {
+				return
+			}
 		case frame, ok := <-frames:
 			if !ok {
 				frames = nil
@@ -122,6 +128,11 @@ func (s *Server) watch(ctx context.Context, cancel context.CancelFunc, upstream 
 				default:
 				}
 				continue
+			}
+			if err := s.captureDeletion(request, frame); err != nil {
+				s.facilityError(err.Error())
+				_ = out.CloseWithError(err)
+				return
 			}
 			behind := false
 			for _, older := range pending {
@@ -206,6 +217,7 @@ func (s *Server) deliverOrHold(out io.Writer, request requestContext, frame *wat
 	_, err := out.Write(append(append([]byte{}, frame.raw...), '\n'))
 	if err == nil {
 		s.recordFrame(request, *frame, "forward-event", "")
+		s.noteReplayOriginalForward(request, *frame)
 	}
 	return false, err
 }

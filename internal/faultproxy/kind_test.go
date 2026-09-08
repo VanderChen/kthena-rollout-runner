@@ -41,7 +41,7 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 	if err := os.Mkdir(output, 0755); err != nil {
 		t.Fatal(err)
 	}
-	proof := map[string]interface{}{"probeID": id, "started": time.Now().UTC(), "scope": "two isolated ConfigMap fixture namespaces; no Kthena changes"}
+	proof := map[string]interface{}{"probeID": id, "started": time.Now().UTC(), "scope": "two isolated ConfigMap/Pod fixture namespaces; no Kthena changes"}
 	save := func(name string, value interface{}) {
 		t.Helper()
 		data, err := json.MarshalIndent(value, "", "  ")
@@ -143,7 +143,7 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 		cleanup, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		cleanupOK := true
-		for _, suffix := range []string{"-error", "-drop", "-hold"} {
+		for _, suffix := range []string{"-error", "-drop", "-hold", "-replay"} {
 			req, err := http.NewRequestWithContext(cleanup, "DELETE", os.Getenv("RUNNER_PROXY_CONTROL_URL")+"/v1/rules/"+id+suffix, nil)
 			if err == nil {
 				req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(secret)))
@@ -419,6 +419,9 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 		t.Fatal(err)
 	case <-ctx.Done():
 		t.Fatal("held request did not resume")
+	}
+	if os.Getenv("RUNNER_PROXY_REPLAY") == "true" {
+		proof["deletionReplay"] = verifyKindDeletionReplay(t, ctx, direct, proxied, id, ns, other, admin, getState, save)
 	}
 	st := getState()
 	save("proxy-state.json", st)

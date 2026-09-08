@@ -22,7 +22,7 @@ type Rule struct {
 	Methods         []string `json:"methods,omitempty"`
 	UIDs            []string `json:"uids,omitempty"`
 	OwnerUID        string   `json:"ownerUID,omitempty"`
-	Mode            string   `json:"mode"` // error, hold, drop-deletion
+	Mode            string   `json:"mode"` // error, hold, drop-deletion, replay-deletion
 	Count           int      `json:"count"`
 	StatusCode      int      `json:"statusCode,omitempty"`
 	DurationSeconds int      `json:"durationSeconds"`
@@ -33,13 +33,17 @@ type Rule struct {
 
 type RuleStatus struct {
 	Rule
-	Active    bool      `json:"active"`
-	Installed time.Time `json:"installed"`
-	Expires   time.Time `json:"expires"`
-	Hits      int       `json:"hits"`
-	Released  int       `json:"released"`
-	Remaining int       `json:"remaining"`
-	EndReason string    `json:"endReason,omitempty"`
+	Active          bool              `json:"active"`
+	Installed       time.Time         `json:"installed"`
+	Expires         time.Time         `json:"expires"`
+	Hits            int               `json:"hits"`
+	Released        int               `json:"released"`
+	Remaining       int               `json:"remaining"`
+	EndReason       string            `json:"endReason,omitempty"`
+	Captured        map[string]string `json:"captured,omitempty"`
+	CaptureOrder    []string          `json:"captureOrder,omitempty"`
+	ReplayRequested bool              `json:"replayRequested,omitempty"`
+	Replayed        int               `json:"replayed,omitempty"`
 }
 
 type requestMeta struct {
@@ -106,6 +110,10 @@ func (r Rule) validate() error {
 		if len(r.UIDs) == 0 || r.InitialSync || r.StatusCode != 0 || len(r.Methods) != 0 {
 			return fmt.Errorf("drop-deletion requires finite old UIDs and a namespace")
 		}
+	case "replay-deletion":
+		if r.Resource != "pods" || r.OwnerUID == "" || len(r.UIDs) != 2 || r.UIDs[0] == "" || r.UIDs[1] == "" || r.UIDs[0] == r.UIDs[1] || r.Count != -1 || r.InitialSync || r.Subresource != "" || r.Name != "" || r.StatusCode != 0 || len(r.Methods) != 0 {
+			return fmt.Errorf("replay-deletion requires exactly two distinct owned old Pod UIDs and bounded capture lifetime")
+		}
 	default:
 		return fmt.Errorf("unknown fault mode %q", r.Mode)
 	}
@@ -130,7 +138,7 @@ func (r Rule) matchesRequest(m requestMeta) bool {
 	if r.CollectionOnly && (m.Name != "" || m.Watch) {
 		return false
 	}
-	if r.Mode == "drop-deletion" || r.Resource != m.Resource || r.Subresource != m.Subresource || r.Name != "" && r.Name != m.Name && !(m.Method == "POST" && m.Name == "") || len(r.Methods) > 0 && !has(r.Methods, m.Method) {
+	if r.Mode == "drop-deletion" || r.Mode == "replay-deletion" || r.Resource != m.Resource || r.Subresource != m.Subresource || r.Name != "" && r.Name != m.Name && !(m.Method == "POST" && m.Name == "") || len(r.Methods) > 0 && !has(r.Methods, m.Method) {
 		return false
 	}
 	if r.InitialSync {

@@ -44,27 +44,30 @@ type Record struct {
 }
 
 type State struct {
-	Rules           []RuleStatus `json:"rules"`
-	Errors          []string     `json:"errors"`
-	Sequence        uint64       `json:"sequence"`
-	InFlightAllowed int          `json:"inFlightAllowed"`
+	Rules           []RuleStatus        `json:"rules"`
+	Errors          []string            `json:"errors"`
+	Sequence        uint64              `json:"sequence"`
+	InFlightAllowed int                 `json:"inFlightAllowed"`
+	ReplayStreams   []ReplayStreamState `json:"replayStreams,omitempty"`
 }
 
 type Server struct {
-	proxy        *httputil.ReverseProxy
-	token        string
-	mu           sync.Mutex
-	rules        []*RuleStatus
-	changed      chan struct{}
-	errors       []string
-	inFlight     map[uint64]requestMeta
-	journal      *json.Encoder
-	sequence     uint64
-	requests     atomic.Uint64
-	work         sync.WaitGroup
-	closed       bool
-	maxQueue     int
-	maxQueueSize int
+	proxy         *httputil.ReverseProxy
+	token         string
+	mu            sync.Mutex
+	rules         []*RuleStatus
+	changed       chan struct{}
+	errors        []string
+	inFlight      map[uint64]requestMeta
+	journal       *json.Encoder
+	sequence      uint64
+	requests      atomic.Uint64
+	work          sync.WaitGroup
+	closed        bool
+	maxQueue      int
+	maxQueueSize  int
+	replayFrames  map[string]map[string]watchFrame
+	replayStreams map[uint64]*replayStream
 }
 
 type contextKey struct{}
@@ -115,6 +118,7 @@ func (s *Server) changedLocked() {
 func (s *Server) activeLocked(r *RuleStatus) bool {
 	if r.Active && time.Now().After(r.Expires) {
 		r.Active, r.EndReason = false, "expired"
+		s.forgetReplayLocked(r.ID)
 		s.recordLocked(Record{Action: "rule-expired", RuleID: r.ID})
 		s.changedLocked()
 	}
@@ -317,11 +321,30 @@ func (s *Server) ControlHandler() http.Handler {
 			state := State{Errors: append([]string{}, s.errors...), Sequence: s.sequence, InFlightAllowed: len(s.inFlight)}
 			for _, rule := range s.rules {
 				s.activeLocked(rule)
-				state.Rules = append(state.Rules, *rule)
+				copy := *rule
+				copy.Captured = map[string]string{}
+				for uid, hash := range rule.Captured {
+					copy.Captured[uid] = hash
+				}
+				copy.CaptureOrder = append([]string(nil), rule.CaptureOrder...)
+				state.Rules = append(state.Rules, copy)
+			}
+			for id, stream := range s.replayStreams {
+				for rule, forwarded := range stream.forwarded {
+					copy := ReplayStreamState{Request: id, RuleID: rule, Forwarded: map[string]string{}}
+					for uid, hash := range forwarded {
+						copy.Forwarded[uid] = hash
+					}
+					state.ReplayStreams = append(state.ReplayStreams, copy)
+				}
 			}
 			s.mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(state)
+			return
+		}
+		if r.Method == "POST" && r.URL.Path == "/v1/replay" {
+			s.controlReplay(w, r)
 			return
 		}
 		if r.Method == "POST" && r.URL.Path == "/v1/rules" {
@@ -370,6 +393,7 @@ func (s *Server) ControlHandler() http.Handler {
 			for _, rule := range s.rules {
 				if rule.ID == id {
 					rule.Active, rule.EndReason = false, "cleared"
+					s.forgetReplayLocked(id)
 					s.recordLocked(Record{Action: "rule-cleared", RuleID: id})
 					s.changedLocked()
 					w.WriteHeader(204)

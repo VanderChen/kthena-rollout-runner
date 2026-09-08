@@ -19,6 +19,8 @@ import (
 
 func (e *normalExecution) specialAction(ctx context.Context, p ScenarioStep, prefix string) error {
 	switch p.Action {
+	case "terminate-controller":
+		return e.terminateController(ctx, prefix)
 	case "verify-resource-stop":
 		return e.verifyResourceStop(ctx, prefix)
 	case "drop-ready":

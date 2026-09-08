@@ -76,7 +76,8 @@ func (c Case) validateScenario() error {
 	recovery := n >= 304 && n <= 388 && c.Format == "rollout-runner/v3"
 	restart := n >= 389 && n <= 400 && c.Format == "rollout-runner/v3"
 	midRollout := n >= 401 && n <= 430 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	controllerRestart := n >= 435 && n <= 440 && c.Format == "rollout-runner/v3"
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !controllerRestart) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -103,6 +104,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "terminate-controller":
+			if !controllerRestart {
+				return fmt.Errorf("controller termination not declared by this case")
+			}
 		case "verify-resource-stop":
 			if !midRollout || n > 424 || (n-401)%4 != 0 {
 				return fmt.Errorf("resource fault not declared by this case")
@@ -168,6 +173,17 @@ func (c Case) validateScenario() error {
 	}
 	if restart && (len(s.Steps) != 2 || s.Steps[0].Action != "restart-container" || s.Steps[1].Action != "update" || textValue(s.InitialSpec, "recoveryPolicy") != "None") {
 		return fmt.Errorf("container restart cases require None, in-place restart then template update")
+	}
+	if controllerRestart {
+		terminations := 0
+		for _, step := range s.Steps {
+			if step.Action == "terminate-controller" {
+				terminations++
+			}
+		}
+		if terminations != 1 {
+			return fmt.Errorf("controller recovery cases require exactly one declared termination")
+		}
 	}
 	if s.Steps[len(s.Steps)-1].Until != "settled" {
 		return fmt.Errorf("last step must verify a settled state")

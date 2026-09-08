@@ -1,0 +1,4 @@
+FROM busybox:1.36
+COPY bin/rollout-runner-controller-restart /usr/local/bin/rollout-runner
+COPY cases/controller-restart /cases/controller-restart
+ENTRYPOINT ["/usr/local/bin/rollout-runner"]

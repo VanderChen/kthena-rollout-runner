@@ -1,4 +1,4 @@
 FROM busybox:1.36
-COPY --chmod=0755 bin/rollout-runner-leader-switch /usr/local/bin/rollout-runner
+COPY --chmod=0755 bin/rollout-runner-leader-switch-r2 /usr/local/bin/rollout-runner
 COPY cases/leader-switch /cases/leader-switch
 ENTRYPOINT ["/usr/local/bin/rollout-runner"]

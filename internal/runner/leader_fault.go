@@ -97,6 +97,26 @@ func (e *normalExecution) electedController(ctx context.Context) (*corev1.Pod, e
 	return leader, nil
 }
 
+// Any different eligible instance may win a real election. Kubernetes may
+// create a replacement before the old lease expires; that process is a valid
+// winner too, provided it belongs to the same unchanged ReplicaSet.
+func leaderTakeoverKind(old, standby, current *corev1.Pod, sent time.Time) (string, error) {
+	if current.UID == old.UID {
+		return "", fmt.Errorf("old leader UID still holds the Lease")
+	}
+	if current.UID == standby.UID {
+		if current.Status.ContainerStatuses[0].RestartCount != standby.Status.ContainerStatuses[0].RestartCount {
+			return "", fmt.Errorf("standby restarted during takeover")
+		}
+		return "preexisting-standby", nil
+	}
+	oldOwner, newOwner := metav1.GetControllerOf(old), metav1.GetControllerOf(current)
+	if oldOwner == nil || newOwner == nil || oldOwner.Kind != "ReplicaSet" || newOwner.Kind != "ReplicaSet" || oldOwner.UID != newOwner.UID || current.CreationTimestamp.Time.Before(sent.Truncate(time.Second)) || current.Status.ContainerStatuses[0].RestartCount != 0 {
+		return "", fmt.Errorf("new election winner is not the same ReplicaSet's fresh replacement")
+	}
+	return "new-replacement", nil
+}
+
 func (e *normalExecution) terminateLeader(ctx context.Context, prefix string) (result error) {
 	leader, standby, lease, dep, err := e.leaderSnapshot(ctx)
 	if err != nil {
@@ -157,8 +177,9 @@ func (e *normalExecution) terminateLeader(ctx context.Context, prefix string) (r
 	for {
 		current, replacement, newLease, newDep, pollErr := e.leaderSnapshot(deadline)
 		if pollErr == nil && current.UID != leader.UID {
-			if current.UID != standby.UID || current.Status.ContainerStatuses[0].RestartCount != standby.Status.ContainerStatuses[0].RestartCount {
-				return fmt.Errorf("INCONCLUSIVE: the preexisting standby did not take over on the same process")
+			takeoverKind, takeoverErr := leaderTakeoverKind(leader, standby, current, sent)
+			if takeoverErr != nil {
+				return fmt.Errorf("INCONCLUSIVE: %w", takeoverErr)
 			}
 			if newLease.UID != lease.UID || newLease.Spec.LeaseTransitions == nil || lease.Spec.LeaseTransitions == nil || *newLease.Spec.LeaseTransitions != *lease.Spec.LeaseTransitions+1 {
 				return fmt.Errorf("CONTROLLER_STATE: exactly one real Lease transition not proved")
@@ -177,6 +198,9 @@ func (e *normalExecution) terminateLeader(ctx context.Context, prefix string) (r
 					}
 				}
 				if synced {
+					if err = writeJSON(filepath.Join(e.dir, prefix+"-leader-takeover.json"), map[string]interface{}{"kind": takeoverKind, "oldLeaderUID": leader.UID, "priorStandbyUID": standby.UID, "newLeaderUID": current.UID}); err != nil {
+						return err
+					}
 					if err = os.WriteFile(filepath.Join(e.dir, prefix+"-new-leader.log"), logs, 0644); err != nil {
 						return err
 					}
@@ -195,7 +219,7 @@ func (e *normalExecution) terminateLeader(ctx context.Context, prefix string) (r
 		}
 		select {
 		case <-deadline.Done():
-			return fmt.Errorf("INCONCLUSIVE: preexisting standby did not become synced leader: %w", deadline.Err())
+			return fmt.Errorf("INCONCLUSIVE: another controller instance did not become synced leader: %w", deadline.Err())
 		case <-time.After(250 * time.Millisecond):
 		}
 	}

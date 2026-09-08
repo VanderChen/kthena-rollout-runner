@@ -237,7 +237,7 @@
           "count": 1
       "timeoutSeconds": 180
     -
-      "name": "delete-elected-leader-and-let-existing-standby-complete-B"
+      "name": "delete-elected-leader-and-let-another-instance-complete-B"
       "action": "terminate-leader"
       "until": "settled"
       "release": "one"

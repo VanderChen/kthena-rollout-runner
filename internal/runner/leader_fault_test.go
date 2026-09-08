@@ -6,6 +6,7 @@ package runner
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,6 +68,35 @@ func TestLeaderSwitchCasesRequireMixedReadyVersions(t *testing.T) {
 		c.Scenario.Steps[1].Action = "terminate-controller"
 		if c.validateScenario() == nil {
 			t.Fatal("ordinary single-controller restart cannot replace elected failover")
+		}
+	}
+}
+
+func TestLeaderTakeoverAllowsFreshReplacementFromSameReplicaSet(t *testing.T) {
+	pods, _ := leaderTestState()
+	old, standby := &pods.Items[0], &pods.Items[1]
+	controller := true
+	old.OwnerReferences = []metav1.OwnerReference{{Kind: "ReplicaSet", UID: "replicaset-uid", Controller: &controller}}
+	sent := time.Now()
+	current := old.DeepCopy()
+	current.Name, current.UID = "replacement", "replacement-uid"
+	current.CreationTimestamp = metav1.NewTime(sent.Truncate(time.Second))
+	if kind, err := leaderTakeoverKind(old, standby, current, sent); err != nil || kind != "new-replacement" {
+		t.Fatal("legitimate new replacement winner rejected", kind, err)
+	}
+	if kind, err := leaderTakeoverKind(old, standby, standby, sent); err != nil || kind != "preexisting-standby" {
+		t.Fatal("legitimate existing standby winner rejected", kind, err)
+	}
+	for _, mutate := range []func(*corev1.Pod){
+		func(p *corev1.Pod) { p.UID = old.UID },
+		func(p *corev1.Pod) { p.OwnerReferences[0].UID = "foreign-replicaset" },
+		func(p *corev1.Pod) { p.CreationTimestamp = metav1.NewTime(sent.Add(-time.Minute)) },
+		func(p *corev1.Pod) { p.Status.ContainerStatuses[0].RestartCount = 1 },
+	} {
+		p := current.DeepCopy()
+		mutate(p)
+		if _, err := leaderTakeoverKind(old, standby, p, sent); err == nil {
+			t.Fatal("unrelated or restarted replacement accepted")
 		}
 	}
 }

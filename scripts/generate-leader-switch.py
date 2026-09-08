@@ -33,14 +33,14 @@ def main():
         conditions = [dict(scope,kind='unit',version=v,ready=True,count=1) for v in ('A','B')]
         steps = [normal.step('healthy-A-and-B-mixture-before-leader-termination', b, until='conditions',
                             conditions=conditions, release='one', holdSeconds=5, stableSeconds=0, timeoutSeconds=180),
-                 normal.step('delete-elected-leader-and-let-existing-standby-complete-B', action='terminate-leader',
+                 normal.step('delete-elected-leader-and-let-another-instance-complete-B', action='terminate-leader',
                              stableSeconds=30, timeoutSeconds=420, expect={'targets': targets})]
         case = {'format': 'rollout-runner/v3', 'id': row['id'], 'baseline': normal.COMMIT,
                 'scenario': {'source': row, 'profile': 'controlled', 'initialSpec': a, 'steps': steps}}
         (out/(row['id']+'.yaml')).write_text(normal.yaml(case)+'\n')
     manifest = {'format': 'rollout-runner/suite-v1', 'controllerCommit': normal.COMMIT,
                 'sourceSHA256': recovery.SOURCE_SHA,
-                'developmentScope': 'RUN441442; real two-replica production with leader election; Lease holder is terminated in actual Ready A/B mixture; preexisting standby must take over and initial sync before B completes',
+                'developmentScope': 'RUN441442; real two-replica production with leader election; Lease holder is terminated in actual Ready A/B mixture; another same-ReplicaSet instance must take over and initial sync before B completes',
                 'cases': rows, 'inputs': {row['id']: hashlib.sha256((out/(row['id']+'.yaml')).read_bytes()).hexdigest() for row in rows}}
     (out/'suite.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n')
     print('Generated two elected-leader failover scenarios.')

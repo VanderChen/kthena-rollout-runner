@@ -82,8 +82,9 @@ func (c Case) validateScenario() error {
 	eviction := n >= 433 && n <= 434 && c.Format == "rollout-runner/v3"
 	leaderSwitch := n >= 441 && n <= 442 && c.Format == "rollout-runner/v3"
 	pluginRetry := n >= 536 && n <= 539 && c.Format == "rollout-runner/v3"
+	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -110,6 +111,13 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "hold-initial-sync":
+			if !initialSync || p.Release != "one" || p.StableSeconds < 30 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
+				return fmt.Errorf("initial-sync fault requires automatic B convergence after bounded hold")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return fmt.Errorf("initial-sync target: %w", err)
+			}
 		case "drop-old-deletions":
 			if !lostDeletion || p.Release != "one" || p.TimeoutSeconds < 600 || p.TimeoutSeconds > 750 {
 				return fmt.Errorf("lost-deletion cases require ordinary release and a bounded full audit window")
@@ -237,6 +245,9 @@ func (c Case) validateScenario() error {
 	}
 	if apiRetry && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[0].Release != "none" || s.Steps[1].Action != "retry-api-error") {
 		return fmt.Errorf("API retry cases require an unfinished B window then exactly one finite failure")
+	}
+	if initialSync && (len(s.Steps) != 1 || s.Steps[0].Action != "hold-initial-sync") {
+		return fmt.Errorf("initial-sync cases require their complete startup fault and resumption")
 	}
 	if lostDeletion && (len(s.Steps) != 1 || s.Steps[0].Action != "drop-old-deletions") {
 		return fmt.Errorf("lost-deletion cases require one uninterrupted controller run")

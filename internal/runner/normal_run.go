@@ -326,6 +326,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "hold-initial-sync":
+		return e.holdInitialSync(ctx, p, prefix)
 	case "evict-ready-entry":
 		return e.evictReadyEntry(ctx, p, prefix)
 	case "terminate-leader":

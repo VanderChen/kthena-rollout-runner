@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 The Kthena Rollout Runner Authors.
 # SPDX-License-Identifier: Apache-2.0
-"""Prove a post-restoration healthy deletion crossing the sparse source budget."""
+"""Prove actual sparse-source budget or descending-order violations after history restoration."""
 import collections
 import hashlib
 import importlib.util
@@ -17,7 +17,7 @@ f=importlib.util.module_from_spec(loader);loader.loader.exec_module(f)
 
 def audit(p,trace):
     result=m.read(p/'result.json');case=m.yaml(p/'case.yaml');n=int(case['id'][4:]);assert 463<=n<=522 and (n-463)%10>=5
-    assert result['status']=='FAIL' and 'BUDGET_VIOLATION' in result['error'] and not (p/'step-02-request.yaml').exists()
+    assert result['status']=='FAIL' and any(reason in result['error'] for reason in ('BUDGET_VIOLATION','ORDER_MISMATCH')) and not (p/'step-02-request.yaml').exists()
     raw=(ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json').read_bytes()
     assert hashlib.sha256(raw).hexdigest()=='757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5'
     source=next(c for c in json.loads(raw)['cases'] if c['id']==case['id']);assert source==case['scenario']['source']
@@ -30,7 +30,7 @@ def audit(p,trace):
     saved=m.read(p/'step-01-before-create-clear.json');assert not saved['errors'] and next(r for r in saved['rules'] if r['id']==rule['id'])['hits']==len(errors)
     clear=m.ts(clears[0]['at']);cps=[m.read(x) for x in p.glob('checkpoint*.json')];hold=next(c for c in cps if c['phase']=='actual-CR-create-failure-no-template-actions');assert hold['elapsedStableNanos']>=10_000_000_000 and m.ts(hold['completed'])<clear
     b=m.yaml(p/'step-01-server.yaml');assert b['metadata']['uid']==owner and b['metadata']['generation']==4 and m.version(next(r for r in b['spec']['template']['roles'] if r['name']=='frontend')['entryTemplate'])=='B'
-    state=collections.defaultdict(dict);deletions=[];violations=[];histories={}
+    state=collections.defaultdict(dict);deletions=[];violations=[];order=[];histories={}
     for row in rows:
         o=row['object'];uid=o['metadata']['uid'];kind=row['kind'];previous=state[kind].get(uid);at=m.ts(row['received'])
         if kind=='controllerrevisions' and m.owned(o,owner):
@@ -45,10 +45,17 @@ def audit(p,trace):
                 proof={'sequence':row['sequence'],'at':row['received'],'uid':uid,'name':o['metadata']['name'],'ordinal':ordinal,'readyBefore':len(ready),'readyUIDsBefore':list(ready),'minimum':minimum}
                 deletions.append(proof)
                 if len(ready)-1<minimum:violations.append(proof)
+                higher={u:pod for u,pod in ready.items() if u in base and m.version(pod)=='A' and int(pod['metadata']['labels'][m.I].rsplit('-',1)[1])>ordinal and int(pod['metadata']['labels'][m.I].rsplit('-',1)[1])>=role['p']}
+                if higher and 'ORDER_MISMATCH' in result['error']:
+                    requests=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='pods' and t.get('method')=='DELETE' and t.get('name')==o['metadata']['name'] and clear<m.ts(t['at'])<=at]
+                    assert requests
+                    first=min(requests,key=lambda t:m.ts(t['at']))
+                    assert not any(t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='pods' and t.get('method')=='DELETE' and t.get('name') in [v['metadata']['name'] for v in higher.values()] and clear<m.ts(t['at'])<=m.ts(first['at']) for t in trace)
+                    order.append(dict(proof,higherReadyOriginalUIDs={u:pod['metadata']['name'] for u,pod in higher.items()},firstActualDELETE=first))
         if row['event']=='DELETED':state[kind].pop(uid,None)
         else:state[kind][uid]=o
         if m.ts(rule['installed'])<=at<clear:
             pods=m.mine(state,'pods',owner);assert set(pods)==set(base) and all(m.ready(v) for v in pods.values())
-    assert violations
+    assert violations or order
     proxy=m.read(p/'fault-proxy-final.json');assert not proxy['errors'] and not any(r['active'] for r in proxy['rules'])
-    return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_BUDGET_AFTER_SPARSE_HISTORY_RESTORE','watchRows':len(rows),'sparsePreparation':preparation,'actualFailedCRCreates':len(errors),'deletions':deletions,'firstViolation':violations[0],'limitation':'Source sparse population, actual failed history writes, safe fault interval and later healthy deletion are independently proven. Failure occurs during allowed B rollout; subsequent C, pinned terminating reference and final controller restart were not executed. No Kthena changes.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ('result.json','observations.jsonl','source-boundary.json','final-resources.yaml')}}
+    return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_BUDGET_AFTER_SPARSE_HISTORY_RESTORE' if violations else 'LOWER_ORDINAL_DELETED_BEFORE_READY_ELIGIBLE_HIGHER_SOURCE','watchRows':len(rows),'sparsePreparation':preparation,'actualFailedCRCreates':len(errors),'deletions':deletions,'firstViolation':(violations or order)[0],'orderViolations':order,'limitation':'Source sparse population, actual failed history writes, safe fault interval and later healthy deletion are independently proven. Failure occurs during allowed B rollout; subsequent C, pinned terminating reference and final controller restart were not executed. No Kthena changes.','evidenceSHA256':{name:hashlib.sha256((p/name).read_bytes()).hexdigest() for name in ('result.json','observations.jsonl','source-boundary.json','final-resources.yaml')}}

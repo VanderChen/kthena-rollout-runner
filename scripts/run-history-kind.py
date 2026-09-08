@@ -4,7 +4,7 @@
 """Run a production history/boundary batch on verified R6 with immutable build evidence.
 Usage: run-history-kind.py MANIFEST BUILD_JSON BINARY
 """
-import base64,copy,datetime,hashlib,json,pathlib,subprocess,sys,time,traceback,urllib.request
+import base64,calendar,copy,datetime,hashlib,json,pathlib,subprocess,sys,time,traceback,urllib.request
 
 root=pathlib.Path(__file__).resolve().parents[1]
 manifest=root/sys.argv[1]
@@ -35,6 +35,10 @@ def save(name,value):
 def state():
     req=urllib.request.Request('http://127.0.0.1:18033/v1/state',headers={'Authorization':'Bearer '+token})
     with urllib.request.urlopen(req,timeout=10) as response:return json.load(response)
+def nanos(value):
+    seconds=calendar.timegm(time.strptime(value[:19],"%Y-%m-%dT%H:%M:%S"))
+    fraction=value[19:-1]
+    return seconds*1_000_000_000+(int(fraction[1:].ljust(9,"0")) if fraction.startswith(".") else 0)
 def until(check,seconds=90):
     deadline=time.monotonic()+seconds
     while True:
@@ -76,11 +80,12 @@ try:
     mounted=json.loads(run(['-n','kthena-system','exec',controller['metadata']['name'],'--','cat','/runner-fault-proxy/kubeconfig']))
     assert mounted==kc, 'actual mounted kubeconfig does not match this run proxy'
     save('mounted-proxy-config.json',{'controllerUID':controller['metadata']['uid'],'configMapUID':config['metadata']['uid'],'configMapName':cmname,'server':mounted['clusters'][0]['cluster']['server'],'sha256':hashlib.sha256(json.dumps(mounted,sort_keys=True).encode()).hexdigest()})
-    startupTrace=run(['-n','rollout-runner','exec','recovery-proxy-022-r6','--','tail','-n','20000','/evidence/trace.jsonl'])
-    assert token.encode() not in startupTrace and b'Bearer ' not in startupTrace
-    startupRequests=[json.loads(line) for line in startupTrace.splitlines() if line]
-    startupRequests=[row for row in startupRequests if row.get('action')=='request' and row['at']>=controller['status']['startTime'] and row.get('resource')=='modelservings']
-    assert startupRequests, 'declared proxy received no controller startup ModelServing API request'
+    def actualStartupRequests():
+        startupTrace=run(['-n','rollout-runner','exec','recovery-proxy-022-r6','--','tail','-n','20000','/evidence/trace.jsonl'])
+        assert token.encode() not in startupTrace and b'Bearer ' not in startupTrace
+        startupRequests=[json.loads(line) for line in startupTrace.splitlines() if line]
+        return [row for row in startupRequests if row.get('action')=='request' and nanos(row['at'])>=nanos(controller['status']['startTime']) and row.get('resource')=='modelservings']
+    startupRequests=until(actualStartupRequests,30)
     save('proxy-controller-startup-requests.json',startupRequests)
     lf=(out/'controller.log').open('xb')
     logFollower=subprocess.Popen(k+['-n','kthena-system','logs',controller['metadata']['name'],'-f','--timestamps'],stdout=lf,stderr=subprocess.STDOUT)

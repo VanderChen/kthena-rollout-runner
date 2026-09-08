@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rollout-history-sparse-r5
+  namespace: rollout-runner
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 14400
+  template:
+    spec:
+      serviceAccountName: rollout-runner
+      restartPolicy: Never
+      containers:
+        - name: runner
+          image: kthena-rollout-runner:recovery-022-r26
+          imagePullPolicy: Never
+          args:
+            - --cases=/cases/history-sparse
+            - --select=RUN-469,RUN-471,RUN-472,RUN-478,RUN-479,RUN-480,RUN-481,RUN-482,RUN-488,RUN-489,RUN-490,RUN-491,RUN-492,RUN-498,RUN-499,RUN-500,RUN-501,RUN-502,RUN-508,RUN-509,RUN-510,RUN-511,RUN-512,RUN-518,RUN-519,RUN-520,RUN-521,RUN-522
+            - --artifacts=/artifacts
+            - --phase-timeout=660s
+            - --run-id=history-sparse-r5
+            - --controller-image=kthena-controller-manager:normal-022-538b2825
+            - --controller-commit=538b2825c06bc1e8c5392d18f18f84faee9fca95
+            - --fault-proxy-api=https://recovery-proxy-022-r6.rollout-runner.svc:8080
+            - --fault-proxy-control=http://recovery-proxy-022-r6.rollout-runner.svc:8081
+            - --fault-proxy-token-file=/control/token
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: results, mountPath: /artifacts}
+            - {name: control, mountPath: /control, readOnly: true}
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: rollout-results
+        - name: control
+          secret:
+            secretName: recovery-proxy-022-control
+            defaultMode: 256

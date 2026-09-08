@@ -22,11 +22,16 @@ import (
 func run() error {
 	listen := flag.String("listen", ":8080", "controller API proxy address")
 	control := flag.String("control-listen", ":8081", "authenticated test control address")
+	tlsCert := flag.String("tls-cert", "", "API listener TLS certificate; required with --tls-key")
+	tlsKey := flag.String("tls-key", "", "API listener TLS private key")
 	upstream := flag.String("upstream", "", "fixed API server origin; defaults to in-cluster API server")
 	ca := flag.String("upstream-ca", "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", "trusted API server CA file")
 	tokenFile := flag.String("control-token-file", "", "file containing test control token")
 	journalPath := flag.String("journal", "", "new append-only execution evidence file")
 	flag.Parse()
+	if (*tlsCert == "") != (*tlsKey == "") {
+		return fmt.Errorf("--tls-cert and --tls-key must be supplied together")
+	}
 	if *journalPath == "" || *tokenFile == "" {
 		return fmt.Errorf("--journal and --control-token-file are required")
 	}
@@ -66,13 +71,19 @@ func run() error {
 	api := &http.Server{Addr: *listen, Handler: proxy, ReadHeaderTimeout: 10 * time.Second}
 	admin := &http.Server{Addr: *control, Handler: proxy.ControlHandler(), ReadHeaderTimeout: 10 * time.Second}
 	errors := make(chan error, 2)
-	go func() { errors <- api.ListenAndServe() }()
+	go func() {
+		if *tlsCert != "" {
+			errors <- api.ListenAndServeTLS(*tlsCert, *tlsKey)
+		} else {
+			errors <- api.ListenAndServe()
+		}
+	}()
 	go func() { errors <- admin.ListenAndServe() }()
 	select {
 	case <-ctx.Done():
 	case err = <-errors:
-		if err != http.ErrServerClosed {
-			return err
+		if err == http.ErrServerClosed {
+			err = nil
 		}
 	}
 	proxy.Close()
@@ -83,6 +94,9 @@ func run() error {
 	_ = api.Close()
 	_ = admin.Close()
 	proxy.Wait()
+	if err != nil {
+		return err
+	}
 	return journal.Sync()
 }
 func main() {

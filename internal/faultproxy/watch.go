@@ -123,7 +123,11 @@ func (s *Server) watch(ctx context.Context, cancel context.CancelFunc, upstream 
 				}
 				continue
 			}
-			held, err := s.deliverOrHold(out, request, &frame)
+			behind := false
+			for _, older := range pending {
+				behind = behind || older.object.Namespace == frame.object.Namespace
+			}
+			held, err := s.deliverOrHold(out, request, &frame, behind)
 			if err != nil {
 				return
 			}
@@ -140,34 +144,39 @@ func (s *Server) watch(ctx context.Context, cancel context.CancelFunc, upstream 
 		case <-tick.C:
 		}
 		kept := pending[:0]
+		blocked := map[string]bool{}
 		for _, frame := range pending {
 			s.mu.Lock()
-			active := s.activeLocked(frame.rule)
+			active := frame.rule != nil && s.activeLocked(frame.rule)
 			s.mu.Unlock()
-			if active {
+			if active || blocked[frame.object.Namespace] {
+				blocked[frame.object.Namespace] = true
 				kept = append(kept, frame)
 				continue
 			}
 			originalRule := frame.rule
-			held, err := s.deliverOrHold(out, request, &frame)
+			held, err := s.deliverOrHold(out, request, &frame, false)
 			if err != nil {
 				return
 			}
 			if held {
+				blocked[frame.object.Namespace] = true
 				kept = append(kept, frame)
 				continue
 			}
 			bytesPending -= len(frame.raw)
-			s.mu.Lock()
-			originalRule.Released++
-			s.mu.Unlock()
-			s.recordFrame(request, frame, "release-event", originalRule.ID)
+			if originalRule != nil {
+				s.mu.Lock()
+				originalRule.Released++
+				s.mu.Unlock()
+				s.recordFrame(request, frame, "release-event", originalRule.ID)
+			}
 		}
 		pending = kept
 	}
 }
 
-func (s *Server) deliverOrHold(out io.Writer, request requestContext, frame *watchFrame) (bool, error) {
+func (s *Server) deliverOrHold(out io.Writer, request requestContext, frame *watchFrame, behindOlder bool) (bool, error) {
 	s.mu.Lock()
 	var selected *RuleStatus
 	for _, rule := range s.rules {
@@ -187,6 +196,12 @@ func (s *Server) deliverOrHold(out io.Writer, request requestContext, frame *wat
 	if selected != nil {
 		s.recordFrame(request, *frame, selected.Mode+"-event", selected.ID)
 		return selected.Mode == "hold", nil
+	}
+	if behindOlder {
+		// A just-cleared rule must not let new events overtake its queued events.
+		// Count only actual rule hits; this ordering queue is separate evidence.
+		s.recordFrame(request, *frame, "queue-behind-older-event", "")
+		return true, nil
 	}
 	_, err := out.Write(append(append([]byte{}, frame.raw...), '\n'))
 	if err == nil {

@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 // This opt-in integration test operates only in its two new, UID-owned fixture
@@ -71,6 +72,29 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 	pc.Host = proxyURL
 	pc.TLSClientConfig = rest.TLSClientConfig{}
 	pc.BearerToken = token.Status.Token
+	if strings.HasPrefix(proxyURL, "https://") {
+		// Exercise the same kubeconfig/tokenFile path used by production. HTTP
+		// kubeconfig endpoints intentionally omit credentials in client-go.
+		privateDir := t.TempDir()
+		tokenPath := filepath.Join(privateDir, "token")
+		if err := os.WriteFile(tokenPath, []byte(token.Status.Token), 0600); err != nil {
+			t.Fatal(err)
+		}
+		kubeconfigPath := filepath.Join(privateDir, "config")
+		kc := clientcmdapi.Config{
+			Clusters:  map[string]*clientcmdapi.Cluster{"proxy": {Server: proxyURL, CertificateAuthority: os.Getenv("RUNNER_PROXY_CA_FILE")}},
+			AuthInfos: map[string]*clientcmdapi.AuthInfo{"caller": {TokenFile: tokenPath}},
+			Contexts:  map[string]*clientcmdapi.Context{"probe": {Cluster: "proxy", AuthInfo: "caller"}}, CurrentContext: "probe",
+		}
+		if err := clientcmd.WriteToFile(kc, kubeconfigPath); err != nil {
+			t.Fatal(err)
+		}
+		pc, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		if err != nil || pc.BearerTokenFile != tokenPath {
+			t.Fatalf("production kubeconfig authentication path: %v", err)
+		}
+		proof["authentication"] = "HTTPS kubeconfig with CA verification and caller tokenFile"
+	}
 	pc.ContentType = "application/vnd.kubernetes.protobuf"
 	pc.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	proxied, err := kubernetes.NewForConfig(pc)

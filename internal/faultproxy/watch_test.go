@@ -4,12 +4,56 @@
 package faultproxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
 )
+
+func TestNewWatchFrameCannotOvertakeQueuedEventsAfterRuleClear(t *testing.T) {
+	s, _, _ := fixture(t, http.NotFoundHandler())
+	var out bytes.Buffer
+	frame := watchFrame{raw: json.RawMessage(`{"type":"ADDED","object":{"metadata":{"namespace":"test","uid":"new"}}}`), event: "ADDED", object: objectMeta{Namespace: "test", UID: "new"}}
+	request := requestContext{id: 1, meta: requestMeta{Resource: "pods", Watch: true}}
+	held, err := s.deliverOrHold(&out, request, &frame, true)
+	if err != nil || !held || out.Len() != 0 || frame.rule != nil {
+		t.Fatal("new event overtook the queue, or ordering was mislabeled as an active fault")
+	}
+	held, err = s.deliverOrHold(&out, request, &frame, false)
+	if err != nil || held || out.Len() == 0 {
+		t.Fatal("event did not flow once older events were drained")
+	}
+}
+
+func TestConcurrentClearAndIncomingEventsPreserveNamespaceOrder(t *testing.T) {
+	for attempt := 0; attempt < 10; attempt++ {
+		t.Run(fmt.Sprint(attempt), func(t *testing.T) {
+			s, origin, streams := watchFixture(t)
+			response, current := connect(t, origin, streams)
+			defer response.Body.Close()
+			frames := readFrames(response)
+			control(t, s, "POST", "/v1/rules", Rule{ID: "pause", Namespace: "test", Resource: "pods", Mode: "hold", Count: -1, DurationSeconds: 30}, 201)
+			current.events <- event("ADDED", "test", "0", false)
+			eventually(t, func() bool { return state(t, s).Rules[0].Hits == 1 })
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				for i := 1; i < 16; i++ {
+					current.events <- event("MODIFIED", "test", fmt.Sprint(i), false)
+				}
+			}()
+			control(t, s, "DELETE", "/v1/rules/pause", nil, 204)
+			for i := 0; i < 16; i++ {
+				if uid := nextUID(t, frames); uid != fmt.Sprint(i) {
+					t.Fatalf("event %d overtaken by %s", i, uid)
+				}
+			}
+			<-done
+		})
+	}
+}
 
 type stream struct {
 	events chan map[string]interface{}

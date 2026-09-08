@@ -158,3 +158,33 @@ python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
 
 报告器的拒绝与结果保留逻辑用`python3 -B -m unittest discover -s scripts -p 'test_*.py'`
 验证；这些合成测试不作为Kind执行证据。补测尚未运行，当前不得宣称该新增断言已完成Kind验证。
+
+### RUN-183 请求边界补充执行
+
+r10的RUN-183在恢复R=3的API请求期间记录frontend-0的RoleDeleting意图，Pod删除
+通知则在成功响应后到达。报告器直接读取原始请求、Watch、owner/旧UID和controller
+日志，仅将这个重叠区间标为OBSERVATION_BOUNDARY_UNRESOLVED；原始FAIL不改写。
+同类RUN-193的删除意图在响应之后，真实证据必须被边界豁免检查拒绝，仍保留FAIL。
+这不是按production现有删除逻辑放宽预算，也不豁免资源残留。
+
+完整303项与RUN-301补测结束后，收尾工具串行启动
+`deploy/normal-183-boundary-addendum.yaml`。它使用相同r10镜像和原始RUN-183输入，
+不挂载301的新输入，也不重复执行完整suite。独立Job/Pod与全部证据导出后，r10最终
+验收必须同时提供两个补测目录：
+
+```sh
+python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
+  --original-suite artifacts/environment-022/r10-frozen-suite.json \
+  --addendum-301 artifacts/normal-r10-301-addendum \
+  --addendum-183 artifacts/normal-r10-183-boundary-addendum \
+  artifacts/normal-r10-303
+```
+
+报告区分305次执行与303个独立用例，保留原始183 FAIL、原因、证据哈希及原Job退出码。
+只有补测实际PASS且四个阶段、真实终态3个frontend B与3个原backend A UID、30秒
+稳定窗口均有证据，才接受新的PASS。补测明确FAIL仍为FAIL；若再次落在同一观察边界，
+报告拒绝验收并保留证据，不自动重跑到绿。缺少日志、错误owner/UID或其他违规也不能
+借此消除失败。未加183参数的301入口仅供其独立报告，不能完成本次r10最终验收。
+
+当前只完成报告校验实现及原始183正例/193反例检查，补测等待完整303结束；不能将
+另一个已完成用例的证据读取器检查称为183补测通过。Kthena源码和运行Go二进制不变。

@@ -214,6 +214,193 @@ class AddendumTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'RUN-153.*annotation missing'):
             REPORTER.verify_with_301_addendum([base], self.original_path, extra)
 
+def boundary_fixture(directory, passed=False):
+    """Small independent event trace exercising causality, not real Kind results."""
+    result = REPORTER.read(directory / 'result.json')
+    result.update(namespace='synthetic-boundary', checkpoints=4 if passed else 3)
+    result.pop('error', None)
+    uid = 'frontend-0-original'
+    violation = 'restore-before-deletion-finishes: BUDGET_VIOLATION: model-0/frontend ready=1 delete=model-0/frontend/frontend-0 minimum=2'
+    if not passed:
+        result.update(status='FAIL', violations=[violation], error='step 03 restore-before-deletion-finishes: ' + violation + '; process violations: ' + violation,
+            normalStarts=[dict(uids=[uid], reason='rollout', readyBefore=1, minimum=2, phase='restore-before-deletion-finishes')])
+    d = directory / 'attempt-1'
+    d.mkdir()
+    save = lambda p, o: p.write_text(json.dumps(o))
+    save(directory / 'result.json', result)
+    save(directory / 'attempts.json', [result])
+    save(d / 'result.json', result)
+    stamp = lambda sec: '2026-09-08T00:00:' + sec + 'Z'
+    events = []
+    def event(sec, kind, obj, typ='MODIFIED'):
+        events.append(dict(sequence=len(events)+1, received=stamp(sec), kind=kind, object=copy.deepcopy(obj), event=typ))
+    def model(gen, replicas):
+        return dict(metadata=dict(name='model', namespace=result['namespace'], uid='owner', generation=gen, resourceVersion=str(gen)),
+            spec=dict(replicas=1, template=dict(roles=[dict(name='backend', replicas=3, workerReplicas=0),
+                dict(name='frontend', replicas=replicas, workerReplicas=0)])))
+    def pod(role, index, version='A', suffix='original', ready=True):
+        return dict(metadata=dict(name=f'model-0-{role}-{index}-0', namespace=result['namespace'], uid=f'{role}-{index}-{suffix}',
+            ownerReferences=[dict(uid='owner', controller=True)], labels={'modelserving.volcano.sh/role': role,
+                'modelserving.volcano.sh/role-id': f'{role}-{index}', 'modelserving.volcano.sh/group-name': 'model-0',
+                'modelserving.volcano.sh/entry': 'true'}), spec=dict(containers=[dict(name='workload', env=[dict(name='ROLLOUT_VERSION', value=version)])]),
+            status=dict(conditions=[dict(type='Ready', status='True' if ready else 'False')]))
+    event('01.00', 'modelservings', model(1,3), 'ADDED')
+    for role in ('backend','frontend'):
+        for i in range(3):event('02.00','pods',pod(role,i),'ADDED')
+    event('10.02', 'modelservings', model(2,3))
+    f2=pod('frontend',2); f2['metadata']['deletionTimestamp']=stamp('11.00')
+    event('11.00','pods',f2);event('16.00','pods',f2,'DELETED')
+    b2=pod('frontend',2,'B','target',False)
+    event('17.00','pods',b2,'ADDED')
+    event('20.02','modelservings',model(3,1))
+    f1=pod('frontend',1);f1['metadata']['deletionTimestamp']=stamp('20.80')
+    event('20.80','pods',f1)
+    b2['metadata']['deletionTimestamp']=stamp('20.90');event('20.90','pods',b2)
+    event('21.02','modelservings',model(4,3))
+    f0=pod('frontend',0);f0['metadata']['deletionTimestamp']=stamp('21.10');event('21.10','pods',f0)
+    if passed:
+        for o in (f0,f1,b2):event('22.00','pods',o,'DELETED')
+        for i in range(3):event('24.00','pods',pod('frontend',i,'B','restored'),'ADDED')
+    (d/'observations.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
+    for i, sec in enumerate(('10','20','21'),1):
+        save(d/f'step-{i:02d}-request-time.json',dict(sent=stamp(sec+'.01'),received=stamp(sec+'.03'),resourceVersion=str(i+1),generation=i+1))
+    for label, sec in [('before','21.00'),('after','21.04')]:
+        save(d/f'step-03-terminating-{label}-proof.json',dict(at=stamp(sec),terminatingUIDs={'frontend-2-target':True}))
+    phases=['baseline','enter-mixed-rollout','shrink-while-B-in-flight','restore-before-deletion-finishes']
+    for i, sec in enumerate(('09.00','19.00','20.50','55.00')[:4 if passed else 3],1):
+        save(d/f'checkpoint-{i:03d}.json',dict(phase=phases[i-1],completed=stamp(sec),stableSince=stamp('25.00') if i==4 else stamp(sec),stableSeconds=30 if i==4 else 0))
+    (directory/'controller.log').write_text(stamp('21.02') + ' event.go:389] "Event occurred" object="synthetic-boundary/model" reason="RoleDeleting" message="Role frontend/frontend-0 in ServingGroup model-0 is now Deleting"\n')
+    return result
+
+
+class BoundaryTests(unittest.TestCase):
+    setUp = AddendumTests.setUp
+    save = AddendumTests.save
+    run_artifacts = AddendumTests.run_artifacts
+
+    def fixture(self, passed=False):
+        run = self.run_artifacts('boundary', ['RUN-183'], self.original, [] if passed else ['RUN-183'])
+        boundary_fixture(run/'RUN-183', passed)
+        return run/'RUN-183'
+
+    def mutate_trace(self, root, change):
+        p=root/'attempt-1/observations.jsonl'
+        es=[json.loads(s) for s in p.read_text().splitlines()]
+        change(es)
+        p.write_text(''.join(json.dumps(e)+'\n' for e in es))
+
+    def test_overlap_diagnosis_preserves_fail(self):
+        root=self.fixture()
+        before=(root/'result.json').read_bytes()
+        r=REPORTER.verify_restore_boundary(root)
+        self.assertEqual(r['classification'],'OBSERVATION_BOUNDARY_UNRESOLVED')
+        self.assertEqual((root/'result.json').read_bytes(),before)
+        self.assertEqual(r['rawStatus'],'FAIL')
+
+    def test_after_response_is_not_exempt(self):
+        root=self.fixture();p=root/'controller.log'
+        p.write_text(p.read_text().replace('21.02Z','21.04Z'))
+        with self.assertRaisesRegex(ValueError,'intent outside'):
+            REPORTER.verify_restore_boundary(root)
+
+    def test_before_request_is_not_the_supported_boundary(self):
+        root=self.fixture();p=root/'controller.log'
+        p.write_text(p.read_text().replace('21.02Z','21.00Z'))
+        with self.assertRaisesRegex(ValueError,'intent outside'):
+            REPORTER.verify_restore_boundary(root)
+
+    def test_wrong_owner_is_rejected(self):
+        root=self.fixture()
+        def change(es):
+            for e in es:
+                if e['kind']=='pods' and e['object']['metadata']['uid']=='frontend-0-original':
+                    e['object']['metadata']['ownerReferences'][0]['uid']='wrong-owner'
+        self.mutate_trace(root,change)
+        with self.assertRaisesRegex(ValueError,'wrong target owner'):
+            REPORTER.verify_restore_boundary(root)
+
+    def test_recreated_target_is_rejected(self):
+        root=self.fixture()
+        self.mutate_trace(root,lambda es: es[-1]['object']['metadata'].update(uid='replacement'))
+        with self.assertRaisesRegex(ValueError,'recreated target'):
+            REPORTER.verify_restore_boundary(root)
+
+    def test_extra_violation_is_rejected(self):
+        root=self.fixture()
+        r=REPORTER.read(root/'result.json');r['violations'].append('OTHER_FAILURE')
+        for p in (root/'result.json',root/'attempt-1/result.json'):self.save(p,r)
+        self.save(root/'attempts.json',[r])
+        with self.assertRaisesRegex(ValueError,'sole supported'):
+            REPORTER.verify_restore_boundary(root)
+
+    def test_healthy_restore_is_proved_from_pods(self):
+        r=REPORTER.verify_restore_completion(self.fixture(True))
+        self.assertEqual(r['finalReadyPods'],6)
+        self.assertEqual(len(r['backendUIDs']),3)
+
+    def test_missing_final_checkpoint_is_rejected(self):
+        root=self.fixture(True);(root/'attempt-1/checkpoint-004.json').unlink()
+        with self.assertRaises(FileNotFoundError):REPORTER.verify_restore_completion(root)
+
+    def test_changed_backend_uid_is_rejected(self):
+        root=self.fixture(True)
+        def change(es):
+            o=copy.deepcopy(es[1]['object']);o['metadata']['uid']='new-backend'
+            es.append(dict(sequence=len(es)+1,received='2026-09-08T00:00:30Z',kind='pods',event='ADDED',object=o))
+        self.mutate_trace(root,change)
+        with self.assertRaisesRegex(ValueError,'six Ready Pods'):
+            REPORTER.verify_restore_completion(root)
+
+    def test_wrong_final_version_is_rejected(self):
+        root=self.fixture(True)
+        self.mutate_trace(root,lambda es: es[-1]['object']['spec']['containers'][0]['env'][0].update(value='A'))
+        with self.assertRaisesRegex(ValueError,'template version'):
+            REPORTER.verify_restore_completion(root)
+
+    def test_unready_final_pod_is_rejected(self):
+        root=self.fixture(True)
+        self.mutate_trace(root,lambda es: es[-1]['object']['status']['conditions'][0].update(status='False'))
+        with self.assertRaisesRegex(ValueError,'six Ready Pods'):
+            REPORTER.verify_restore_completion(root)
+
+    def test_short_stability_is_rejected(self):
+        root=self.fixture(True);p=root/'attempt-1/checkpoint-004.json';o=REPORTER.read(p)
+        o['stableSince']='2026-09-08T00:00:26Z';self.save(p,o)
+        with self.assertRaisesRegex(ValueError,'30 second'):REPORTER.verify_restore_completion(root)
+
+    def triple(self):
+        base=self.run_artifacts('baseline',self.original['inputs'],self.original,['RUN-183','RUN-193'])
+        result=boundary_fixture(base/'RUN-183')
+        summary=REPORTER.read(base/'summary.json');summary['results']=[result if r['id']=='RUN-183' else r for r in summary['results']];self.save(base/'summary.json',summary)
+        a301=self.run_artifacts('assertion',['RUN-301'],self.current)
+        a183=self.run_artifacts('restore',['RUN-183'],self.original)
+        result=boundary_fixture(a183/'RUN-183',True)
+        summary=REPORTER.read(a183/'summary.json');summary['results']=[result];self.save(a183/'summary.json',summary)
+        return base,a301,a183
+
+    def test_aggregate_preserves_193_and_original_183_failure(self):
+        base,a301,a183=self.triple()
+        r=REPORTER.verify_with_addenda([base],self.original_path,a301,a183)
+        self.assertEqual((r['total'],r['executionCount']),(303,305))
+        self.assertEqual(r['counts'],{'PASS':302,'FAIL':1})
+        self.assertEqual(r['boundaryAddendum']['originalResult']['status'],'FAIL')
+        self.assertEqual(next(x for x in r['results'] if x['id']=='RUN-193')['status'],'FAIL')
+
+    def test_retest_different_binary_is_rejected(self):
+        base,a301,a183=self.triple();p=a183/'environment.json';e=REPORTER.read(p);e['runner']['binarySHA256']='different';self.save(p,e)
+        with self.assertRaisesRegex(ValueError,'RUN-183.*binarySHA256'):
+            REPORTER.verify_with_addenda([base],self.original_path,a301,a183)
+
+    def test_retest_different_input_is_rejected(self):
+        base,a301,a183=self.triple();p=a183/'environment.json';e=REPORTER.read(p);e['runner']['caseSHA256']['RUN-183.yaml']='different';self.save(p,e)
+        with self.assertRaisesRegex(ValueError,'case inputs differ'):
+            REPORTER.verify_with_addenda([base],self.original_path,a301,a183)
+
+    def test_retest_unfinished_job_is_rejected(self):
+        base,a301,a183=self.triple();p=a183/'job.json';e=REPORTER.read(p);e['status']['conditions']=[];self.save(p,e)
+        with self.assertRaisesRegex(ValueError,'Job is not Complete'):
+            REPORTER.verify_with_addenda([base],self.original_path,a301,a183)
+
 
 if __name__ == '__main__':
     unittest.main()

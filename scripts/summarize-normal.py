@@ -252,12 +252,240 @@ def verify_with_301_addendum(directories, original_suite_path, addendum_director
     return report
 
 
+def rapid_restore_evidence(root):
+    """Read original JSON artifacts, never a manually supplied classification."""
+    result = read(root / 'result.json')
+    attempts = read(root / 'attempts.json')
+    require(bool(attempts), 'restore: missing attempts')
+    require(all(a['status'] == 'TRIGGER_MISSED' and not a.get('cleanupError') for a in attempts[:-1]),
+            'restore: previous failed execution cannot be replaced')
+    directory = root / f'attempt-{len(attempts)}'
+    raw = read(directory / 'result.json')
+    comparable = dict(result, durationSeconds=raw['durationSeconds'])
+    require(raw == attempts[-1] == comparable and not raw.get('cleanupError'), 'restore: attempt result mismatch')
+    paths = [root / 'result.json', root / 'attempts.json', directory / 'result.json',
+             directory / 'observations.jsonl']
+    events = [json.loads(s) for s in paths[-1].read_text().splitlines()]
+    require(bool(events), 'restore: empty Watch')
+    for i, event in enumerate(events, 1):
+        require(event['sequence'] == i and event['event'] not in ('GAP', 'ERROR'), 'restore: incomplete Watch')
+    models = [e['object'] for e in events if e['kind'] == 'modelservings']
+    require(bool(models) and len({o['metadata']['uid'] for o in models}) == 1, 'restore: ambiguous owner')
+    require(all(o['metadata']['name'] == 'model' and o['metadata']['namespace'] == raw['namespace']
+                for o in models), 'restore: wrong ModelServing owner')
+    owner = models[0]['metadata']['uid']
+
+    def owned(obj):
+        return obj['metadata'].get('namespace') == raw['namespace'] and any(
+            r.get('uid') == owner and r.get('controller') is True
+            for r in obj['metadata'].get('ownerReferences', []))
+
+    requests, accepted = [], []
+    for i in range(1, 4):
+        path = directory / f'step-{i:02d}-request-time.json'
+        paths.append(path)
+        request = read(path)
+        require(observation_time(request['sent']) < observation_time(request['received']), 'restore: invalid request interval')
+        candidates = [o for o in models if o['metadata']['resourceVersion'] == request['resourceVersion']
+                      and o['metadata']['generation'] == request['generation']]
+        require(bool(candidates), 'restore: accepted API response absent from Watch')
+        requests.append(request)
+        accepted.append(candidates[0])
+    require(all(observation_time(a['received']) < observation_time(b['sent'])
+                for a, b in zip(requests, requests[1:])), 'restore: requests out of order')
+    require(accepted[0]['spec'] == accepted[2]['spec'], 'restore: final desired differs from B before shrink')
+    for obj, expected in zip(accepted, (3, 1, 3)):
+        roles = {r['name']: r for r in obj['spec']['template']['roles']}
+        require(obj['spec']['replicas'] == 1 and set(roles) == {'frontend', 'backend'} and
+                roles['frontend']['replicas'] == expected and roles['backend']['replicas'] == 3 and
+                all(r.get('workerReplicas', 0) == 0 for r in roles.values()), 'restore: wrong R3/1/3 W0 layout')
+    proofs = []
+    for label in ('before', 'after'):
+        path = directory / f'step-03-terminating-{label}-proof.json'
+        paths.append(path)
+        proofs.append(read(path))
+    before, after = proofs
+    request = requests[2]
+    require(observation_time(before['at']) < observation_time(request['sent']) <
+            observation_time(request['received']) < observation_time(after['at']), 'restore: missing live trigger interval')
+    common = {u for u, yes in before['terminatingUIDs'].items() if yes and after['terminatingUIDs'].get(u)}
+    require(bool(common), 'restore: no same terminating UID across accepted restore')
+    for uid in common:
+        rows = [e for e in events if e['kind'] == 'pods' and e['object']['metadata']['uid'] == uid]
+        require(bool(rows) and all(owned(e['object']) for e in rows), 'restore: terminating UID has wrong owner')
+        require(any(e['object']['metadata'].get('deletionTimestamp') and
+                    observation_time(e['received']) < observation_time(before['at']) for e in rows),
+                'restore: trigger UID deletion missing before request')
+        require(not any(e['event'] == 'DELETED' and observation_time(e['received']) < observation_time(after['at'])
+                        for e in rows), 'restore: trigger UID already disappeared')
+    return dict(result=result, directory=directory, events=events, owner=owner, owned=owned,
+                request=request, paths=paths, common=sorted(common), accepted=accepted)
+
+
+def pod_ready(obj):
+    return not obj['metadata'].get('deletionTimestamp') and any(
+        c['type'] == 'Ready' and c['status'] == 'True' for c in obj.get('status', {}).get('conditions', []))
+
+
+def pod_version(obj):
+    return next(e['value'] for c in obj['spec']['containers'] if c['name'] == 'workload'
+                for e in c.get('env', []) if e['name'] == 'ROLLOUT_VERSION')
+
+
+def verify_restore_boundary(root):
+    """Diagnose one ambiguous intent, never turn a raw failure into PASS.
+
+    Deliberately independent of case ID: RUN-193's real trace must fail this
+    temporal check even though it reports the same availability error.
+    """
+    evidence = rapid_restore_evidence(root)
+    result, events, request = (evidence[k] for k in ('result', 'events', 'request'))
+    violation = 'restore-before-deletion-finishes: BUDGET_VIOLATION: model-0/frontend ready=1 delete=model-0/frontend/frontend-0 minimum=2'
+    require(result['status'] == 'FAIL' and result.get('violations') == [violation] and
+            result.get('error') == 'step 03 restore-before-deletion-finishes: ' + violation + '; process violations: ' + violation,
+            'boundary: not the sole supported budget error')
+    target = [e for e in events if e['kind'] == 'pods' and
+              e['object']['metadata'].get('name') == 'model-0-frontend-0-0']
+    require(bool(target) and len({e['object']['metadata']['uid'] for e in target}) == 1,
+            'boundary: missing or recreated target UID')
+    require(all(evidence['owned'](e['object']) and pod_version(e['object']) == 'A' for e in target),
+            'boundary: wrong target owner or version')
+    uid = target[0]['object']['metadata']['uid']
+    deletion = next((e for e in target if e['event'] == 'DELETED' or e['object']['metadata'].get('deletionTimestamp')), None)
+    require(deletion is not None, 'boundary: no target deletion')
+    earlier = [e for e in target if e['sequence'] < deletion['sequence']]
+    require(bool(earlier) and pod_ready(earlier[-1]['object']), 'boundary: target was not Ready')
+    require(observation_time(deletion['received']) > observation_time(request['received']), 'boundary: deletion not after response')
+    starts = [s for s in result.get('normalStarts', []) if uid in s.get('uids', [])]
+    require(len(starts) == 1 and starts[0]['reason'] == 'rollout' and starts[0]['readyBefore'] == 1 and
+            starts[0]['minimum'] == 2 and starts[0]['phase'] == 'restore-before-deletion-finishes',
+            'boundary: target belongs to another action')
+    live = {}
+    for e in events[:deletion['sequence'] - 1]:
+        if e['kind'] == 'pods':
+            o = e['object']
+            if e['event'] == 'DELETED':
+                live.pop(o['metadata']['uid'], None)
+            else:
+                live[o['metadata']['uid']] = o
+    healthy = {u for u, o in live.items() if evidence['owned'](o) and pod_ready(o) and
+               o['metadata']['labels'].get('modelserving.volcano.sh/role') == 'frontend'}
+    require(healthy == {uid}, 'boundary: target not sole healthy frontend')
+    log_path = root / 'controller.log'
+    lines = [line for line in log_path.read_text().splitlines() if
+             f'object="{result["namespace"]}/model"' in line and 'reason="RoleDeleting"' in line and
+             'message="Role frontend/frontend-0 in ServingGroup model-0 is now Deleting"' in line]
+    require(len(lines) == 1, 'boundary: missing or ambiguous RoleDeleting log')
+    intent = lines[0].split()[0]
+    require(observation_time(request['sent']) < observation_time(intent) < observation_time(request['received']),
+            'boundary: deletion intent outside restore request interval')
+    evidence['paths'].append(log_path)
+    return dict(classification='OBSERVATION_BOUNDARY_UNRESOLVED', rawStatus='FAIL', targetUID=uid,
+                ownerUID=evidence['owner'], request=request, intentLogTime=intent,
+                firstPodDeletionTime=deletion['received'], terminatingUIDs=evidence['common'],
+                artifactSHA256={str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in evidence['paths']},
+                limitation='The API request overlaps an observed deletion intent. Causality is unresolved; this is not PASS or proof that the deletion was correct.')
+
+
+def verify_restore_completion(root):
+    evidence = rapid_restore_evidence(root)
+    result, events, directory = (evidence[k] for k in ('result', 'events', 'directory'))
+    require(result['status'] == 'PASS' and not result.get('error') and not result.get('violations'), 'restore: completion is not raw PASS')
+    require(result.get('checkpoints') == 4, 'restore: missing final checkpoint count')
+    paths = [directory / f'checkpoint-{i:03d}.json' for i in range(1, 5)]
+    checkpoints = [read(p) for p in paths]
+    require([c['phase'] for c in checkpoints] == ['baseline', 'enter-mixed-rollout', 'shrink-while-B-in-flight',
+            'restore-before-deletion-finishes'], 'restore: incomplete phases')
+    ends = [observation_time(c['completed']) for c in checkpoints]
+    require(all(a < b for a, b in zip(ends, ends[1:])), 'restore: checkpoint order')
+    final = checkpoints[-1]
+    stable = observation_time(final['stableSince'])
+    require(final['stableSeconds'] == 30 and (ends[-1] - stable).total_seconds() >= 30 and stable > ends[-2],
+            'restore: missing 30 second stable window')
+    live, baseline, states = {}, None, []
+    for e in events:
+        at = observation_time(e['received'])
+        require(at <= ends[-1], 'restore: Watch extends beyond final checkpoint')
+        if baseline is None and at > ends[0]:
+            baseline = copy.deepcopy(live)
+        if at >= stable and not states:
+            states.append(copy.deepcopy(live))
+        if e['kind'] == 'pods':
+            o = e['object']
+            require(evidence['owned'](o), 'restore: unexpected Pod owner')
+            uid = o['metadata']['uid']
+            if e['event'] == 'DELETED':
+                live.pop(uid, None)
+            else:
+                live[uid] = o
+            if at >= stable:
+                states.append(copy.deepcopy(live))
+    if not states:
+        states.append(copy.deepcopy(live))
+    require(baseline is not None and len(baseline) == 6 and all(pod_ready(o) and pod_version(o) == 'A'
+            for o in baseline.values()), 'restore: missing healthy A baseline')
+    role_key = 'modelserving.volcano.sh/role'
+    backend = {u for u, o in baseline.items() if o['metadata']['labels'][role_key] == 'backend'}
+    require(len(backend) == 3, 'restore: baseline backend count')
+    for state in states:
+        require(len(state) == 6 and all(pod_ready(o) for o in state.values()), 'restore: final layout is not six Ready Pods')
+        require({u for u, o in state.items() if o['metadata']['labels'][role_key] == 'backend'} == backend,
+                'restore: original backend UID changed')
+        require(all(pod_version(o) == ('B' if o['metadata']['labels'][role_key] == 'frontend' else 'A')
+                    for o in state.values()), 'restore: final template version differs')
+        for role in ('frontend', 'backend'):
+            members = [o for o in state.values() if o['metadata']['labels'][role_key] == role]
+            require(len(members) == 3 and len({o['metadata']['labels'].get('modelserving.volcano.sh/role-id')
+                    for o in members}) == 3 and all(o['metadata']['labels'].get('modelserving.volcano.sh/group-name') == 'model-0'
+                    and o['metadata']['labels'].get('modelserving.volcano.sh/entry') == 'true' for o in members),
+                    'restore: final role membership differs')
+    evidence['paths'] += paths
+    return dict(rawStatus='PASS', attempts=len(read(root / 'attempts.json')), ownerUID=evidence['owner'],
+                terminatingUIDs=evidence['common'], backendUIDs=sorted(backend), finalReadyPods=6,
+                stableSince=final['stableSince'], completed=final['completed'],
+                artifactSHA256={str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in evidence['paths']})
+
+
+def verify_with_addenda(directories, original_suite_path, addendum_301, addendum_183):
+    report = verify_with_301_addendum(directories, original_suite_path, addendum_301)
+    old = next(r for r in report['results'] if r['id'] == 'RUN-183')
+    review = verify_restore_boundary(pathlib.Path(old['artifacts']))
+    additional = verify([addendum_183], original_suite_path, {'RUN-183'})
+    for key in ('controllerCommit', 'runnerImageID', 'binarySHA256', 'controllerImage', 'controllerImageID'):
+        require(report[key] == additional[key], f'RUN-183 addendum changes candidate {key}')
+    require(additional['shards'][0]['runID'] not in {s['runID'] for s in report['shards']}, 'RUN-183 must be a separate execution')
+    replacement = additional['results'][0]
+    require(replacement['status'] in ('PASS', 'FAIL'), 'RUN-183 addendum remains inconclusive')
+    if replacement['status'] == 'PASS':
+        replacement['restoreCompletionEvidence'] = verify_restore_completion(addendum_183 / 'RUN-183')
+    elif 'BUDGET_VIOLATION: model-0/frontend ready=1 delete=model-0/frontend/frontend-0 minimum=2' in replacement.get('error', ''):
+        # A second ambiguous result is not acceptance and never triggers a blind
+        # retry-until-green loop. Other failures retain their raw verdict.
+        try:
+            verify_restore_boundary(addendum_183 / 'RUN-183')
+        except ValueError as exc:
+            require(str(exc) == 'boundary: deletion intent outside restore request interval',
+                    'RUN-183 failed addendum needs manual evidence review: ' + str(exc))
+        else:
+            raise ValueError('RUN-183 addendum still has an unresolved observation boundary')
+    report['results'] = [replacement if r['id'] == 'RUN-183' else r for r in report['results']]
+    report['counts'] = dict(collections.Counter(r['status'] for r in report['results']))
+    report['shards'] += additional['shards']
+    report['executionCount'] = sum(s['selected'] for s in report['shards'])
+    report['boundaryAddendum'] = dict(caseID='RUN-183', originalResult=old, boundaryReview=review,
+                                    acceptedResult=replacement, unchangedInputSHA256=read(original_suite_path)['inputs']['RUN-183'])
+    return report
+
+
 def markdown(report):
     counts = ', '.join(f'{k}={v}' for k, v in report['counts'].items())
     lines = ['# 第一大类 Kind 验证', '', f"实际执行 {report['total']} 项；{counts}。所有判定保留 runner 原始结果。", '', f"Kthena production: `{report['controllerCommit']}`。", f"Runner imageID: `{report['runnerImageID']}`。", '', '| 子类 | 执行 | PASS | 其他结果 |', '| --- | ---: | ---: | --- |']
     if 'assertionAddendum' in report:
         a = report['assertionAddendum']
         lines[3:3] = ['', f"共 {report['executionCount']} 次实际执行、303 个独立用例。RUN-301 补齐“不新增模板版本”断言后，以同一镜像/二进制重新执行；本表使用补测原始结果 {a['acceptedResult']['status']}。首次执行结果 {a['originalResult']['status']} 及证据仍保留于 JSON 的 assertionAddendum.originalResult，其余 302 项输入未变。", '']
+    if 'boundaryAddendum' in report:
+        a = report['boundaryAddendum']
+        lines[3:3] = ['', f"RUN-183 原始 FAIL 的删除意图与恢复请求区间重叠，因果证据不足。原始 FAIL、证据哈希和退出码保留；同一镜像、二进制及原输入的独立补跑结果为 {a['acceptedResult']['status']}，表中采用此新执行结果。RUN-193 等其余结果未因这项边界核查改变。", '']
     sections = collections.defaultdict(list)
     for result in report['results']:
         sections[result['section']].append(result)
@@ -277,11 +505,16 @@ def main():
     parser.add_argument('--out', required=True, type=pathlib.Path, help='new report directory; never overwrite')
     parser.add_argument('--original-suite', type=pathlib.Path, help='frozen original suite; requires --addendum-301')
     parser.add_argument('--addendum-301', type=pathlib.Path, help='completed same-image RUN-301 assertion addendum')
+    parser.add_argument('--addendum-183', type=pathlib.Path, help='completed same-image RUN-183 boundary retest; requires the301 addendum')
     parser.add_argument('runs', nargs='+', type=pathlib.Path)
     args = parser.parse_args()
     try:
         require(bool(args.original_suite) == bool(args.addendum_301), 'both --original-suite and --addendum-301 are required together')
-        report = verify_with_301_addendum(args.runs, args.original_suite, args.addendum_301) if args.addendum_301 else verify(args.runs)
+        require(not args.addendum_183 or args.addendum_301, '--addendum-183 requires --addendum-301')
+        if args.addendum_183:
+            report = verify_with_addenda(args.runs, args.original_suite, args.addendum_301, args.addendum_183)
+        else:
+            report = verify_with_301_addendum(args.runs, args.original_suite, args.addendum_301) if args.addendum_301 else verify(args.runs)
         args.out.mkdir(parents=True, exist_ok=False)
         (args.out / 'summary.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
         (args.out / 'RESULTS.md').write_text(markdown(report))

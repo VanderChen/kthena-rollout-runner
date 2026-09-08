@@ -17,7 +17,7 @@ REV='modelserving.volcano.sh/revision'
 def audit(p,trace):
     result=m.read(p/'result.json');case=m.yaml(p/'case.yaml');n=int(case['id'][4:]);source=case['scenario']['source']
     assert 463<=n<=522 and (n-463)%10>=5 and result['status']=='FAIL'
-    assert 'TIMEOUT: B-allowed-target-after-history-recovery (target versions map[A:3] want map[A:1 B:2])' in result['error']
+    assert any(text in result['error'] for text in ('TIMEOUT: B-allowed-target-after-history-recovery (target versions map[A:3] want map[A:1 B:2])','TIMEOUT: B-allowed-target-after-history-recovery (group 0 has wrong versions/layout)'))
     assert not result.get('violations') and not result.get('normalStarts') and not (p/'step-02-request.yaml').exists()
     raw=(ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json').read_bytes()
     assert hashlib.sha256(raw).hexdigest()=='757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5'
@@ -39,18 +39,27 @@ def audit(p,trace):
         if row['event']=='DELETED':state[kind].pop(uid,None)
         else:state[kind][uid]=o
         if row['sequence']>prep['lastPreparationSequence']:
-            pods=m.mine(state,'pods',owner);assert set(pods)==set(base) and all(m.ready(o) and m.version(o)=='A' for o in pods.values())
-    final=m.yaml(p/'final-resources.yaml');pods=m.mine(final,'pods',owner);assert set(pods)==set(base) and all(m.ready(o) for o in pods.values())
+            pods=m.mine(state,'pods',owner);assert set(base)<=set(pods) and len(pods)<=len(base)+config['s'] and all(m.ready(pods[u]) and m.version(pods[u])=='A' for u in base)
+    final=m.yaml(p/'final-resources.yaml');pods=m.mine(final,'pods',owner);assert set(base)<=set(pods) and all(m.ready(o) for o in pods.values())
+    extras={u:o for u,o in pods.items() if u not in base};assert len(extras)<=config['s']
+    for o in extras.values():assert o['metadata']['labels'][m.R]=='frontend' and int(o['metadata']['labels'][m.I].rsplit('-',1)[1])==1 and m.version(o) in ('A','B')
     probes=[m.read(p) for p in sorted(p.glob('history-probe-*.json'))];probes=[p for p in probes if p['phase']=='B-allowed-target-after-history-recovery' and m.ts(p['started'])>clear]
-    assert len(probes)>300 and m.ts(probes[-1]['completed'])-m.ts(probes[0]['started'])>=410_000_000_000
+    allprobes=probes
+    complete=lambda probe: {o['metadata']['uid'] for o in probe['pods']['items'] if m.owned(o,owner)}==set(pods) and all(m.ready(o) for o in probe['pods']['items'] if m.owned(o,owner))
+    if extras:
+        last_bad=max((i for i,v in enumerate(probes) if not complete(v)),default=-1);probes=probes[last_bad+1:]
+    assert len(probes)>300 and m.ts(probes[-1]['completed'])-m.ts(probes[0]['started'])>=(390 if extras else 410)*1_000_000_000
     for probe in probes:
-        assert not probe.get('error');actual={o['metadata']['uid']:o for o in probe['pods']['items'] if m.owned(o,owner)};assert set(actual)==set(base) and all(m.ready(o) and m.version(o)=='A' for o in actual.values())
+        assert not probe.get('error');actual={o['metadata']['uid']:o for o in probe['pods']['items'] if m.owned(o,owner)};assert set(actual)==set(pods) and all(m.ready(o) and m.version(o)==m.version(pods[u]) for u,o in actual.items())
     assert max(m.ts(b['started'])-m.ts(a['completed']) for a,b in zip(probes,probes[1:]))<3_000_000_000
     histories=m.mine(final,'controllerrevisions',owner)
     bhistory=next(o for o in histories.values() if m.version(next(r for r in o['data']['data'] if r['name']=='frontend')['entryTemplate'])=='B')
     responses={t['request']:t for t in trace if t['action']=='response'}
     creates=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='controllerrevisions' and t.get('method')=='POST' and clear<m.ts(t['at']) and responses.get(t['request'],{}).get('status')==201];assert creates
-    assert not any(t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='pods' and t.get('method') in ('POST','DELETE') and clear<m.ts(t['at']) for t in trace)
+    pod_requests=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='pods' and clear<m.ts(t['at'])]
+    assert not any(t.get('method')=='DELETE' for t in pod_requests)
+    pod_creates=[t for t in pod_requests if t['method']=='POST'];assert len(pod_creates)==len(extras) and all(responses.get(t['request'],{}).get('status')==201 for t in pod_creates)
+    assert not any(t['method']=='POST' and m.ts(t['at'])>m.ts(probes[0]['started']) for t in pod_requests)
     before=m.yaml(p/'fixture-preparation/fixture-restart-controller-replacement.yaml');after=m.yaml(p/'fault-controller-after.yaml');assert before['metadata']['uid']==after['metadata']['uid'] and after['status']['containerStatuses'][0]['restartCount']==0
     proxy=m.read(p/'fault-proxy-final.json');assert not proxy['errors'] and not any(r['active'] for r in proxy.get('rules') or [])
-    return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'ELIGIBLE_SPARSE_A_NEVER_UPDATES_AFTER_HISTORY_CREATE_RECOVERY','watchRows':len(rows),'sourcePreparation':prep,'actualFailedCRCreates':len(errors),'successfulBCreation':creates[0],'BHistoryUID':bhistory['metadata']['uid'],'eligibleOriginalUIDs':eligible,'allRetainedUIDs':list(base),'persistentSince':probes[0]['started'],'persistentUntil':probes[-1]['completed'],'persistentNanos':m.ts(probes[-1]['completed'])-m.ts(probes[0]['started']),'directPodReferenceProbes':len(probes),'limitation':'Actual B was accepted and its history persisted after fault clear, but both eligible original high ordinals stayed Ready A with no Pod creation/deletion for over 410 seconds. This proves bounded non-convergence, not an internal root cause or infinite stall. C, terminating references and final restart were not executed.','evidenceSHA256':{f:hashlib.sha256((p/f).read_bytes()).hexdigest() for f in ('result.json','observations.jsonl','final-resources.yaml','source-boundary.json')}}
+    return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'ELIGIBLE_SPARSE_A_NEVER_UPDATES_WITH_EXTRA_READY_CAPACITY' if extras else 'ELIGIBLE_SPARSE_A_NEVER_UPDATES_AFTER_HISTORY_CREATE_RECOVERY','watchRows':len(rows),'sourcePreparation':prep,'actualFailedCRCreates':len(errors),'successfulBCreation':creates[0],'BHistoryUID':bhistory['metadata']['uid'],'eligibleOriginalUIDs':eligible,'allRetainedUIDs':list(base),'extraReadyUIDs':{u:{'name':o['metadata']['name'],'version':m.version(o)} for u,o in extras.items()},'actualPodCreates':pod_creates,'persistentSince':probes[0]['started'],'persistentUntil':probes[-1]['completed'],'persistentNanos':m.ts(probes[-1]['completed'])-m.ts(probes[0]['started']),'directPodReferenceProbes':len(probes),'limitation':'Actual B was accepted and its history persisted after fault clear, but both eligible original high ordinals stayed Ready A through the reported direct-read window, with no Pod deletion and only the recorded initial extra Pod creation. Surplus Ready capacity does not substitute for updating eligible old A members. This proves bounded non-convergence, not an internal root cause or infinite stall. C, terminating references and final restart were not executed.','evidenceSHA256':{f:hashlib.sha256((p/f).read_bytes()).hexdigest() for f in ('result.json','observations.jsonl','final-resources.yaml','source-boundary.json')}}

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Prove the physical sparse source boundary independently of its runner ledger."""
 import collections
+import copy
 import hashlib
 import importlib.util
 import pathlib
@@ -18,18 +19,24 @@ def audit(p,rows):
     expanded=m.yaml(q/'step-00-server.yaml');restore=m.yaml(sorted(q.glob('restore-source-R3-write-*-server.yaml'))[-1])
     assert original['metadata']['generation']==1 and expanded['metadata']['generation']==2 and source['metadata']['generation']==3
     assert all(o['metadata']['uid']==owner for o in (expanded,restore,source)) and restore['spec']==source['spec']==original['spec']
-    roles={r['name']:r for r in expanded['spec']['template']['roles']};assert roles['frontend']['replicas']==5
-    spec=source['spec']
-    assert {r['name']:r['replicas'] for r in spec['template']['roles']}=={'frontend':3,'backend':3}
-    source_roles={r['name']:r for r in source['spec']['template']['roles']}
-    for name,role in roles.items():
-        restored=dict(role);restored['replicas']=3;assert restored==source_roles[name]
+    spec=source['spec'];sg=spec['rolloutStrategy'].get('type','ServingGroupRollingUpdate')=='ServingGroupRollingUpdate'
+    expected=copy.deepcopy(spec)
+    if sg:expected['replicas']=5
+    else:next(r for r in expected['template']['roles'] if r['name']=='frontend')['replicas']=5
+    case=m.yaml(p/'case.yaml');is_boundary=case['scenario'].get('fixture')=='sparse-boundary-A'
+    if is_boundary:
+        cfg=expected['rolloutStrategy']['rollingUpdateConfiguration'] if sg else next(r for r in expected['template']['roles'] if r['name']=='frontend')
+        if cfg.get('maxUnavailable',1)==0 and cfg.get('maxSurge',0)==0:cfg['maxUnavailable']=1
+    assert expanded['spec']==expected
+    assert spec['replicas']==(3 if sg else 1)
+    assert {r['name']:r['replicas'] for r in spec['template']['roles']}==({'frontend':1} if sg else {'frontend':3,'backend':3})
+    axis=m.G if sg else m.I
     eight={o['metadata']['uid']:o for o in m.yaml(q/'expanded-pods.yaml')['items'] if m.owned(o,owner)}
-    assert len(eight)==8 and all(m.ready(o) and m.version(o)=='A' for o in eight.values())
+    assert len(eight)==(5 if sg else 8) and all(m.ready(o) and m.version(o)=='A' for o in eight.values())
     removed=boundary['deletedPreparationUIDs'];retained=boundary['retainedUIDs']
-    assert len(removed)==2 and len(retained)==6 and set(removed.values())|set(retained.values())==set(eight)
+    assert len(removed)==2 and len(retained)==(3 if sg else 6) and set(removed.values())|set(retained.values())==set(eight)
     for name,uid in removed.items():
-        o=eight[uid];assert o['metadata']['name']==name and o['metadata']['labels'][m.R]=='frontend' and int(o['metadata']['labels'][m.I].rsplit('-',1)[1]) in (1,2)
+        o=eight[uid];assert o['metadata']['name']==name and o['metadata']['labels'][m.R]=='frontend' and int(o['metadata']['labels'][axis].rsplit('-',1)[1]) in (1,2)
     receipts=m.read(q/'external-deletes.json');assert len(receipts)==2
     for receipt in receipts:
         assert receipt['accepted'] and removed[receipt['name']]==receipt['uid']==receipt['options']['preconditions']['uid']
@@ -65,10 +72,10 @@ def audit(p,rows):
     assert set(pods)==set(retained.values()) and all(m.ready(o) and m.version(o)=='A' for o in pods.values())
     for uid,o in pods.items():assert o['spec']==eight[uid]['spec'] and o['metadata']['labels']==eight[uid]['metadata']['labels']
     groups=collections.defaultdict(set)
-    for o in pods.values():groups[o['metadata']['labels'][m.R]].add(int(o['metadata']['labels'][m.I].rsplit('-',1)[1]))
-    assert dict(groups)=={'frontend':{0,3,4},'backend':{0,1,2}}
-    pg=m.mine(base,'podgroups',owner);assert len(pg)==1 and next(iter(pg.values()))['spec']['minMember']==6
-    assert len(m.mine(base,'configmaps',owner))==6 and not m.mine(base,'services',owner)
+    for o in pods.values():groups[o['metadata']['labels'][m.R]].add(int(o['metadata']['labels'][axis].rsplit('-',1)[1]))
+    assert dict(groups)==({'frontend':{0,3,4}} if sg else {'frontend':{0,3,4},'backend':{0,1,2}})
+    pg=m.mine(base,'podgroups',owner);assert len(pg)==(3 if sg else 1) and all(o['spec']['minMember']==(1 if sg else 6) for o in pg.values())
+    assert len(m.mine(base,'configmaps',owner))==len(pods) and not m.mine(base,'services',owner)
     crs=m.mine(base,'controllerrevisions',owner);assert len(crs)==1
     for o in pods.values():assert 'model-'+o['metadata']['labels']['modelserving.volcano.sh/revision']==next(iter(crs.values()))['metadata']['name']
     prep=[r for r in rows if r['sequence']<=boundary['lastPreparationSequence']]
@@ -84,8 +91,27 @@ def audit(p,rows):
             assert item['accepted'] and item['uid']==item['options']['preconditions']['uid'] and m.ts(item['received'])<m.ts(boundary['at'])
             cm=m.yaml(q/('orphan-preparation-'+item['name']+'.yaml'))
             assert cm['metadata']['uid']==item['uid'] and m.owned(cm,owner) and cm['metadata']['labels'][m.R]=='frontend'
-            assert int(cm['metadata']['labels'][m.I].rsplit('-',1)[1]) in (1,2)
+            assert int(cm['metadata']['labels'][axis].rsplit('-',1)[1]) in (1,2)
+            at=m.replay(rows,item['sent']);assert not any(all(o['metadata']['labels'].get(k)==cm['metadata']['labels'].get(k) for k in (m.G,m.R,m.I)) for o in m.mine(at,'pods',owner).values())
+    if (q/'preparation-podgroup-cleanup.json').exists():
+        assert sg
+        for item in m.read(q/'preparation-podgroup-cleanup.json'):
+            assert item['accepted'] and item['uid']==item['options']['preconditions']['uid'] and m.ts(item['received'])<m.ts(boundary['at'])
+            pg=m.yaml(q/('orphan-preparation-podgroup-'+item['name']+'.yaml'))
+            assert m.owned(pg,owner) and pg['metadata']['uid']==item['uid'] and int(item['name'].rsplit('-',1)[1]) in (1,2)
+            at=m.replay(rows,item['sent']);assert not any(o['metadata']['labels'][m.G]==item['name'] for o in m.mine(at,'pods',owner).values())
     cps=[m.read(x) for x in q.glob('checkpoint-*.json')]
     cp=next(cp for cp in cps if cp['phase']=='sparse-source-A-established');assert cp['elapsedStableNanos']>=10_000_000_000
     assert m.ts(cp['completed'])<=m.ts(boundary['at'])
+    stable=m.replay(rows,cp['stableSince'])
+    for row in rows:
+        if not m.ts(cp['stableSince'])<m.ts(row['received'])<=m.ts(cp['completed']):continue
+        uid=row['object']['metadata']['uid']
+        if row['event']=='DELETED':stable[row['kind']].pop(uid,None)
+        else:stable[row['kind']][uid]=row['object']
+        live=m.mine(stable,'pods',owner);assert set(live)==set(pods) and all(m.ready(o) and m.version(o)=='A' for o in live.values())
+        cms=m.mine(stable,'configmaps',owner);assert len(cms)==len(pods) and not m.mine(stable,'services',owner)
+        for cm in cms.values():
+            members=[o for o in live.values() if all(o['metadata']['labels'].get(k)==cm['metadata']['labels'].get(k) for k in (m.G,m.R,m.I))]
+            assert len(members)==1
     return {'lastPreparationSequence':boundary['lastPreparationSequence'],'sourceGeneration':3,'retainedUIDs':retained,'deletedPreparationUIDs':removed,'preparationControllerUID':after['metadata']['uid'],'stableNanos':cp['elapsedStableNanos'],'sourceBoundarySHA256':hashlib.sha256((p/'source-boundary.json').read_bytes()).hexdigest()}

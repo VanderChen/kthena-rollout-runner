@@ -88,11 +88,12 @@ func (c Case) validateScenario() error {
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
+	numericBoundary := n >= 540 && n <= 565 && c.Format == "rollout-runner/v2"
 	historyCollision := (n == 533 || n == 534) && c.Format == "rollout-runner/v3"
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -307,6 +308,9 @@ func (c Case) validateScenario() error {
 	}
 	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), ordinals)) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
+	}
+	if numericBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "update" || s.Steps[0].StableSeconds < 30) {
+		return fmt.Errorf("numeric boundary requires literal A-to-B request and stable allowed target")
 	}
 	if historyCollision && (len(s.Steps) != 1 || s.Steps[0].Action != "history-collision-recovery") {
 		return fmt.Errorf("collision requires precreated conflict plus native Create AlreadyExists sequence")

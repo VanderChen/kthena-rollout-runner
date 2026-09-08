@@ -15,6 +15,52 @@ h=importlib.util.module_from_spec(loader);loader.loader.exec_module(h);m=h.m
 REV=h.REV
 
 
+def plugin_regression(p, rows, owner, baseline, stage, deletions):
+    """Prove a new memberless ranktable after actual target state became clean."""
+    spec=stage['server']['spec'];d,u,s,part=h.budget(spec,'frontend')
+    assert spec['rolloutStrategy']['type']=='RoleRollingUpdate' and part==0
+    state=collections.defaultdict(dict);clean=None;failure=None
+    def completed(value):
+        pods=m.mine(value,'pods',owner)
+        assert len(pods)==d+3 and all(m.ready(o) for o in pods.values())
+        assert collections.Counter(m.version(o) for o in pods.values())=={'A':3,'B':d}
+        for uid,o in pods.items():
+            assert m.version(o)==('B' if o['metadata']['labels'][m.R]=='frontend' else 'A')
+            if o['metadata']['labels'][m.R]=='backend':assert uid in baseline
+        h.plugins(value,owner,spec)
+        ms=next(o for o in value['modelservings'].values() if o['metadata']['uid']==owner)
+        status=ms['status'];assert status['observedGeneration']>=stage['server']['metadata']['generation']
+        assert status['currentRevision']==status['updateRevision'] and status['replicas']==status['availableReplicas']==1
+        histories=m.mine(value,'controllerrevisions',owner)
+        target=next(o for o in histories.values() if o['metadata']['name']=='model-'+status['updateRevision'])
+        requested={r['name']:r for r in spec['template']['roles']}
+        for role in target['data']['data']:
+            for key in ('entryTemplate','workerTemplate'):assert role.get(key)==requested[role['name']].get(key)
+        return set(pods)
+    for row in rows:
+        o=row['object'];uid=o['metadata']['uid'];kind=row['kind']
+        if clean and kind=='configmaps' and row['event']=='ADDED' and m.owned(o,owner):
+            members=[pod for pod in m.mine(state,'pods',owner).values() if all(pod['metadata']['labels'].get(k)==o['metadata']['labels'].get(k) for k in (m.G,m.R,m.I))]
+            data=json.loads(o['data']['ranktable.json'])
+            if not members and data['status']=='Initializing' and int(data['server_count'])==0:
+                failure=row;break
+        if row['event']=='DELETED':state[kind].pop(uid,None)
+        else:state[kind][uid]=o
+        if m.ts(row['received'])>=stage['received']:
+            try:uids=completed(state)
+            except (AssertionError,KeyError,StopIteration):
+                clean=None
+                continue
+            clean={'sequence':row['sequence'],'at':row['received'],'podUIDs':sorted(uids)}
+    assert clean and failure, 'no independent completed-state to orphan-creation transition'
+    cm=failure['object'];final=m.yaml(p/'final-resources.yaml');assert cm['metadata']['uid'] in m.mine(final,'configmaps',owner)
+    actual=m.mine(final,'pods',owner);assert set(actual)==set(clean['podUIDs']) and all(m.ready(o) for o in actual.values())
+    assert not [o for o in actual.values() if all(o['metadata']['labels'].get(k)==cm['metadata']['labels'].get(k) for k in (m.G,m.R,m.I))]
+    removed=[r for r in rows if r['kind']=='pods' and r['event']=='DELETED' and all(r['object']['metadata']['labels'].get(k)==cm['metadata']['labels'].get(k) for k in (m.G,m.R,m.I))]
+    assert removed and m.ts(removed[-1]['received'])<m.ts(failure['received'])
+    return {'id':m.read(p/'result.json')['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'MEMBERLESS_RANKTABLE_RECREATED_AFTER_TARGET_SETTLED','watchRows':len(rows),'lastCleanState':clean,'unexpectedConfigMap':cm,'birthSequence':failure['sequence'],'birthAt':failure['received'],'lastMemberDeletedAt':removed[-1]['received'],'lastMemberUID':removed[-1]['object']['metadata']['uid'],'healthyDeletionChecks':deletions,'limitation':'The actual target capacity, history status and plugin state first became clean, then a new memberless Initializing ranktable regressed the required stability window. Frozen final evidence retains that UID. This proves a stability/cleanup regression, not permanent leakage; a full final30s window did not complete.'}
+
+
 def audit_case(p):
     case=m.yaml(p/'case.yaml');result=m.read(p/'result.json');source=case['scenario']['source'];n=int(case['id'][4:])
     assert 540<=n<=572 and result['id']==case['id']==source['id']
@@ -57,6 +103,8 @@ def audit_case(p):
     if violations:
         assert result['status']=='FAIL' and 'BUDGET_VIOLATION' in result.get('error','')
         return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_NUMERIC_BUDGET','watchRows':len(rows),'firstViolation':violations[0],'healthyDeletionChecks':deletions,'limitation':'Actual accepted numerical boundary followed by independently reconstructed unhealthy capacity loss. Later final convergence is not credited.'}
+    if result['status']=='FAIL' and 'STABILITY_VIOLATION: settled predicate regressed: unexpected ConfigMap' in result.get('error',''):
+        return plugin_regression(p,rows,owner,baseline,stages[-1],deletions)
     assert result['status']=='PASS' and not result.get('violations') and len(stages)==len(case['scenario']['steps'])
     reports=[]
     for stage in stages:

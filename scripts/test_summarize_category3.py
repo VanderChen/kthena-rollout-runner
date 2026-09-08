@@ -32,7 +32,9 @@ class Category3EvidenceIntegrity(unittest.TestCase):
             self.write(self.control / name, controller)
         self.environment = {'baseline': report.BASELINE, 'runner': {'binarySHA256': 'original-binary'}}
         self.write(self.base / 'environment.json', self.environment)
-        self.write(self.control / 'build.json', {'binarySHA256': 'original-binary', 'workingTree': ''})
+        build = {'binarySHA256': 'original-binary', 'workingTree': '', 'runnerCommit': 'source-commit', 'image': 'runner:immutable', 'imageID': 'sha256:original', 'immutableBuildEvidence': 'immutable-build.json'}
+        self.write(self.control / 'build.json', build)
+        self.write(self.root / 'immutable-build.json', build)
 
     def write(self, path, data):
         path.write_text(json.dumps(data))
@@ -49,6 +51,21 @@ class Category3EvidenceIntegrity(unittest.TestCase):
         self.done['selected'].append('RUN-541')
         self.write(self.control / 'completion.json', self.done)
         with self.assertRaisesRegex(AssertionError, 'every selected case'):
+            report.read_review(self.root, self.item)
+
+    def test_dispatch_edits_do_not_change_verified_immutable_binary(self):
+        path = self.control / 'build.json'
+        build = report.read_json(path)
+        build['workingTree'] = ' M scripts/unrelated-audit.py\n'
+        self.write(path, build)
+        self.assertEqual(report.read_review(self.root, self.item)[1], self.rows)
+
+    def test_retagged_image_is_rejected(self):
+        path = self.control / 'build.json'
+        build = report.read_json(path)
+        build['imageID'] = 'sha256:different'
+        self.write(path, build)
+        with self.assertRaisesRegex(AssertionError, 'immutable build proof'):
             report.read_review(self.root, self.item)
 
     def test_baseline_and_binary_mismatch_are_rejected(self):

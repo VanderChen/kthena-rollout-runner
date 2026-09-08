@@ -42,7 +42,13 @@ def read_review(root, item):
     assert environment['baseline'] == BASELINE, 'different Kthena baseline'
     build = read_json(control / 'build.json')
     assert environment['runner']['binarySHA256'] == build['binarySHA256'], 'different runner binary'
-    assert build['workingTree'] == ''
+    immutable = read_json(root / build['immutableBuildEvidence'])
+    assert immutable['workingTree'] == '', 'image built from an unrecorded working tree'
+    for key in ('runnerCommit', 'binarySHA256', 'image', 'imageID'):
+        assert immutable[key] == build[key], 'immutable build proof mismatch'
+    # build.workingTree records the later manifest dispatch, when an unrelated
+    # auditor may be under development; the executed binary must match its
+    # original clean build, independently of those later files.
     rows = report['cases']
     assert len({r['id'] for r in rows}) == len(rows), 'duplicate case in audit'
     assert {r['id'] for r in rows} == set(done['selected']), 'audit does not account for every selected case'

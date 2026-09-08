@@ -92,3 +92,16 @@ func TestNormalCleanupRefusesReusedNamespaceIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestNewIdentityCannotReferenceRetainedOldHistory(t *testing.T) {
+	ms := map[string]interface{}{"status": map[string]interface{}{"currentRevision": "new-B", "updateRevision": "new-B"}}
+	if err := identityHistoryEvidence(ms, "model-old-A"); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"currentRevision", "updateRevision"} {
+		ms["status"] = map[string]interface{}{field: "old-A"}
+		if err := identityHistoryEvidence(ms, "model-old-A"); err == nil || !strings.Contains(err.Error(), "FOREIGN_HISTORY_REFERENCED") {
+			t.Fatal(field, err)
+		}
+	}
+}

@@ -206,6 +206,9 @@ func (e *normalExecution) identityBoundary(ctx context.Context, p ScenarioStep, 
 		if cr.UID != oldHistory.UID || !identityOwned(cr, oldOwner) || !reflect.DeepEqual(cr.Data, oldHistory.Data) {
 			return fmt.Errorf("FOREIGN_OWNER_ADOPTED: old ControllerRevision identity/data changed")
 		}
+		if err = identityHistoryEvidence(ms.Object, oldHistory.Name); err != nil {
+			return err
+		}
 		if err = e.locked(func() error { return nil }); err != nil {
 			return err
 		}
@@ -304,4 +307,15 @@ func identityOwned(object metav1.Object, owner string) bool {
 		}
 	}
 	return false
+}
+
+func identityHistoryEvidence(ms map[string]interface{}, oldName string) error {
+	status := mapValue(ms, "status")
+	for _, field := range []string{"currentRevision", "updateRevision"} {
+		revision := textValue(status, field)
+		if revision != "" && "model-"+revision == oldName {
+			return fmt.Errorf("FOREIGN_HISTORY_REFERENCED: new ModelServing %s references retained old-owner history", field)
+		}
+	}
+	return nil
 }

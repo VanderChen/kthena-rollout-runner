@@ -291,6 +291,9 @@ def main():
             elif (int(result['id'][4:])-463)%10>=5 and any(reason in result.get('error','') for reason in ('BUDGET_VIOLATION','ORDER_MISMATCH')):
                 loader=importlib.util.spec_from_file_location('sparse_budget',ROOT/'scripts/audit-history-sparse-budget.py');budget=importlib.util.module_from_spec(loader);loader.loader.exec_module(budget)
                 report=budget.audit(base/result['id'],trace)
+            elif (int(result['id'][4:])-463)%10>=5 and 'TIMEOUT: B-allowed-target-after-history-recovery (target versions map[A:3]' in result.get('error',''):
+                loader=importlib.util.spec_from_file_location('sparse_stall',ROOT/'scripts/audit-history-sparse-stall.py');stall=importlib.util.module_from_spec(loader);loader.loader.exec_module(stall)
+                report=stall.audit(base/result['id'],trace)
             else:report=audit_old_surge_failure(base/result['id'],trace)
         except (AssertionError,KeyError,StopIteration,FileNotFoundError) as err:
             import traceback

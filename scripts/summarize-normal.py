@@ -351,7 +351,6 @@ def restore_deletion_evidence(root):
     require(deletion is not None, 'boundary: no target deletion')
     earlier = [e for e in target if e['sequence'] < deletion['sequence']]
     require(bool(earlier) and pod_ready(earlier[-1]['object']), 'boundary: target was not Ready')
-    require(observation_time(deletion['received']) > observation_time(request['received']), 'boundary: deletion not after response')
     starts = [s for s in result.get('normalStarts', []) if uid in s.get('uids', [])]
     require(len(starts) == 1 and starts[0]['reason'] == 'rollout' and starts[0]['readyBefore'] == 1 and
             starts[0]['minimum'] == 2 and starts[0]['phase'] == 'restore-before-deletion-finishes',
@@ -373,6 +372,7 @@ def restore_deletion_evidence(root):
              'message="Role frontend/frontend-0 in ServingGroup model-0 is now Deleting"' in line]
     require(len(lines) == 1, 'boundary: missing or ambiguous RoleDeleting log')
     intent = lines[0].split()[0]
+    require(observation_time(intent) < observation_time(deletion['received']), 'boundary: deletion precedes recorded intent')
     evidence['paths'].append(log_path)
     relation = ('BEFORE_REQUEST' if observation_time(intent) < observation_time(request['sent']) else
                 'AFTER_RESPONSE' if observation_time(intent) > observation_time(request['received']) else 'REQUEST_INTERVAL')

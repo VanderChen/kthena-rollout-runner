@@ -103,6 +103,14 @@ func TestPriorRoleIntentRejectsUnsupportedEvidence(t *testing.T) {
 	}
 }
 
+func TestPriorRoleDeletionNotificationBeforeRestoreRequest(t *testing.T) {
+	l, objects, request, logs := priorIntentFixture(t)
+	l.Starts[len(l.Starts)-1].At = request.Sent.Add(-time.Millisecond)
+	if _, err := inspectPriorRoleIntent(l, objects, "test", logs, request); err != nil {
+		t.Fatal("already-issued deletion must not be charged to a future request:", err)
+	}
+}
+
 // Optional read-only regression against independently captured Kind traces.
 // No cluster mutation, replay or replacement of the original result is involved.
 func TestPriorRoleIntentKindArtifacts(t *testing.T) {
@@ -113,7 +121,7 @@ func TestPriorRoleIntentKindArtifacts(t *testing.T) {
 	for _, row := range []struct {
 		run, id  string
 		accepted bool
-	}{{"normal-r10-183-addendum", "RUN-183", true}, {"normal-r10-303", "RUN-183", false}, {"normal-r10-303", "RUN-193", false}} {
+	}{{"normal-r10-183-addendum", "RUN-183", true}, {"normal-r12-183-intent", "RUN-183", true}, {"normal-r10-303", "RUN-183", false}, {"normal-r10-303", "RUN-193", false}} {
 		t.Run(row.run+"/"+row.id, func(t *testing.T) {
 			dir := filepath.Join(root, row.run, row.id, "attempt-1")
 			var l NormalLedger

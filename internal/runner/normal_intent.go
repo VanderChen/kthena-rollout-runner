@@ -67,7 +67,7 @@ func inspectPriorRoleIntent(l *NormalLedger, objects Objects, namespace, logs st
 	violation := fmt.Sprintf("%s: BUDGET_VIOLATION: %s ready=%d delete=%s minimum=%d", l.Phase, start.Scope, start.ReadyBefore, start.Key, start.Minimum)
 	if !ok || beforeErr != nil || afterErr != nil || string(beforeSpec) != string(afterSpec) || old.Mode != "Role" || r.R != 1 || r.U != 1 || r.S != 0 || r.P != 0 || r.W != 0 || next.R <= r.R || !sameEffectiveModel(expect, l.Model) ||
 		start.Reason != "rollout" || start.Phase != l.Phase || start.Ordinal != 0 || start.ReadyBefore != 1 || start.Minimum != max(next.R-next.U, 0) ||
-		start.Version == r.Entry || len(start.UIDs) != 1 || l.Violations[0] != violation || !start.At.After(request.Received) {
+		start.Version == r.Entry || len(start.UIDs) != 1 || l.Violations[0] != violation {
 		return bad()
 	}
 	uid := start.UIDs[0]
@@ -89,7 +89,7 @@ func inspectPriorRoleIntent(l *NormalLedger, objects Objects, namespace, logs st
 		}
 		intents = append(intents, at)
 	}
-	if len(intents) != 1 || !intents[0].Before(request.Sent) {
+	if len(intents) != 1 || !intents[0].Before(request.Sent) || !intents[0].Before(start.At) {
 		return bad()
 	}
 	// Every earlier member of this Role scope must have an observed finite

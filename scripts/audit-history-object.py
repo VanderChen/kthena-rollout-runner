@@ -128,9 +128,13 @@ def main():
     assert done['controllerSpecRestored'] and done['historicalModelServingUIDsPreserved']==9 and not done['proxyErrors']
     build=m.read(control/'build.json');assert m.read(base/'environment.json')['runner']['binarySHA256']==build['binarySHA256']
     assert m.read(control/'controller-before.json')['spec']==m.read(control/'controller-restored.json')['spec']
-    trace=[json.loads(s) for s in open(control/'proxy-trace.jsonl')];reports=[];out=base/'independent-history-object-audit';out.mkdir()
+    trace=[json.loads(s) for s in open(control/'proxy-trace.jsonl')];reports=[];out=base/'independent-history-object-audit';out=base/(sys.argv[2] if len(sys.argv)>2 else out.name);out.mkdir()
     for result in m.read(base/'summary.json')['results']:
-        try:report=audit_case(base/result['id'],trace)
+        try:
+            if result['status']!='PASS' and result.get('error','').startswith('step 01 establish-protected-A-and-eligible-B: STABILITY_VIOLATION:'):
+                loader=importlib.util.spec_from_file_location('precondition',ROOT/'scripts/audit-history-precondition.py');precondition=importlib.util.module_from_spec(loader);loader.loader.exec_module(precondition)
+                report=precondition.audit(base/result['id'],trace)
+            else:report=audit_case(base/result['id'],trace)
         except (AssertionError,KeyError,StopIteration,FileNotFoundError) as e:
             import traceback
             report={'id':result['id'],'classification':'PENDING_REVIEW','rawStatus':result['status'],'rawError':result.get('error'),'auditError':repr(e),'traceback':traceback.format_exc()}

@@ -283,11 +283,14 @@ def main():
     for line in (control/'proxy-trace.jsonl').open():
         record = json.loads(line)
         if m.ts(record['at']) >= start: trace.append(record)
-    out = base/'independent-history-audit'; out.mkdir(); reports = []
+    out = base/(sys.argv[2] if len(sys.argv)>2 else 'independent-history-audit'); out.mkdir(); reports = []
     for result in results:
         try:
             if result['status']=='PASS':report=audit_case(base/result['id'],trace)
             elif result['id']=='RUN-514' and 'SKEW_VIOLATION' in result.get('error',''):report=audit_single_role_oracle(base/result['id'],trace)
+            elif (int(result['id'][4:])-463)%10>=5 and 'BUDGET_VIOLATION' in result.get('error',''):
+                loader=importlib.util.spec_from_file_location('sparse_budget',ROOT/'scripts/audit-history-sparse-budget.py');budget=importlib.util.module_from_spec(loader);loader.loader.exec_module(budget)
+                report=budget.audit(base/result['id'],trace)
             else:report=audit_old_surge_failure(base/result['id'],trace)
         except (AssertionError,KeyError,StopIteration,FileNotFoundError) as err:
             import traceback

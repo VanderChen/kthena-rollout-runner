@@ -15,7 +15,7 @@ m=importlib.util.module_from_spec(loader);loader.loader.exec_module(m)
 def audit(p,rows):
     q=p/'fixture-preparation';boundary=m.read(p/'source-boundary.json')
     original=m.yaml(p/'before-server.yaml');source=m.yaml(p/'source-initial-server.yaml');owner=original['metadata']['uid']
-    expanded=m.yaml(q/'step-00-server.yaml');restore=m.yaml(q/'restore-source-R3-server.yaml')
+    expanded=m.yaml(q/'step-00-server.yaml');restore=m.yaml(sorted(q.glob('restore-source-R3-write-*-server.yaml'))[-1])
     assert original['metadata']['generation']==1 and expanded['metadata']['generation']==2 and source['metadata']['generation']==3
     assert all(o['metadata']['uid']==owner for o in (expanded,restore,source)) and restore['spec']==source['spec']==original['spec']
     roles={r['name']:r for r in expanded['spec']['template']['roles']};assert roles['frontend']['replicas']==5

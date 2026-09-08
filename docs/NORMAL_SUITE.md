@@ -113,6 +113,18 @@ python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
 结果矛盾的分片。失败仍保留FAIL；INCONCLUSIVE和TRIGGER_MISSED独立计数。
 脚本退出0表示303项证据汇总检查完成，不表示全部用例通过。
 
+### RUN-153副本基线验收
+
+RUN-153原有Go断言检查历史UID和Data不变，报告器另从完整Watch和四个checkpoint
+验证`coordinated-role-replica-baseline`：初始frontend/backend均为3，扩容完成、
+仅修改策略及重启后均为4；扩容完成后不能回退。历史UID、owner和Data全程保持。
+证据缺失、注解未更新或Data被改写时，报告拒绝接受原始PASS；不会覆盖原result.json。
+通过时，报告的RUN-153条目包含`replicaBaselineEvidence`及原始文件摘要。
+
+此检查使用r10已保存的实际Kind JSON，无需修改303项输入或重建运行二进制。
+当前RUN-153实际记录已通过此附加核验；它证明持久化的基线及重启后的状态，
+不宣称执行了目录动作之外的后续B滚动。合成反例测试与Kind证据分别保留。
+
 ### RUN-301断言补充执行
 
 核查中发现RUN-301移除coordination的阶段缺少`noNewRevision`断言，已补齐；反例测试
@@ -120,7 +132,8 @@ python3 scripts/summarize-normal.py --out artifacts/normal-final-report \
 时序以及其他302项输入不变。r10二进制已经支持此断言，因此补测使用同一个r10镜像，
 将修正后的RUN-301输入通过ConfigMap挂载；无需修改Kthena，也不覆盖在跑Job的输入。
 
-完整r10结束后再执行补测，避免共享控制器/调度资源相互影响：
+当前本地收尾脚本已等待完整r10导出，随后自动核验并执行补测；不要重复下发。
+以下手工命令供未启用收尾脚本的执行使用，必须先等完整r10结束：
 
 ```sh
 kubectl --kubeconfig /private/tmp/runner-normal-022.kubeconfig create configmap \

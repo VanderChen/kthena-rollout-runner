@@ -13,6 +13,26 @@ MODULE = importlib.util.spec_from_file_location('summarize_normal', pathlib.Path
 REPORTER = importlib.util.module_from_spec(MODULE)
 MODULE.loader.exec_module(REPORTER)
 ORIGINAL_301_SHA = 'dc23f58aea34d902dc9b44207ca4cdcafceef02e7e993c914a2c2e049be0fdfc'
+BASELINE_ANNOTATION = 'modelserving.volcano.sh/coordinated-role-replica-baseline'
+
+
+def replica_baseline_fixture(directory):
+    """Minimal synthetic trace; never mixed into actual Kind artifact directories."""
+    model = dict(metadata=dict(name='model', namespace='synthetic-run153', uid='model-uid'))
+    history = dict(metadata=dict(name='model-A', uid='history-uid', namespace='synthetic-run153',
+        ownerReferences=[dict(uid='model-uid', controller=True)],
+        annotations={BASELINE_ANNOTATION: '{"backend":3,"frontend":3}'}), data={'data': 'immutable-A'})
+    scaled = copy.deepcopy(history)
+    scaled['metadata']['annotations'][BASELINE_ANNOTATION] = '{"backend":4,"frontend":4}'
+    events = [
+        dict(sequence=1, received='2026-09-08T00:00:01Z', kind='modelservings', event='ADDED', object=model),
+        dict(sequence=2, received='2026-09-08T00:00:02Z', kind='controllerrevisions', event='ADDED', object=history),
+        dict(sequence=3, received='2026-09-08T00:00:11Z', kind='controllerrevisions', event='MODIFIED', object=scaled),
+    ]
+    (directory / 'observations.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in events))
+    for i, phase in enumerate(['baseline', 'scale-equivalent-A', 'change-only-budgets', 'restart-and-compare'], 1):
+        (directory / f'checkpoint-{i:03d}.json').write_text(json.dumps(dict(
+            phase=phase, completed=f'2026-09-08T00:00:{i * 10:02d}Z')))
 
 
 class AddendumTests(unittest.TestCase):
@@ -38,6 +58,9 @@ class AddendumTests(unittest.TestCase):
             if cid in failures:
                 result['error'] = 'synthetic failure for report validation'
             (directory / cid).mkdir()
+            if cid == 'RUN-153':
+                result['namespace'] = 'synthetic-run153'
+                replica_baseline_fixture(directory / cid)
             self.save(directory / cid / 'result.json', result)
             if cid == 'RUN-301':
                 self.save(directory / cid / 'ledger.json', dict(
@@ -127,6 +150,68 @@ class AddendumTests(unittest.TestCase):
         base = self.run_artifacts('baseline', ids, self.original)
         extra = self.run_artifacts('addendum', ['RUN-301'], self.current)
         with self.assertRaisesRegex(ValueError, 'missing cases: RUN-078'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def change_153_trace(self, base, change):
+        path = base / 'RUN-153/observations.jsonl'
+        events = [json.loads(s) for s in path.read_text().splitlines()]
+        change(events)
+        path.write_text(''.join(json.dumps(e) + '\n' for e in events))
+
+    def test_rejects_stale_replica_baseline_despite_original_pass(self):
+        base, extra = self.complete_pair()
+        self.change_153_trace(base, lambda es: es[2]['object']['metadata']['annotations'].update(
+            {BASELINE_ANNOTATION: '{"backend":3,"frontend":3}'}))
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*replica baseline'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def test_rejects_baseline_updated_only_after_scale_checkpoint(self):
+        base, extra = self.complete_pair()
+        self.change_153_trace(base, lambda es: es[2].update(received='2026-09-08T00:00:21Z'))
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*replica baseline'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def test_rejects_rewritten_history_data(self):
+        base, extra = self.complete_pair()
+        self.change_153_trace(base, lambda es: es[2]['object'].update(data={'data': 'rewritten-A'}))
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*Data'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def test_rejects_missing_post_restart_checkpoint(self):
+        base, extra = self.complete_pair()
+        (base / 'RUN-153/checkpoint-004.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*checkpoint'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def test_replica_baseline_proof_preserves_raw_result(self):
+        base, extra = self.complete_pair()
+        original = REPORTER.read(base / 'RUN-153/result.json')
+        report = REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+        result = next(r for r in report['results'] if r['id'] == 'RUN-153')
+        self.assertEqual(result['replicaBaselineEvidence']['checkpoints'][-1]['replicas'], {'backend': 4, 'frontend': 4})
+        self.assertEqual(REPORTER.read(base / 'RUN-153/result.json'), original)
+
+    def test_rejects_replica_baseline_regression_after_restart_checkpoint(self):
+        base, extra = self.complete_pair()
+        def regress(events):
+            late = copy.deepcopy(events[-1])
+            late.update(sequence=4, received='2026-09-08T00:00:41Z')
+            late['object']['metadata']['annotations'][BASELINE_ANNOTATION] = '{"backend":3,"frontend":3}'
+            events.append(late)
+        self.change_153_trace(base, regress)
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*regressed'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def test_rejects_recreated_history_identity(self):
+        base, extra = self.complete_pair()
+        self.change_153_trace(base, lambda es: es[2]['object']['metadata'].update(uid='another-history'))
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*identity'):
+            REPORTER.verify_with_301_addendum([base], self.original_path, extra)
+
+    def test_rejects_missing_replica_baseline_annotation(self):
+        base, extra = self.complete_pair()
+        self.change_153_trace(base, lambda es: es[2]['object']['metadata']['annotations'].clear())
+        with self.assertRaisesRegex(ValueError, 'RUN-153.*annotation missing'):
             REPORTER.verify_with_301_addendum([base], self.original_path, extra)
 
 

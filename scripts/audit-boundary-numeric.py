@@ -77,7 +77,12 @@ def audit_case(p):
         histories=m.mine(final,'controllerrevisions',owner);ms=next(o for o in final['modelservings'].values() if o['metadata']['uid']==owner);status=ms['status']
         assert status['observedGeneration']>=stage['server']['metadata']['generation'] and status.get('replicas',0)==status.get('availableReplicas',0)==spec.get('replicas',1)
         target=next(o for o in histories.values() if o['metadata']['name']=='model-'+status['targetRevision'])
-        assert target['data']['data']==spec['template']['roles']
+        history_roles={r['name']:r for r in target['data']['data']};requested_roles={r['name']:r for r in spec['template']['roles']}
+        assert set(history_roles)==set(requested_roles)
+        for name,role in requested_roles.items():
+            for template in ('entryTemplate','workerTemplate'):assert history_roles[name].get(template)==role.get(template)
+        # Scaling keeps the same template history; its captured replica counts
+        # need not be rewritten to match a later accepted scale request.
         if status.get('currentRevision'):assert any(o['metadata']['name']=='model-'+status['currentRevision'] for o in histories.values())
         if n<=565 or index==2:assert status['currentRevision']==status['targetRevision']
         for pod in pods.values():

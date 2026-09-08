@@ -39,6 +39,7 @@ def audit(p,rows):
     selected=[m.read(q/('sparse-fault-rule-%d.json'%i))['id'] for i in range(9)]
     for rid in selected:
         rule=next(r for r in rules['rules'] if r['id']==rid);assert not rule['active'] and rule['hits']==rule['released']
+    assert sum(r['hits'] for r in rules['rules'] if r['id'] in selected)>0, 'fixture pause never intercepted actual controller traffic'
     gen=m.yaml(q/'source-generation-before-restart.yaml');assert gen['status']['observedGeneration']>=3
     before=m.yaml(q/'fixture-restart-controller-terminated.yaml');after=m.yaml(q/'fixture-restart-controller-replacement.yaml')
     receipt=m.read(q/'fixture-restart-controller-delete.json')

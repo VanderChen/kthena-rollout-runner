@@ -88,10 +88,11 @@ func (c Case) validateScenario() error {
 	initialSync := (n == 450 || n == 451 || n == 453 || n == 454) && c.Format == "rollout-runner/v3"
 	lostDeletion := n >= 443 && n <= 448 && c.Format == "rollout-runner/v3"
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
+	historyCollision := (n == 533 || n == 534) && c.Format == "rollout-runner/v3"
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -125,6 +126,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "history-collision-recovery":
+			if !historyCollision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) == 0 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
+				return fmt.Errorf("collision requires actual POST AlreadyExists and automatic allowed B recovery")
+			}
 		case "history-object-recovery":
 			want := map[int]string{523: "missing", 525: "corrupt-data", 526: "missing-role", 527: "foreign-owner", 528: "missing", 530: "corrupt-data", 531: "missing-role", 532: "foreign-owner"}[n]
 			if !historyObject || p.HistoryFault != want || !p.Expect.NoReplacement || p.Expect.NoNewRevision || p.Release != "one" || p.StableSeconds < 30 || len(p.Spec) != 0 {
@@ -302,6 +307,9 @@ func (c Case) validateScenario() error {
 	}
 	if historyCreate && (len(s.Steps) != 1 || s.Steps[0].Action != "history-create-recovery" || !strings.Contains(textValue(s.Source, "initial"), ordinals)) {
 		return fmt.Errorf("history persistence requires its full compound action and actual supported ordinal fixture")
+	}
+	if historyCollision && (len(s.Steps) != 1 || s.Steps[0].Action != "history-collision-recovery") {
+		return fmt.Errorf("collision requires precreated conflict plus native Create AlreadyExists sequence")
 	}
 	if historyObject && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-object-recovery") {
 		return fmt.Errorf("historical object fault requires actual protected A/B source and restoration")

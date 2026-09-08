@@ -716,7 +716,7 @@ func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, o
 	if !l.Armed {
 		return
 	}
-	if kind == "controllerrevisions" && event == "ADDED" && l.NoNewRevision && !l.Revisions[string(o.GetUID())] {
+	if kind == "controllerrevisions" && event == "ADDED" && objectOwned(o, l.Owner) && l.NoNewRevision && !l.Revisions[string(o.GetUID())] {
 		l.fail("UNEXPECTED_REVISION: " + o.GetName())
 	}
 	for _, m := range l.Metrics(objects["pods"]) {

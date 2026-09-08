@@ -96,12 +96,13 @@ func (c Case) validateScenario() error {
 	historyCreate := n >= 463 && n <= 522 && c.Format == "rollout-runner/v3"
 	sparseBoundary := n >= 574 && n <= 603 && c.Format == "rollout-runner/v3"
 	numericBoundary := n >= 540 && n <= 572 && c.Format == "rollout-runner/v2"
+	dependencyBoundary := n == 573 && c.Format == "rollout-runner/v3"
 	equalCollision := n == 610 && c.Format == "rollout-runner/v3"
 	historyCollision := (n == 533 || n == 534) && c.Format == "rollout-runner/v3"
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -149,6 +150,13 @@ func (c Case) validateScenario() error {
 			model, err := readModel(p.Spec)
 			if err != nil || model.Mode != "Role" || model.N != 1 || model.Roles["frontend"].R != 3 || model.Roles["frontend"].W != 1 || model.Roles["frontend"].P != 1 {
 				return fmt.Errorf("invalid mixed historical source")
+			}
+		case "stable-dependency-boundary":
+			if !dependencyBoundary || p.Release != "one" || p.StableSeconds < 30 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
+				return fmt.Errorf("stable dependency boundary requires actual high surge and automatic completion")
+			}
+			if _, err := readModel(p.Spec); err != nil {
+				return err
 			}
 		case "history-equal-collision":
 			if !equalCollision || p.Release != "one" || p.StableSeconds < 30 || !p.Expect.NoNewRevision || p.Expect.NoReplacement || len(p.Spec) == 0 {
@@ -290,6 +298,9 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("condition requires positive count")
 			}
 		}
+	}
+	if dependencyBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "stable-dependency-boundary") {
+		return fmt.Errorf("stable dependency boundary cannot skip its real source and post-clear gate")
 	}
 	if sparseBoundary && (len(s.Steps) != 1 || s.Steps[0].Action != "update" || s.Steps[0].StableSeconds < 30 || s.Steps[0].Expect.BlockedByBudget != (n == 592 || n == 598)) {
 		return fmt.Errorf("sparse boundary requires its exact source and semantic target")

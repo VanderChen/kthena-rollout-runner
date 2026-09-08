@@ -297,9 +297,14 @@ def verify_new_execution(root, verified_binary=None):
 
 
 def verify(directories, original_suite, a301, a183, fixes, candidate):
+    report = BASE.verify_with_addenda(directories, original_suite, a301, a183)
+    return apply_write_corrections(report, original_suite, fixes, candidate)
+
+
+def apply_write_corrections(report, original_suite, fixes, candidate):
+    """Apply only the three verified write corrections to an existing raw report."""
     require(candidate['runnerCommit'] == FIX_COMMIT and candidate['dockerImageID'] == FIX_IMAGE and candidate['binarySHA256'] == FIX_BINARY,
             'write fix: candidate is not the reviewed correction')
-    report = BASE.verify_with_addenda(directories, original_suite, a301, a183)
     seen_conflicts = {r['id'] for r in report['results'] if 'Operation cannot be fulfilled' in r.get('error', '') and 'the object has been modified' in r.get('error', '')}
     require(seen_conflicts == FIX_IDS, 'write fix: additional or missing original conflicts require review')
     extra = BASE.verify([fixes], required_ids=FIX_IDS)

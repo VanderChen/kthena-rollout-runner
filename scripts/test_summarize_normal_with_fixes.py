@@ -272,6 +272,14 @@ class CorrectionTests(unittest.TestCase):
             self.assertNotEqual(item['originalResult']['provenance']['runnerImageID'],item['acceptedResult']['provenance']['runnerImageID'])
         self.assertEqual(REPORT.read(dirs[0]/'RUN-247/result.json')['status'],'FAIL')
 
+    def test_write_correction_alone_does_not_resolve_183(self):
+        base,a301,a183,new=self.combined()
+        original=REPORT.BASE.verify_with_301_addendum([base],self.original_path,a301)
+        report=REPORT.apply_write_corrections(original,self.original_path,new,dict(runnerCommit=REPORT.FIX_COMMIT,dockerImageID=REPORT.FIX_IMAGE,binarySHA256=REPORT.FIX_BINARY))
+        self.assertEqual(next(r for r in report['results']if r['id']=='RUN-183')['status'],'FAIL')
+        self.assertEqual(report['executionCount'],307)
+        self.assertEqual(len(report['runnerWriteCorrection']['corrections']),3)
+
     def test_wrong_fixed_binary_is_rejected(self):
         dirs=self.combined();p=dirs[-1]/'environment.json';e=REPORT.read(p);e['runner']['binarySHA256']='unreviewed';save(p,e)
         with self.assertRaisesRegex(ValueError,'wrong runner identity'):self.report(dirs)

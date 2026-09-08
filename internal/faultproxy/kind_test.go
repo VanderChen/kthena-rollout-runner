@@ -236,6 +236,36 @@ func TestKindProxyProtocolAndRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	proof["recoveredCreateUID"] = recovered.UID
+	listFault := Rule{ID: id + "-list", Namespace: ns, Resource: "configmaps", Methods: []string{"GET"}, CollectionOnly: true, Mode: "error", StatusCode: 503, Count: 1, DurationSeconds: 30}
+	admin("POST", "/v1/rules", listFault, 201)
+	if _, err = proxied.CoreV1().ConfigMaps(ns).Get(ctx, "probe", metav1.GetOptions{}); err != nil {
+		t.Fatal("named Get consumed List error", err)
+	}
+	if _, err = proxied.CoreV1().ConfigMaps(other).List(ctx, metav1.ListOptions{}); err != nil {
+		t.Fatal("other namespace consumed List error", err)
+	}
+	listWatch, err := proxied.CoreV1().ConfigMaps(ns).Watch(ctx, metav1.ListOptions{ResourceVersion: recovered.ResourceVersion})
+	if err != nil {
+		t.Fatal("Watch consumed List error", err)
+	}
+	listWatch.Stop()
+	if _, err = proxied.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{}); !apierrors.IsServiceUnavailable(err) {
+		t.Fatal("actual List must fail once", err)
+	}
+	listed, err := proxied.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatal("List must recover automatically", err)
+	}
+	foundOriginal := false
+	for _, item := range listed.Items {
+		if item.UID == created.UID {
+			foundOriginal = true
+		}
+	}
+	if !foundOriginal {
+		t.Fatal("recovered List lost existing object")
+	}
+	proof["collectionOnlyFailureAndRecovery"] = map[string]interface{}{"resource": "configmaps", "namespace": ns, "originalUIDPreserved": created.UID, "getAndWatchAndOtherNamespaceUnaffected": true}
 	finalized := makeCM(ns, "old")
 	finalized.Finalizers = []string{"rollout-runner/proxy-probe"}
 	old, err := direct.CoreV1().ConfigMaps(ns).Create(ctx, finalized, metav1.CreateOptions{})

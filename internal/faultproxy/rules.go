@@ -27,6 +27,8 @@ type Rule struct {
 	StatusCode      int      `json:"statusCode,omitempty"`
 	DurationSeconds int      `json:"durationSeconds"`
 	InitialSync     bool     `json:"initialSync,omitempty"`
+	CollectionOnly  bool     `json:"collectionOnly,omitempty"`
+	Generation      int64    `json:"generation,omitempty"`
 }
 
 type RuleStatus struct {
@@ -85,6 +87,12 @@ func (r Rule) validate() error {
 	if r.InitialSync && (r.Namespace != "" || r.Name != "" || r.Subresource != "" || len(r.UIDs) != 0 || r.OwnerUID != "" || len(r.Methods) != 1 || r.Methods[0] != http.MethodGet) {
 		return fmt.Errorf("initial-sync fault must explicitly target global GET startup requests")
 	}
+	if r.CollectionOnly && (r.InitialSync || r.Name != "" || r.Subresource != "" || len(r.UIDs) != 0 || r.OwnerUID != "" || r.Generation != 0 || r.Mode != "error" || len(r.Methods) != 1 || (r.Methods[0] != http.MethodGet && r.Methods[0] != http.MethodDelete)) {
+		return fmt.Errorf("collection-only errors require a namespaced List/DeleteCollection without object or initial-sync filters")
+	}
+	if r.Generation < 0 || r.Generation > 0 && (r.Mode != "error" || r.InitialSync || r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodPut || r.Name == "" || r.OwnerUID == "") {
+		return fmt.Errorf("generation filter requires an exact owned object PUT")
+	}
 	switch r.Mode {
 	case "error":
 		if len(r.Methods) == 0 || r.StatusCode < 400 || r.StatusCode > 599 {
@@ -119,6 +127,9 @@ func has(values []string, value string) bool {
 }
 
 func (r Rule) matchesRequest(m requestMeta) bool {
+	if r.CollectionOnly && (m.Name != "" || m.Watch) {
+		return false
+	}
 	if r.Mode == "drop-deletion" || r.Resource != m.Resource || r.Subresource != m.Subresource || r.Name != "" && r.Name != m.Name && !(m.Method == "POST" && m.Name == "") || len(r.Methods) > 0 && !has(r.Methods, m.Method) {
 		return false
 	}
@@ -135,16 +146,20 @@ func (r Rule) matchesRequest(m requestMeta) bool {
 }
 
 func (r Rule) needsObject(m requestMeta) bool {
-	return len(r.UIDs) > 0 || r.OwnerUID != "" || r.Name != "" && m.Name == ""
+	return len(r.UIDs) > 0 || r.OwnerUID != "" || r.Generation > 0 || r.Name != "" && m.Name == ""
 }
 
 type objectMeta struct {
 	Name, Namespace, UID string
+	Generation           int64
 	OwnerReferences      []struct{ UID string }
 	DeletionTimestamp    *string
 }
 
 func (r Rule) matchesObject(m objectMeta) bool {
+	if r.Generation > 0 && r.Generation != m.Generation {
+		return false
+	}
 	if r.Namespace != "" && r.Namespace != m.Namespace || r.Name != "" && r.Name != m.Name || len(r.UIDs) > 0 && !has(r.UIDs, m.UID) {
 		return false
 	}

@@ -78,7 +78,8 @@ func (c Case) validateScenario() error {
 	midRollout := n >= 401 && n <= 430 && c.Format == "rollout-runner/v3"
 	graceRestart := n >= 431 && n <= 432 && c.Format == "rollout-runner/v3"
 	controllerRestart := n >= 435 && n <= 440 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
+	apiRetry := n >= 455 && n <= 462 && c.Format == "rollout-runner/v3"
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry) || c.ID != fmt.Sprintf("RUN-%03d", n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -105,6 +106,10 @@ func (c Case) validateScenario() error {
 			return fmt.Errorf("invalid step")
 		}
 		switch p.Action {
+		case "retry-api-error":
+			if !apiRetry || len(p.Spec) != 0 || p.Release != "one" || p.Expect.NoReplacement {
+				return fmt.Errorf("invalid API retry action")
+			}
 		case "resume-after-grace":
 			if !graceRestart {
 				return fmt.Errorf("grace resumption not declared by this case")
@@ -197,6 +202,9 @@ func (c Case) validateScenario() error {
 		if terminations != 1 {
 			return fmt.Errorf("controller recovery cases require exactly one declared termination")
 		}
+	}
+	if apiRetry && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[0].Release != "none" || s.Steps[1].Action != "retry-api-error") {
+		return fmt.Errorf("API retry cases require an unfinished B window then exactly one finite failure")
 	}
 	if s.Steps[len(s.Steps)-1].Until != "settled" {
 		return fmt.Errorf("last step must verify a settled state")

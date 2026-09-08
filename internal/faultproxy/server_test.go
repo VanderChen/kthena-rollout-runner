@@ -166,6 +166,85 @@ func TestFiniteErrorOnlyMatchesExactNamespaceAndCreateOwnerIncludingProtobuf(t *
 	control(t, s, "POST", "/v1/rules", rule, 409)
 }
 
+func TestCollectionOnlyFaultCannotBeConsumedByGetWatchOrOtherNamespace(t *testing.T) {
+	s, api, _ := fixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+	}))
+	rule := Rule{ID: "list", Namespace: "test", Resource: "controllerrevisions", Methods: []string{"GET"}, CollectionOnly: true, Mode: "error", StatusCode: 503, Count: 1, DurationSeconds: 30}
+	control(t, s, "POST", "/v1/rules", rule, 201)
+	for _, suffix := range []string{"/test/controllerrevisions/model-a", "/other/controllerrevisions", "/test/controllerrevisions?watch=true", "/test/controllerrevisions?watch=1&sendInitialEvents=true"} {
+		response, err := http.Get(api.URL + "/apis/apps/v1/namespaces" + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 200 || state(t, s).Rules[0].Hits != 0 {
+			t.Fatal("non-List consumed fault")
+		}
+	}
+	for _, want := range []int{503, 200} {
+		response, err := http.Get(api.URL + "/apis/apps/v1/namespaces/test/controllerrevisions?labelSelector=model%3Dtest")
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != want {
+			t.Fatal("List fault/recovery incorrect", response.StatusCode)
+		}
+	}
+	if state(t, s).Rules[0].Hits != 1 || state(t, s).Rules[0].Active {
+		t.Fatal("List failure must occur exactly once")
+	}
+}
+
+func TestGenerationBoundStatusFaultIgnoresStaleGeneration(t *testing.T) {
+	s, api, _ := fixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	rule := Rule{ID: "status-generation", Namespace: "test", Resource: "modelservings", Name: "model", Subresource: "status", Methods: []string{"PUT"}, OwnerUID: "owner", Generation: 2, Mode: "error", StatusCode: 503, Count: 1, DurationSeconds: 30}
+	control(t, s, "POST", "/v1/rules", rule, 201)
+	for _, sample := range []struct {
+		body string
+		want int
+	}{
+		{`{"metadata":{"name":"model","uid":"owner","generation":1}}`, 200},
+		{`{"metadata":{"name":"model","uid":"other","generation":2}}`, 200},
+		{`{"metadata":{"name":"model","uid":"owner","generation":2}}`, 503},
+		{`{"metadata":{"name":"model","uid":"owner","generation":2}}`, 200},
+	} {
+		req, _ := http.NewRequest("PUT", api.URL+"/apis/workload.serving.volcano.sh/v1alpha1/namespaces/test/modelservings/model/status", strings.NewReader(sample.body))
+		req.Header.Set("Content-Type", "application/json")
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != sample.want {
+			t.Fatal("generation/owner boundary failed", response.StatusCode)
+		}
+	}
+}
+
+func TestDeleteCollectionFaultExcludesNamedDeletes(t *testing.T) {
+	s, api, _ := fixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	rule := Rule{ID: "collection-delete", Namespace: "test", Resource: "pods", Methods: []string{"DELETE"}, CollectionOnly: true, Mode: "error", StatusCode: 503, Count: 1, DurationSeconds: 30}
+	control(t, s, "POST", "/v1/rules", rule, 201)
+	for _, sample := range []struct {
+		path string
+		want int
+	}{{"/api/v1/namespaces/test/pods/one", 200}, {"/api/v1/namespaces/other/pods", 200}, {"/api/v1/namespaces/test/pods?labelSelector=group%3Dold", 503}, {"/api/v1/namespaces/test/pods?labelSelector=group%3Dold", 200}} {
+		req, _ := http.NewRequest("DELETE", api.URL+sample.path, strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != sample.want {
+			t.Fatal("DeleteCollection boundary failed", response.StatusCode)
+		}
+	}
+}
+
 func TestHoldPreventsRequestUntilExplicitReleaseAndPreservesGlobalReconnectGuard(t *testing.T) {
 	var calls atomic.Int32
 	s, api, journal := fixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(200) }))

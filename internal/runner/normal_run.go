@@ -325,6 +325,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 	prefix := fmt.Sprintf("step-%02d", e.phase)
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
 	switch p.Action {
+	case "retry-api-error":
+		return e.retryAPIError(ctx, p, prefix)
 	case "resume-after-grace":
 		if err := e.locked(func() error { return e.l.Transition(e.l.Model.Spec, p.Name, p.Expect, e.o.objects) }); err != nil {
 			return err

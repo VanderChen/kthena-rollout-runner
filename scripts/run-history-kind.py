@@ -4,7 +4,7 @@
 """Run a production history/boundary batch on verified R6 with immutable build evidence.
 Usage: run-history-kind.py MANIFEST BUILD_JSON BINARY
 """
-import base64,calendar,copy,datetime,hashlib,json,pathlib,subprocess,sys,time,traceback,urllib.request
+import base64,calendar,copy,datetime,hashlib,json,os,pathlib,subprocess,sys,time,traceback,urllib.request
 
 root=pathlib.Path(__file__).resolve().parents[1]
 manifest=root/sys.argv[1]
@@ -13,6 +13,7 @@ args=jobRequest['spec']['template']['spec']['containers'][0]['args']
 runid=next(a.split('=',1)[1] for a in args if a.startswith('--run-id='))
 selected=next(a.split('=',1)[1].split(',') for a in args if a.startswith('--select='))
 jobname=jobRequest['metadata']['name']
+proxyPod=os.environ.get('RUNNER_PROXY_POD','recovery-proxy-022-r6')
 out=root/'artifacts/environment-022'/(runid+'-control');out.mkdir()
 target=root/'artifacts'/runid
 assert not target.exists()
@@ -81,7 +82,7 @@ try:
     assert mounted==kc, 'actual mounted kubeconfig does not match this run proxy'
     save('mounted-proxy-config.json',{'controllerUID':controller['metadata']['uid'],'configMapUID':config['metadata']['uid'],'configMapName':cmname,'server':mounted['clusters'][0]['cluster']['server'],'sha256':hashlib.sha256(json.dumps(mounted,sort_keys=True).encode()).hexdigest()})
     def actualStartupRequests():
-        startupTrace=run(['-n','rollout-runner','exec','recovery-proxy-022-r6','--','tail','-n','20000','/evidence/trace.jsonl'])
+        startupTrace=run(['-n','rollout-runner','exec',proxyPod,'--','tail','-n','20000','/evidence/trace.jsonl'])
         assert token.encode() not in startupTrace and b'Bearer ' not in startupTrace
         startupRequests=[json.loads(line) for line in startupTrace.splitlines() if line]
         return [row for row in startupRequests if row.get('action')=='request' and nanos(row['at'])>=nanos(controller['status']['startTime']) and row.get('resource')=='modelservings']
@@ -139,7 +140,7 @@ try:
     assert rp['status']['containerStatuses'][0]['imageID']==build['imageID'] and rp['status']['containerStatuses'][0]['restartCount']==0
     summary=json.loads((target/'summary.json').read_text())
     assert summary['selected']==len(selected) and [r['id'] for r in summary['results']]==selected
-    trace=run(['-n','rollout-runner','exec','recovery-proxy-022-r6','--','cat','/evidence/trace.jsonl'])
+    trace=run(['-n','rollout-runner','exec',proxyPod,'--','cat','/evidence/trace.jsonl'])
     assert token.encode() not in trace and b'Bearer ' not in trace
     with (out/'proxy-trace.jsonl').open('xb') as f:f.write(trace)
     proxyState=state();save('proxy-after.json',proxyState)

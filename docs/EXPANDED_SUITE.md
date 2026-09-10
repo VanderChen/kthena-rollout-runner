@@ -29,11 +29,13 @@
 
 ## 本轮 Kind 编排
 
-`scripts/run-history-kind.py MANIFEST BUILD_JSON BINARY` 是本轮环境专用的串行批次编排器，固定了 kubeconfig、已部署的 R6 代理、证书文件、原控制器 spec 和 9 个历史 ModelServing UID；不是任意新集群的初始化工具。专用 Dockerfile、二进制 SHA256、镜像 ID 和构建记录位于 `artifacts/environment-022/`。
+`scripts/run-history-kind.py MANIFEST BUILD_JSON BINARY` 是本轮环境专用的串行批次编排器，固定了 kubeconfig、原控制器 spec 和 9 个历史 ModelServing UID；不是任意新集群的初始化工具。默认使用已验证的 R6 代理，可通过 `RUNNER_PROXY_POD`、`RUNNER_PROXY_CONTROL_URL`、`RUNNER_PROXY_CA_FILE` 指定经过组件验证的独立代理实例；控制器连接地址取自 manifest 的 `--fault-proxy-api`。专用 Dockerfile、二进制 SHA256、镜像 ID 和构建记录位于 `artifacts/environment-022/`。
 
 编排器先核对原环境，建立每批独立且不可变的代理 ConfigMap，验证控制器实际挂载内容和代理原生启动请求，再创建唯一用例 Job。结束后收集原始输出和请求 trace，恢复原完整控制器 spec，核对全部历史 UID 和代理状态。只有前一批完成收集及恢复后才能开始下一批；不能并发修改共享控制器。
 
 代理规则限定用例 namespace、资源、操作和实际对象身份。HTTP 503、Watch 重放、丢弃或暂停分别记录实际命中。原生 API 409 与代理合成错误须明确区分；没有命中的注入不算故障覆盖。源状态准备可对有限已知对象做带 UID 前置条件的操作；明确测试边界之后，不得使用准备清理替代被测控制器恢复。
+
+等价历史冲突使用 R7 的 `omit-list-object`：在有界期间只从指定 namespace、selector、无分页 ControllerRevision List 中隐藏精确 name/UID/controller-owner 的对象，保留其他对象和集合元数据。它不修改存储对象、按名 GET 或 runner 的直接 Watch。随后一次 GET404 打开实际创建竞态，暂停的 POST 必须转发给真实 API 并得到原生 AlreadyExists；缺少任一命中均无冲突覆盖。`scripts/check-list-omission-kind.py` 验证代理本身，不计目录用例。
 
 ## 判定与报告
 
@@ -42,6 +44,8 @@
 原始 `result.json`、连续 List/Watch、真实请求与响应、Pod/CR UID、版本及时间窗口由 `scripts/audit-*.py` 独立复核。超预算、错误删除次序或实际不收敛都保留为产品失败；runner 注入或判定问题允许修正后在新的 attempt 补充验证。已确认的有效产品失败不通过重跑覆盖。复合用例在早期失败时，未执行的后续重启、恢复或稳定阶段没有覆盖信用。
 
 第一、二类最终报告分别位于 `artifacts/category1-final-verification/`、`artifacts/category2-final-verification/`。第二类汇总由 `cases/category2-verification-manifest.json` 固定独立审计 SHA256，`scripts/summarize-category2.py` 检查全部唯一 ID，保留早期 runner 与源准备发现，拒绝缺项、待复核结果及重复有效结论。第三类尚无完成报告。
+
+第三类使用 `cases/category3-verification-manifest.json` 与 `scripts/summarize-category3.py`，额外核对不可变构建、实际镜像/二进制和完整环境恢复。三个分类报告均完成后，`scripts/summarize-expanded-suite.py` 才可输出 `artifacts/expanded-suite-final-verification/`；它要求 708 个唯一结论、统一 production 基线和最终环境核对，不把未命中或 runner 中止算成 PASS/产品 FAIL。
 
 失败独立保存于 issues 任务 022 的 `FAILURES_CATEGORY_1.md`、`FAILURES_CATEGORY_2.md`、`FAILURES_CATEGORY_3.md`。各项报告中的 limitation 说明实际覆盖范围；有界超时证明观测窗口内未收敛，不自动证明永久泄漏或唯一内部根因。
 

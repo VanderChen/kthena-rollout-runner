@@ -43,6 +43,11 @@
       "run": "boundary-sparse-r1",
       "audit": "independent-sparse-boundary-audit-r2/summary.json",
       "sha256": "4418edd93226fc35217fe958fa9ffec60f056fcee82d1fd6f0f4e8b7a923fc8a"
+    },
+    {
+      "run": "rejection-smoke-r2",
+      "audit": "independent-rejection-audit/summary.json",
+      "sha256": "7fe268b35035d4505b82c4d6f37f71487f51bc0aaf20d9626a2568a1abeeddc9"
     }
   ]
 }

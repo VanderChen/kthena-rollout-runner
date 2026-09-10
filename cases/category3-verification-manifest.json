@@ -63,6 +63,11 @@
       "run": "boundary-completion-r3",
       "audit": "independent-completion-boundary-audit/summary.json",
       "sha256": "59f3821bb30059a659082a721b9c50be32411d94d1a034593dcb5f140b559f55"
+    },
+    {
+      "run": "boundary-identity-r3",
+      "audit": "independent-identity-boundary-audit/summary.json",
+      "sha256": "760a287a06da523cc22e3f413f58e68a1a91e5fb9463ac1ff5231c5fbdf914b6"
     }
   ]
 }

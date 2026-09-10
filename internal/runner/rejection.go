@@ -30,7 +30,13 @@ func admissionRejection(err error) bool {
 	s := status.Status()
 	switch s.Code {
 	case 400, 422:
-		return s.Reason == metav1.StatusReasonBadRequest || s.Reason == metav1.StatusReasonInvalid
+		if s.Reason == metav1.StatusReasonBadRequest || s.Reason == metav1.StatusReasonInvalid {
+			return true
+		}
+		// AdmissionResponse.Result may omit Reason while its native API Status
+		// still explicitly records a webhook denial. Keep transport/RBAC errors
+		// inconclusive and require the actual denial envelope in this case.
+		return s.Reason == "" && s.Status == metav1.StatusFailure && strings.HasPrefix(s.Message, "admission webhook \"") && strings.Contains(s.Message, "\" denied the request:")
 	case 403:
 		return strings.Contains(s.Message, "admission webhook") && strings.Contains(s.Message, "denied")
 	}

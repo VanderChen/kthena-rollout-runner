@@ -90,6 +90,9 @@ func TestAdmissionRejectDoesNotAcceptConflictTransportOrRBAC(t *testing.T) {
 		want bool
 	}{
 		{apierrors.NewBadRequest("invalid type"), true},
+		{&apierrors.StatusError{ErrStatus: metav1.Status{Code: 400, Status: metav1.StatusFailure, Message: `admission webhook "validate-modelserving" denied the request: invalid budget`}}, true},
+		{&apierrors.StatusError{ErrStatus: metav1.Status{Code: 400, Message: "error calling admission webhook: connection reset"}}, false},
+		{&apierrors.StatusError{ErrStatus: metav1.Status{Code: 400, Status: metav1.StatusFailure, Reason: metav1.StatusReasonTimeout, Message: `admission webhook "validate-modelserving" denied the request: timeout`}}, false},
 		{&apierrors.StatusError{ErrStatus: metav1.Status{Code: 422, Reason: metav1.StatusReasonInvalid}}, true},
 		{apierrors.NewForbidden(resource, "model", errors.New("RBAC cannot update")), false},
 		{apierrors.NewForbidden(resource, "model", errors.New("admission webhook test denied the request")), true},

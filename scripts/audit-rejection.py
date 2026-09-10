@@ -72,16 +72,24 @@ def audit_case(p):
         file,receipt=accepted[0];actual=m.yaml(p/(file.name.removesuffix('-receipt.json')+'-unexpected-accepted.yaml'))
         assert actual['metadata']['uid']==owner
         return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'ADMISSION_UNEXPECTED_ACCEPT','watchRows':len(rows),'actualAcceptedRequest':receipt,'storedResponseGeneration':actual['metadata']['generation'],'source':source,'limitation':'Actual request required to be rejected was accepted by the API. Later continuation and immutable UID window were not verified; no source changes and no product rerun.'}
+    if result['status']=='INCONCLUSIVE' and 'request did not reach a conclusive admission rejection' in result.get('error',''):
+        receipt=receipts[-1][1];status=receipt['status'];message=status.get('message','')
+        assert not receipt['accepted'] and status['code'] in (400,422) and status['status']=='Failure' and not status.get('reason')
+        assert message.startswith('admission webhook "') and '" denied the request:' in message
+        assert all(r['status']['code']==409 for _,r in receipts[:-1])
+        final=m.yaml(p/'final-resources.yaml');actual=next(o for o in final['modelservings'].values() if o['metadata']['uid']==owner)
+        assert actual['metadata']['generation']==generation and actual['spec']==spec
+        return {'id':case['id'],'classification':'RUNNER_ORACLE','failure':'EXPLICIT_NATIVE_WEBHOOK_DENIAL_WITHOUT_REASON_MISCLASSIFIED','watchRows':len(rows),'actualAdmissionStatus':status,'requestReceipt':receipt,'limitation':'The native API explicitly rejected the request, but runner incorrectly required a reason field and stopped. Frozen accepted spec is unchanged. Required post-rejection stable window and in-flight continuation did not execute; zero valid catalogue verdict credit pending a corrected supplement.'}
     assert result['status']=='PASS' and not result.get('violations')
     proof=m.read(p/(prefix+'-rejection.json'));status=proof['status']
     assert not receipts[-1][1]['accepted'] and status==receipts[-1][1]['status']
     assert status['code'] in (400,403,422)
     if status['code']==403:assert 'admission webhook' in status['message'] and 'denied' in status['message']
-    else:assert status['reason'] in ('BadRequest','Invalid')
+    else:assert status.get('reason') in ('BadRequest','Invalid') or (status.get('status')=='Failure' and not status.get('reason') and status.get('message','').startswith('admission webhook "') and '" denied the request:' in status['message'])
     assert all(r['status']['code']==409 for _,r in receipts[:-1])
     assert proof['attemptPrefix']==receipts[-1][0].name.removesuffix('-receipt.json')
     after=m.yaml(p/(proof['attemptPrefix']+'-after.yaml'));assert after['metadata']['uid']==owner and after['metadata']['generation']==generation and after['spec']==spec
-    snapshots=[m.read(f) for f in p.glob('rejection-state-*.json')];assert len(snapshots)>=30
+    snapshots=[m.read(f) for f in sorted(p.glob('rejection-state-*.json'))];assert len(snapshots)>=2
     for sample in snapshots:
         o=sample['object'];assert o['metadata']['uid']==owner and o['metadata']['generation']==generation and o['spec']==spec
     trigger=m.yaml(p/(proof['attemptPrefix']+'-trigger-pods.yaml'))['items'];trigger={o['metadata']['uid']:o for o in trigger if m.owned(o,owner)}
@@ -92,6 +100,9 @@ def audit_case(p):
     if not active:assert all(m.ready(o) for o in trigger.values())
     cps=[m.read(f) for f in p.glob('checkpoint-*.json')];held=next(c for c in cps if c['phase']==step['name']);finalcp=next(c for c in cps if c['phase']==case['scenario']['steps'][-1]['name'])
     assert held['elapsedStableNanos']>=(10 if active else 30)*1_000_000_000 and finalcp['elapsedStableNanos']>=30_000_000_000
+    probe_times=[m.ts(sample['at']) for sample in snapshots]
+    assert probe_times[0]<=m.ts(held['stableSince']) and probe_times[-1]>=m.ts(finalcp['completed'])-2_000_000_000
+    assert all(0<b-a<=2_000_000_000 for a,b in zip(probe_times,probe_times[1:])), 'native rejection probes contain an unreviewed timing gap'
     assert m.ts(proof['received'])<m.ts(held['stableSince'])
     for sample in [held['stableSince'],held['completed']]:
         state=m.replay(rows,sample);pods=m.mine(state,'pods',owner)

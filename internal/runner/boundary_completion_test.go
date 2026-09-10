@@ -5,6 +5,8 @@ package runner
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"path/filepath"
 	"testing"
@@ -88,4 +90,50 @@ func TestSparseCompletionRejectsStaleOrStillUpdatingStatus(t *testing.T) {
 			t.Fatal("still updating counted complete")
 		}
 	}
+}
+
+func TestCompletionSourceRetainsActualOldHistoryButRejectsUnknownTemplate(t *testing.T) {
+	cases, err := LoadCases(filepath.Join("..", "..", "cases", "boundary-completion"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cases[0]
+	prior, err := newNormalLedger(c.Scenario.InitialSpec, "owner", "controlled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := readModel(c.Scenario.Steps[0].Spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior.Committed["old-commitment"] = true
+	fresh, err := completionSourceLedger(target, prior)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fresh.Committed) != 0 {
+		t.Fatal("preparation commitments retained")
+	}
+	for i, spec := range []map[string]interface{}{c.Scenario.InitialSpec, c.Scenario.Steps[0].Spec} {
+		cr := &unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "history"}, "data": map[string]interface{}{"data": listValue(mapValue(spec, "template"), "roles")}}}
+		cr.SetUID(types.UID([]string{"A", "B"}[i]))
+		cr.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+		fresh.After("controllerrevisions", "LIST", cr, Objects{})
+		if fresh.error() != nil {
+			t.Fatal("actual accepted history lost", fresh.error())
+		}
+	}
+	unknown := cloneMap(c.Scenario.Steps[0].Spec)
+	role := listValue(mapValue(unknown, "template"), "roles")[0].(map[string]interface{})
+	container := listValue(mapValue(mapValue(role, "entryTemplate"), "spec"), "containers")[0].(map[string]interface{})
+	for _, raw := range listValue(container, "env") {
+		env := raw.(map[string]interface{})
+		if textValue(env, "name") == "ROLLOUT_VERSION" {
+			env["value"] = "C"
+		}
+	}
+	cr := &unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "unknown", "uid": "unknown"}, "data": map[string]interface{}{"data": listValue(mapValue(unknown, "template"), "roles")}}}
+	cr.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+	fresh.After("controllerrevisions", "LIST", cr, Objects{})
+	requireNormalViolation(t, fresh, "UNEXPECTED_HISTORY_TEMPLATE")
 }

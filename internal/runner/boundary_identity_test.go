@@ -6,6 +6,7 @@ package runner
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"path/filepath"
@@ -22,6 +23,24 @@ func TestIdentityBoundaryCannotSkipActualOldOwnerResidue(t *testing.T) {
 	c.Scenario.Steps[0].Action = "update"
 	if c.Validate() == nil {
 		t.Fatal("ordinary rollout substituted for identity boundary")
+	}
+}
+
+func TestIdentitySourceLeavesNamespaceInfrastructureOutsideOldOwner(t *testing.T) {
+	rootCA := corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "kube-root-ca.crt"}}
+	if identityPluginSiblingsRemain([]corev1.ConfigMap{rootCA}, nil, "old") {
+		t.Fatal("unowned namespace CA blocks new identity source")
+	}
+	oldCM := rootCA.DeepCopy()
+	oldCM.Name = "old-ranktable"
+	oldCM.OwnerReferences = []metav1.OwnerReference{{UID: "old"}}
+	if !identityPluginSiblingsRemain([]corev1.ConfigMap{rootCA, *oldCM}, nil, "old") {
+		t.Fatal("old ranktable cleanup not verified")
+	}
+	pg := unstructured.Unstructured{}
+	pg.SetOwnerReferences([]metav1.OwnerReference{{UID: "old"}})
+	if !identityPluginSiblingsRemain([]corev1.ConfigMap{rootCA}, []unstructured.Unstructured{pg}, "old") {
+		t.Fatal("old PodGroup cleanup not verified")
 	}
 }
 

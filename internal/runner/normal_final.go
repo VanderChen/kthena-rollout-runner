@@ -286,7 +286,14 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 			updatedGroups++
 		}
 	}
-	if updated != int64(updatedGroups) {
+	// A template change confined to a zero-sized dimension is a preload, not
+	// an instantiated rollout. Existing unchanged groups may retain their old
+	// revision accounting until expansion; their real capacity and both history
+	// references are still checked. Do not apply this to active changes, a
+	// promoted current revision, missing source history, or an identical spec.
+	previous, knownPrevious := l.RevisionLayouts[current]
+	preloadOnly := current != target && knownPrevious && !sameTemplates(previous, l.Model) && !activeTemplateChange(l, current)
+	if updated != int64(updatedGroups) && !(preloadOnly && updated >= 0 && updated <= int64(updatedGroups)) {
 		return false, "updatedReplicas not converged"
 	}
 	revisions := map[string]bool{}

@@ -100,7 +100,7 @@ func TestZeroRoleDoesNotRequirePhantomRoleButActiveRoleMustRemain(t *testing.T) 
 	current := objectForSpec("test", c.ID, spec)
 	current.SetUID("owner")
 	current.SetGeneration(2)
-	current.Object["status"] = map[string]interface{}{"observedGeneration": int64(2), "replicas": int64(1), "availableReplicas": int64(1), "updatedReplicas": int64(1), "currentRevision": "fixture-A", "updateRevision": "B"}
+	current.Object["status"] = map[string]interface{}{"observedGeneration": int64(2), "replicas": int64(1), "availableReplicas": int64(1), "updatedReplicas": int64(0), "currentRevision": "fixture-A", "updateRevision": "B"}
 	objects := Objects{"pods": {}, "configmaps": {}, "services": {}, "podgroups": {}, "modelservings": {"owner": current}, "controllerrevisions": {}}
 	for _, version := range []string{"fixture-A", "B"} {
 		cr := &unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "model-" + version}}}
@@ -120,6 +120,22 @@ func TestZeroRoleDoesNotRequirePhantomRoleButActiveRoleMustRemain(t *testing.T) 
 	if ok, why := e.settled(ScenarioExpectation{}); !ok {
 		t.Fatal(why)
 	}
+	status := current.Object["status"].(map[string]interface{})
+	status["updatedReplicas"] = int64(2)
+	if ok, _ := e.settled(ScenarioExpectation{}); ok {
+		t.Fatal("preload accepted phantom updated capacity")
+	}
+	status["updatedReplicas"] = int64(0)
+	status["currentRevision"] = "B"
+	if ok, _ := e.settled(ScenarioExpectation{}); ok {
+		t.Fatal("promoted revision bypassed actual updated group accounting")
+	}
+	status["currentRevision"] = "fixture-A"
+	l.RevisionLayouts["B"] = initial
+	if ok, _ := e.settled(ScenarioExpectation{}); ok {
+		t.Fatal("zero-sized preload accepted wrong target history")
+	}
+	l.RevisionLayouts["B"] = l.Model
 	for uid := range objects["pods"] {
 		delete(objects["pods"], uid)
 		break

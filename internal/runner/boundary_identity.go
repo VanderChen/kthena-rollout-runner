@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -99,7 +100,7 @@ func (e *normalExecution) identityBoundary(ctx context.Context, p ScenarioStep, 
 			if cmerr != nil {
 				return cmerr
 			}
-			if len(pg.Items) == 0 && len(cms.Items) == 0 {
+			if !identityPluginSiblingsRemain(cms.Items, pg.Items, oldOwner) {
 				break
 			}
 		} else if err != nil {
@@ -270,6 +271,22 @@ func (e *normalExecution) identityBoundary(ctx context.Context, p ScenarioStep, 
 		return err
 	}
 	return e.finishStep(ctx, p, prefix+"-final")
+}
+
+// Namespace infrastructure, such as kube-root-ca.crt, is not an old owner's
+// plugin sibling and must remain outside the source preparation cleanup scope.
+func identityPluginSiblingsRemain(cms []corev1.ConfigMap, pgs []unstructured.Unstructured, owner string) bool {
+	for i := range cms {
+		if ownedConfigMap(&cms[i], owner) {
+			return true
+		}
+	}
+	for i := range pgs {
+		if objectOwned(&pgs[i], owner) {
+			return true
+		}
+	}
+	return false
 }
 
 func identityCapacity(ms map[string]interface{}, pods []corev1.Pod, newOwner, oldOwner string, oldPods map[string]types.UID) error {

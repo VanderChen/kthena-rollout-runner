@@ -273,7 +273,7 @@ func (e *normalExecution) sparseCompletionBoundary(ctx context.Context, p Scenar
 	guard := p.Expect
 	guard.RequireCompleted = false
 	if err = e.locked(func() error {
-		fresh, err := newNormalLedger(model.Spec, e.l.Owner, e.l.Profile)
+		fresh, err := completionSourceLedger(model, e.l)
 		if err != nil {
 			return err
 		}
@@ -366,6 +366,18 @@ func (e *normalExecution) sparseCompletionBoundary(ctx context.Context, p Scenar
 		return err
 	}
 	return e.finishStep(ctx, p, prefix+"-final")
+}
+
+func completionSourceLedger(model NormalModel, prior *NormalLedger) (*NormalLedger, error) {
+	fresh, err := newNormalLedger(model.Spec, prior.Owner, prior.Profile)
+	if err != nil {
+		return nil, err
+	}
+	// The source resets Pod commitments, not the real A/B template history.
+	// Old current A must remain readable for the subsequent status boundary.
+	fresh.History = append([]NormalModel{}, prior.History...)
+	fresh.History = append(fresh.History, model)
+	return fresh, nil
 }
 
 func (e *normalExecution) probeCompletionStatus(ctx context.Context) error {

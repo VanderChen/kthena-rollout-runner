@@ -123,17 +123,9 @@ func (e *normalExecution) equalHistoryCollision(ctx context.Context, p ScenarioS
 	if err = e.step(ctx, submit); err != nil {
 		return err
 	}
-	if err = e.waitFaultState(ctx, prefix+"-native-post-held", installedIDs, func(state faultproxy.State) bool {
-		read, post := false, false
-		for _, r := range state.Rules {
-			if r.ID == readID {
-				read = r.Hits == 1 && !r.Active
-			}
-			if r.ID == postID {
-				post = r.Hits > 0 && r.Released == 0
-			}
-		}
-		return read && post
+	// The single stale read must exhaust; only the POST pause must stay active.
+	if err = e.waitFaultState(ctx, prefix+"-native-post-held", []string{postID}, func(state faultproxy.State) bool {
+		return equivalentCollisionHeld(state, readID, postID)
 	}); err != nil {
 		return err
 	}
@@ -169,4 +161,17 @@ func (e *normalExecution) equalHistoryCollision(ctx context.Context, p ScenarioS
 		return fmt.Errorf("HISTORY_COLLISION_OVERWRITTEN: equivalent source history replaced or mutated")
 	}
 	return saveYAML(filepath.Join(e.dir, prefix+"-equivalent-retained.yaml"), actual)
+}
+
+func equivalentCollisionHeld(state faultproxy.State, readID, postID string) bool {
+	read, post := false, false
+	for _, r := range state.Rules {
+		if r.ID == readID {
+			read = r.Mode == "error" && r.StatusCode == 404 && r.Count == 1 && r.Hits == 1 && !r.Active && r.EndReason == "count-exhausted"
+		}
+		if r.ID == postID {
+			post = r.Mode == "hold" && r.Active && r.Hits > 0 && r.Released == 0
+		}
+	}
+	return read && post
 }

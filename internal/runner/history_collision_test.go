@@ -110,3 +110,31 @@ func TestEquivalentHistoryCollisionCannotSkipNativeRaceOrAllowNewHistory(t *test
 		t.Fatal("B recovery prohibited by an invalid unchanged-UID guard")
 	}
 }
+
+func TestEquivalentCollisionRequiresOneConsumedReadAndLivePostHold(t *testing.T) {
+	state := faultproxy.State{Rules: []faultproxy.RuleStatus{
+		{Rule: faultproxy.Rule{ID: "read", Mode: "error", StatusCode: 404, Count: 1}, Hits: 1, EndReason: "count-exhausted"},
+		{Rule: faultproxy.Rule{ID: "post", Mode: "hold"}, Active: true, Hits: 1},
+	}}
+	if !equivalentCollisionHeld(state, "read", "post") {
+		t.Fatal("expected consumed single read followed by a held real POST")
+	}
+	for _, failure := range []string{"expired-read", "unhit-read", "extra-read", "released-post", "expired-post"} {
+		changed := faultproxy.State{Rules: append([]faultproxy.RuleStatus{}, state.Rules...)}
+		switch failure {
+		case "expired-read":
+			changed.Rules[0].EndReason = "expired"
+		case "unhit-read":
+			changed.Rules[0].Hits = 0
+		case "extra-read":
+			changed.Rules[0].Hits = 2
+		case "released-post":
+			changed.Rules[1].Released = 1
+		case "expired-post":
+			changed.Rules[1].Active = false
+		}
+		if equivalentCollisionHeld(changed, "read", "post") {
+			t.Fatal("accepted", failure)
+		}
+	}
+}

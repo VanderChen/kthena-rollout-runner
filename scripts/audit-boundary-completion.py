@@ -25,6 +25,13 @@ def audit_case(p,trace):
                     if env['name']=='ROLLOUT_VERSION':env['value']='B'
     assert expected_b==b3['spec'] and m.yaml(sorted(q.glob('restore-original-budget-B2-write-*-request.yaml'))[-1])['spec']==case['scenario']['steps'][0]['spec']
     six={o['metadata']['uid']:o for o in m.yaml(q/'six-B-pods.yaml')['items'] if m.owned(o,owner)};assert len(six)==6 and all(m.ready(o) and m.version(o)=='B' for o in six.values())
+    if result['status']=='FAIL' and 'UNEXPECTED_HISTORY_TEMPLATE: model-'+old_status['currentRevision'] in result.get('error','') and not (p/'step-01-source-boundary.json').exists():
+        baseline=m.yaml(p/'baseline-resources.yaml');old=next(o for o in m.mine(baseline,'controllerrevisions',owner).values() if o['metadata']['name']=='model-'+old_status['currentRevision'])
+        final=m.yaml(p/'final-resources.yaml');histories=m.mine(final,'controllerrevisions',owner);assert old['metadata']['uid'] in histories and histories[old['metadata']['uid']]['data']==old['data']
+        pods=m.mine(final,'pods',owner);assert len(pods)==4 and set(pods)<=set(six) and all(m.ready(o) and m.version(o)=='B' for o in pods.values())
+        assert {(o['metadata']['labels'][m.R],int(o['metadata']['labels'][m.I].rsplit('-',1)[1])) for o in pods.values()}=={('frontend',1),('frontend',2),('backend',1),('backend',2)}
+        assert not list(p.glob('step-01-old-current-*-receipt.json'))
+        return {'id':case['id'],'classification':'RUNNER_ORACLE','failure':'FRESH_SOURCE_LEDGER_DROPPED_ACTUAL_ACCEPTED_A_HISTORY','watchRows':len(rows),'oldHistoryUID':old['metadata']['uid'],'actualB12UIDs':list(pods),'limitation':'Real B12 source capacity was prepared and the original owned A history remained unchanged. Resetting the runner ledger forgot that known A template and rejected it before the old-status write/source boundary. Automatic completion and final restart did not execute; zero catalogue verdict credit pending corrected supplement.'}
     boundary=m.read(p/'step-01-source-boundary.json');kept=boundary['retainedUIDs'];removed=boundary['removedPreparationUIDs'];assert len(kept)==4 and len(removed)==2 and set(kept.values())|set(removed.values())==set(six)
     ordinal=lambda o:int(o['metadata']['labels'][m.I].rsplit('-',1)[1])
     assert all(ordinal(six[u])==0 for u in removed.values())

@@ -15,9 +15,19 @@ h=importlib.util.module_from_spec(loader);loader.loader.exec_module(h);m=h.m
 
 def audit_case(p,trace):
     result=m.read(p/'result.json');case=m.yaml(p/'case.yaml');source=case['scenario']['source']
-    assert result['status']=='PASS' and case['id']==source['id']=='RUN-610' and not result.get('violations')
+    assert case['id']==source['id']=='RUN-610'
     raw=(ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json').read_bytes()
     assert hashlib.sha256(raw).hexdigest()=='757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5' and source==next(r for r in json.loads(raw)['cases'] if r['id']==case['id'])
+    if result['status']=='INCONCLUSIVE' and 'equal-stale-read (count-exhausted)' in result.get('error',''):
+        pre=m.yaml(p/'step-01-equivalent-precreated-server.yaml');admitted=m.yaml(p/'step-01-B-dry-run-admitted.yaml');initial=m.yaml(p/'before-server.yaml');owner=initial['metadata']['uid']
+        assert m.owned(pre,owner) and pre['data']['data']==admitted['spec']['template']['roles']
+        rule=m.read(p/'step-01-collision-rule-1.json');assert rule['methods']==['GET'] and rule['statusCode']==404 and rule['count']==1 and rule['name']==pre['metadata']['name']
+        hits=[r for r in trace if r.get('ruleID')==rule['id'] and r['action']=='error-request'];assert len(hits)==1 and hits[0]['status']==404
+        state=m.read(p/'fault-proxy-final.json');post=next(r for r in state['rules'] if r['id'].endswith('-equal-post') and result['namespace'].endswith(r['namespace']))
+        assert post['hits']==0 and not (p/'step-01-native-already-exists.json').exists()
+        rows=[json.loads(s) for s in open(p/'observations.jsonl')];assert [r['sequence'] for r in rows]==list(range(1,len(rows)+1)) and not any(r['event']=='GAP' for r in rows)
+        return {'id':case['id'],'classification':'RUNNER_ORACLE','failure':'EXPECTED_SINGLE_READ_EXHAUSTION_REJECTED_BY_PAUSE_GUARD','watchRows':len(rows),'singleInjectedRead':hits[0],'precreatedOwnedHistoryUID':pre['metadata']['uid'],'limitation':'Exactly one intentional GET404 was consumed against the real equivalent owned history. Generic pause guard incorrectly required this count1 rule to stay active. The native POST collision was not reached (0 held POST); automatic reuse/stable convergence receives zero credit pending a corrected supplement.'}
+    assert result['status']=='PASS' and not result.get('violations')
     original=m.yaml(p/'before-server.yaml');owner=original['metadata']['uid'];base=m.mine(m.yaml(p/'baseline-resources.yaml'),'pods',owner)
     assert len(base)==6 and all(m.ready(o) and m.version(o)=='A' for o in base.values())
     pre=m.yaml(p/'step-01-equivalent-precreated-server.yaml');retained=m.yaml(p/'step-01-equivalent-retained.yaml');name=pre['metadata']['name'];cruid=pre['metadata']['uid']

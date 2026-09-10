@@ -105,6 +105,19 @@ def audit_case(p):
         return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_NUMERIC_BUDGET','watchRows':len(rows),'firstViolation':violations[0],'healthyDeletionChecks':deletions,'limitation':'Actual accepted numerical boundary followed by independently reconstructed unhealthy capacity loss. Later final convergence is not credited.'}
     if result['status']=='FAIL' and 'STABILITY_VIOLATION: settled predicate regressed: unexpected ConfigMap' in result.get('error',''):
         return plugin_regression(p,rows,owner,baseline,stages[-1],deletions)
+    if result['status']=='FAIL' and 'zero-dimension-preload-B-history (updatedReplicas not converged)' in result.get('error',''):
+        assert n in (568,569,572) and len(stages)==1 and not deletions
+        final=m.yaml(p/'final-resources.yaml');pods=m.mine(final,'pods',owner);spec=stages[0]['server']['spec']
+        assert next(r for r in spec['template']['roles'] if r['name']=='frontend')['replicas']==0 and set(pods)==set(baseline) and len(pods)==3
+        assert all(m.ready(o) and m.version(o)=='A' and o['metadata']['labels'][m.R]=='backend' for o in pods.values());h.plugins(final,owner,spec)
+        ms=next(o for o in final['modelservings'].values() if o['metadata']['uid']==owner);status=ms['status'];assert status['observedGeneration']==2 and status['replicas']==status['availableReplicas']==1 and status.get('updatedReplicas',0)==0
+        histories=m.mine(final,'controllerrevisions',owner);assert len(histories)==2
+        target=next(o for o in histories.values() if o['metadata']['name']=='model-'+status['updateRevision']);assert target['metadata']['name']!='model-'+status['currentRevision']
+        requested={r['name']:r for r in spec['template']['roles']}
+        for role in target['data']['data']:
+            for key in ('entryTemplate','workerTemplate'):assert role.get(key)==requested[role['name']].get(key)
+        assert all(r['object']['metadata']['uid'] in baseline for r in rows if r['kind']=='pods' and m.ts(r['received'])>=stages[0]['sent'])
+        return {'id':case['id'],'classification':'RUNNER_ORACLE','failure':'INACTIVE_TEMPLATE_PRELOAD_REQUIRES_INSTANTIATED_UPDATED_GROUP','watchRows':len(rows),'targetHistoryUID':target['metadata']['uid'],'unchangedBackendUIDs':list(pods),'actualStatus':status,'limitation':'Only frontend R0 changes template; actual backend3 Ready and readable target B history satisfy preload semantics. Runner incorrectly required existing groups to be counted as an instantiated target rollout. Required successful checkpoint and RUN569 later expansion did not execute; zero valid case credit pending corrected supplement.'}
     assert result['status']=='PASS' and not result.get('violations') and len(stages)==len(case['scenario']['steps'])
     reports=[]
     for stage in stages:

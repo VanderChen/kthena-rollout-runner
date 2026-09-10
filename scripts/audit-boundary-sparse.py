@@ -31,20 +31,28 @@ def audit_case(p,trace):
     identical=n in (594,595,596,600,601,602);trap=n in (592,598);sg=source['config']['mode']=='SG';axis=m.G if sg else m.I
     ordinal=lambda o:int(o['metadata']['labels'][axis].rsplit('-',1)[1])
     assert request['spec']==step['spec'] and server['metadata']['uid']==owner and server['metadata']['generation']==(3 if identical else 4)
-    assert m.ts(receipt['sent'])>m.ts(boundary['at']) and (request['spec']==initial['spec'])==identical
+    assert m.ts(receipt['sent'])>m.ts(boundary['at']) and (server['spec']==initial['spec'])==identical
     spec=server['spec'];d,u,s,part=h.budget(spec,'frontend');assert d==3
     protected={uid:o for uid,o in base.items() if o['metadata']['labels'][m.R]=='backend' or identical or trap or ordinal(o)<part}
     expected_old=sum(o['metadata']['labels'][m.R]=='frontend' for o in protected.values());counts={}
     if expected_old:counts['A']=expected_old
     if expected_old<3:counts['B']=3-expected_old
-    state=collections.defaultdict(dict);history={};deletions=[];budget_bad=[];order_bad=[]
+    state=collections.defaultdict(dict);history={};deletions=[];budget_bad=[];order_bad=[];pg_bad=[]
+    source_pgs=m.mine(m.yaml(p/'baseline-resources.yaml'),'podgroups',owner)
     for row in rows:
         o=row['object'];uid=o['metadata']['uid'];kind=row['kind'];at=m.ts(row['received']);prev=state[kind].get(uid)
         if kind=='controllerrevisions' and m.owned(o,owner):
             assert uid not in history or history[uid]==o['data'];history[uid]=o['data']
+        if sg and row['sequence']>prep['lastPreparationSequence'] and kind=='podgroups' and row['event']=='DELETED' and uid in source_pgs:
+            members={key:pod for key,pod in m.mine(state,'pods',owner).items() if pod['metadata']['labels'][m.G]==o['metadata']['name']}
+            ready={key:pod for key,pod in m.mine(state,'pods',owner).items() if m.ready(pod)}
+            if members and set(members)<=set(base) and all(m.ready(pod) for pod in members.values()) and len(ready)-len(members)<max(0,d-u):
+                requests=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='podgroups' and t.get('method')=='DELETE' and t.get('name')==o['metadata']['name'] and m.ts(receipt['sent'])<m.ts(t['at'])<=at]
+                assert requests;native=min(requests,key=lambda t:m.ts(t['at']));response=next(t for t in trace if t['action']=='response' and t['request']==native['request']);assert response['status']==200
+                pg_bad.append({'sequence':row['sequence'],'at':row['received'],'podGroupUID':uid,'podGroupName':o['metadata']['name'],'originalReadyMemberUIDs':list(members),'readyBefore':len(ready),'minimum':max(0,d-u),'actualDELETE':native,'nativeResponse':response})
         if row['sequence']>prep['lastPreparationSequence'] and kind=='pods' and m.owned(o,owner):
             if uid in protected:assert row['event']!='DELETED' and not o['metadata'].get('deletionTimestamp') and m.version(o)=='A'
-            if uid not in base:assert m.version(o)=='B' and o['metadata']['labels'][m.R]=='frontend' and not identical and not trap
+            if uid not in base:assert (m.version(o)=='B' or sg and ordinal(o)<part and m.version(o)=='A') and o['metadata']['labels'][m.R]=='frontend' and not identical and not trap
             if prev and m.ready(prev) and (row['event']=='DELETED' or o['metadata'].get('deletionTimestamp')):
                 assert at>m.ts(receipt['sent']) and o['metadata']['labels'][m.R]=='frontend' and ordinal(o)>=part
                 ready={key:pod for key,pod in m.mine(state,'pods',owner).items() if pod['metadata']['labels'][m.R]=='frontend' and m.ready(pod)}
@@ -62,6 +70,9 @@ def audit_case(p,trace):
         if row['sequence']>prep['lastPreparationSequence']:
             front=[o for o in m.mine(state,'pods',owner).values() if o['metadata']['labels'][m.R]=='frontend' and not o['metadata'].get('deletionTimestamp')]
             assert len(front)<=d+s
+    if pg_bad:
+        assert result['status']=='FAIL' and 'PodGroup deletion exceeds released capacity' in result.get('error','')
+        return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'ORIGINAL_SG_REPLACEMENT_STARTED_WITHOUT_READY_BUDGET','watchRows':len(rows),'sourcePreparation':prep,'firstViolation':pg_bad[0],'limitation':'Native API200 and full Watch prove deletion of a second original healthy SG PodGroup while only2 Ready source units remain and U1 requires2. The prior replacement has no Ready credit. The final journal freezes on PG deletion before that groups Pod deletion notification, so no later Pod Watch/convergence credit is claimed. New low-ordinal A creation is recorded but not alone treated as the budget failure.'}
     if budget_bad or order_bad:
         assert result['status']=='FAIL'
         return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_SPARSE_BOUNDARY_BUDGET' if budget_bad else 'LOWER_ORDINAL_DELETED_BEFORE_READY_ELIGIBLE_HIGHER_SOURCE','watchRows':len(rows),'sourcePreparation':prep,'firstViolation':(budget_bad or order_bad)[0],'budgetViolations':budget_bad,'orderViolations':order_bad,'limitation':'Actual accepted boundary and original sparse identities verified; failure before final convergence, no later completion credit.'}

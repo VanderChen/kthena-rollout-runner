@@ -18,6 +18,31 @@
       "run": "boundary-dependency-r1",
       "audit": "independent-dependency-boundary-audit/summary.json",
       "sha256": "9409dbf83c1448101d997667358b8aa627872edfa8bd933d733f273b476b055f"
+    },
+    {
+      "run": "boundary-zero-r1",
+      "audit": "independent-boundary-audit-r2/summary.json",
+      "sha256": "ee8b04ca27df5e98871fb4a93cb6a0aebb2ab28fb6289aa695b65704dd3db1e9"
+    },
+    {
+      "run": "history-equal-r1",
+      "audit": "independent-history-equal-audit-r2/summary.json",
+      "sha256": "98e6edf270fae90cf3887034b2abf710753bf5035fe921d19fc80c1df9aabbd7"
+    },
+    {
+      "run": "boundary-completion-r1",
+      "audit": "independent-completion-boundary-audit-r2/summary.json",
+      "sha256": "057be8c78af4395748c329490a56352e34fb300ed05e3220c3ac70d455a85d0c"
+    },
+    {
+      "run": "boundary-identity-r2",
+      "audit": "independent-identity-boundary-audit-r2/summary.json",
+      "sha256": "03c46c54e0f61d5e08724996652eba7f1b5fb95cad80319d0508f7e0ecfa55f9"
+    },
+    {
+      "run": "boundary-sparse-r1",
+      "audit": "independent-sparse-boundary-audit-r2/summary.json",
+      "sha256": "4418edd93226fc35217fe958fa9ffec60f056fcee82d1fd6f0f4e8b7a923fc8a"
     }
   ]
 }

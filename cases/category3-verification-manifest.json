@@ -8,6 +8,16 @@
       "run": "boundary-numeric-r1",
       "audit": "independent-boundary-audit/summary.json",
       "sha256": "3e7e538961b4409c1ea754ab91d05bb877ebede264573a3ff8074fe7db49662a"
+    },
+    {
+      "run": "rejection-smoke-r1",
+      "audit": "independent-rejection-audit-r2/summary.json",
+      "sha256": "67a5444312113c92cc5cdc98c999953dfa6f8e9b24f955abd50c62f3f0afbeb1"
+    },
+    {
+      "run": "boundary-dependency-r1",
+      "audit": "independent-dependency-boundary-audit/summary.json",
+      "sha256": "9409dbf83c1448101d997667358b8aa627872edfa8bd933d733f273b476b055f"
     }
   ]
 }

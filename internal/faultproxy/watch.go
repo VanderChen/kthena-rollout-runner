@@ -42,6 +42,9 @@ func (b *watchBody) Close() error {
 func (s *Server) response(response *http.Response) error {
 	x := response.Request.Context().Value(contextKey{}).(requestContext)
 	s.record(Record{Request: x.id, Action: "response", Method: x.meta.Method, Path: x.meta.Path, Status: response.StatusCode})
+	if !x.meta.Watch && response.StatusCode == http.StatusOK {
+		return s.omitListObject(response, x)
+	}
 	if !x.meta.Watch || response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil
 	}

@@ -48,6 +48,16 @@
       "run": "rejection-smoke-r2",
       "audit": "independent-rejection-audit/summary.json",
       "sha256": "7fe268b35035d4505b82c4d6f37f71487f51bc0aaf20d9626a2568a1abeeddc9"
+    },
+    {
+      "run": "boundary-zero-r2",
+      "audit": "independent-boundary-audit/summary.json",
+      "sha256": "113960067d742d6773b1f402545ae912a3dda9e7edffe2523cd941b6631e4b19"
+    },
+    {
+      "run": "history-equal-r2",
+      "audit": "independent-history-equal-audit/summary.json",
+      "sha256": "c7d917f286eb8cfd612da740cf24e7f56a5860a2dc537a72ca9b669d6d767aec"
     }
   ]
 }

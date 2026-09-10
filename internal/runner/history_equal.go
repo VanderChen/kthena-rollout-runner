@@ -20,7 +20,7 @@ import (
 )
 
 // Keep one actual equivalent owned history throughout the collision. A single
-// controller-only stale NotFound read opens the real Create race; the held POST
+// controller-only stale List and NotFound read open the real Create race; the held POST
 // is forwarded to the API server, which must return its native AlreadyExists.
 func (e *normalExecution) equalHistoryCollision(ctx context.Context, p ScenarioStep, prefix string) (result error) {
 	api := e.r.dynamic.Resource(MSGVR).Namespace(e.namespace)
@@ -94,9 +94,12 @@ func (e *normalExecution) equalHistoryCollision(ctx context.Context, p ScenarioS
 	}
 	stem := e.r.opt.RunID + "-" + strings.ToLower(e.c.ID) + "-equal"
 	postID, readID := stem+"-post", stem+"-stale-read"
+	listID := stem + "-stale-list"
+	zero := int64(0)
 	rules := []faultproxy.Rule{
 		{ID: postID, Namespace: e.namespace, Resource: "controllerrevisions", Name: target.Name, Methods: []string{"POST"}, Mode: "hold", Count: -1, DurationSeconds: 90},
 		{ID: readID, Namespace: e.namespace, Resource: "controllerrevisions", Name: target.Name, Methods: []string{"GET"}, Mode: "error", StatusCode: 404, Count: 1, DurationSeconds: 90},
+		{ID: listID, Namespace: e.namespace, Resource: "controllerrevisions", Methods: []string{"GET"}, Mode: "omit-list-object", Count: -1, DurationSeconds: 90, CollectionOnly: true, LabelSelector: "modelserving.volcano.sh/name=model", ListLimit: &zero, OmitObject: &faultproxy.ListOmission{Name: target.Name, UID: string(existing.UID), OwnerUID: string(before.GetUID())}},
 	}
 	var installedIDs []string
 	cleared := false
@@ -124,12 +127,12 @@ func (e *normalExecution) equalHistoryCollision(ctx context.Context, p ScenarioS
 		return err
 	}
 	// The single stale read must exhaust; only the POST pause must stay active.
-	if err = e.waitFaultState(ctx, prefix+"-native-post-held", []string{postID}, func(state faultproxy.State) bool {
-		return equivalentCollisionHeld(state, readID, postID)
+	if err = e.waitFaultState(ctx, prefix+"-native-post-held", []string{postID, listID}, func(state faultproxy.State) bool {
+		return equivalentCollisionHeld(state, readID, postID, listID)
 	}); err != nil {
 		return err
 	}
-	if err = e.resumeRecovery(installedIDs, prefix+"-native-race"); err != nil {
+	if err = e.resumeRecovery([]string{listID, readID, postID}, prefix+"-native-race"); err != nil {
 		return err
 	}
 	cleared = true
@@ -163,8 +166,8 @@ func (e *normalExecution) equalHistoryCollision(ctx context.Context, p ScenarioS
 	return saveYAML(filepath.Join(e.dir, prefix+"-equivalent-retained.yaml"), actual)
 }
 
-func equivalentCollisionHeld(state faultproxy.State, readID, postID string) bool {
-	read, post := false, false
+func equivalentCollisionHeld(state faultproxy.State, readID, postID, listID string) bool {
+	read, post, list := false, false, false
 	for _, r := range state.Rules {
 		if r.ID == readID {
 			read = r.Mode == "error" && r.StatusCode == 404 && r.Count == 1 && r.Hits == 1 && !r.Active && r.EndReason == "count-exhausted"
@@ -172,6 +175,9 @@ func equivalentCollisionHeld(state faultproxy.State, readID, postID string) bool
 		if r.ID == postID {
 			post = r.Mode == "hold" && r.Active && r.Hits > 0 && r.Released == 0
 		}
+		if r.ID == listID {
+			list = r.Mode == "omit-list-object" && r.Active && r.Hits > 0
+		}
 	}
-	return read && post
+	return read && post && list
 }

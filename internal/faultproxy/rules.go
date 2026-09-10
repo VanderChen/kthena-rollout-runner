@@ -15,23 +15,32 @@ import (
 )
 
 type Rule struct {
-	ID              string   `json:"id"`
-	Namespace       string   `json:"namespace,omitempty"`
-	Resource        string   `json:"resource"`
-	Name            string   `json:"name,omitempty"`
-	Subresource     string   `json:"subresource,omitempty"`
-	Methods         []string `json:"methods,omitempty"`
-	UIDs            []string `json:"uids,omitempty"`
-	OwnerUID        string   `json:"ownerUID,omitempty"`
-	Mode            string   `json:"mode"` // error, hold, drop-deletion, replay-deletion
-	Count           int      `json:"count"`
-	StatusCode      int      `json:"statusCode,omitempty"`
-	DurationSeconds int      `json:"durationSeconds"`
-	InitialSync     bool     `json:"initialSync,omitempty"`
-	CollectionOnly  bool     `json:"collectionOnly,omitempty"`
-	Generation      int64    `json:"generation,omitempty"`
-	LabelSelector   string   `json:"labelSelector,omitempty"`
-	ListLimit       *int64   `json:"listLimit,omitempty"`
+	ID              string        `json:"id"`
+	Namespace       string        `json:"namespace,omitempty"`
+	Resource        string        `json:"resource"`
+	Name            string        `json:"name,omitempty"`
+	Subresource     string        `json:"subresource,omitempty"`
+	Methods         []string      `json:"methods,omitempty"`
+	UIDs            []string      `json:"uids,omitempty"`
+	OwnerUID        string        `json:"ownerUID,omitempty"`
+	Mode            string        `json:"mode"` // error, hold, drop-deletion, replay-deletion
+	Count           int           `json:"count"`
+	StatusCode      int           `json:"statusCode,omitempty"`
+	DurationSeconds int           `json:"durationSeconds"`
+	InitialSync     bool          `json:"initialSync,omitempty"`
+	CollectionOnly  bool          `json:"collectionOnly,omitempty"`
+	Generation      int64         `json:"generation,omitempty"`
+	LabelSelector   string        `json:"labelSelector,omitempty"`
+	ListLimit       *int64        `json:"listLimit,omitempty"`
+	OmitObject      *ListOmission `json:"omitObject,omitempty"`
+}
+
+// ListOmission describes one real object hidden from a controller-only List.
+// It never changes the stored object, direct runner observations, or Watch.
+type ListOmission struct {
+	Name     string `json:"name"`
+	UID      string `json:"uid"`
+	OwnerUID string `json:"ownerUID"`
 }
 
 type RuleStatus struct {
@@ -106,7 +115,7 @@ func (r Rule) validate() error {
 	if r.InitialSync && (r.Namespace != "" || r.Name != "" || r.Subresource != "" || len(r.UIDs) != 0 || r.OwnerUID != "" || len(r.Methods) != 1 || r.Methods[0] != http.MethodGet) {
 		return fmt.Errorf("initial-sync fault must explicitly target global GET startup requests")
 	}
-	if r.CollectionOnly && (r.InitialSync || r.Name != "" || r.Subresource != "" || len(r.UIDs) != 0 || r.OwnerUID != "" || r.Generation != 0 || r.Mode != "error" || len(r.Methods) != 1 || (r.Methods[0] != http.MethodGet && r.Methods[0] != http.MethodDelete)) {
+	if r.CollectionOnly && (r.InitialSync || r.Name != "" || r.Subresource != "" || len(r.UIDs) != 0 || r.OwnerUID != "" || r.Generation != 0 || (r.Mode != "error" && r.Mode != "omit-list-object") || len(r.Methods) != 1 || (r.Methods[0] != http.MethodGet && r.Methods[0] != http.MethodDelete)) {
 		return fmt.Errorf("collection-only errors require a namespaced List/DeleteCollection without object or initial-sync filters")
 	}
 	if r.Generation < 0 || r.Generation > 0 && (r.Mode != "error" || r.InitialSync || r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodPut || r.Name == "" || r.OwnerUID == "") {
@@ -116,6 +125,10 @@ func (r Rule) validate() error {
 		return fmt.Errorf("selector and limit filters require a collection-only GET error and nonnegative limit")
 	}
 	switch r.Mode {
+	case "omit-list-object":
+		if !r.CollectionOnly || r.Resource != "controllerrevisions" || r.Methods[0] != http.MethodGet || r.LabelSelector == "" || r.ListLimit == nil || *r.ListLimit != 0 || r.Count != -1 || r.StatusCode != 0 || r.OmitObject == nil || r.OmitObject.Name == "" || r.OmitObject.UID == "" || r.OmitObject.OwnerUID == "" {
+			return fmt.Errorf("List omission requires an exact owned history identity and bounded unpaged selected GET")
+		}
 	case "error":
 		if len(r.Methods) == 0 || r.StatusCode < 400 || r.StatusCode > 599 {
 			return fmt.Errorf("error rule requires methods and HTTP error status")
@@ -134,6 +147,9 @@ func (r Rule) validate() error {
 		}
 	default:
 		return fmt.Errorf("unknown fault mode %q", r.Mode)
+	}
+	if r.OmitObject != nil && r.Mode != "omit-list-object" {
+		return fmt.Errorf("omitted object is only valid for List omission")
 	}
 	for _, method := range r.Methods {
 		if method != "GET" && method != "POST" && method != "PUT" && method != "PATCH" && method != "DELETE" {

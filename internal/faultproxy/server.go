@@ -149,8 +149,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Read an object only for explicitly selected HTTP fault identity checks.
 	var body []byte
 	needIdentity := false
+	listOmission := false
 	s.mu.Lock()
 	for _, rule := range s.rules {
+		if s.activeLocked(rule) && rule.Mode == "omit-list-object" && rule.matchesRequest(x.meta) {
+			listOmission = true
+		}
 		if s.activeLocked(rule) && rule.matchesRequest(x.meta) && rule.needsObject(x.meta) {
 			needIdentity = true
 		}
@@ -186,7 +190,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		var selected *RuleStatus
 		for _, rule := range s.rules {
-			if s.activeLocked(rule) && rule.matchesRequest(x.meta) && (!rule.needsObject(x.meta) || rule.matchesObject(object)) {
+			if s.activeLocked(rule) && rule.Mode != "omit-list-object" && rule.matchesRequest(x.meta) && (!rule.needsObject(x.meta) || rule.matchesObject(object)) {
 				selected = rule
 				break
 			}
@@ -223,7 +227,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		delete(s.inFlight, x.id)
 		s.mu.Unlock()
 	}()
-	if x.meta.Watch {
+	if x.meta.Watch || listOmission {
 		// Native clients understand JSON responses. Negotiate JSON explicitly so
 		// the proxy never treats protobuf watch frames as text. This negotiation
 		// is recorded and tested against a real typed Kubernetes client.

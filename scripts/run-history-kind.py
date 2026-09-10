@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 The Kthena Rollout Runner Authors.
 # SPDX-License-Identifier: Apache-2.0
-"""Run a production history/boundary batch on verified R6 with immutable build evidence.
+"""Run a production history/boundary batch on a verified proxy with immutable build evidence.
 Usage: run-history-kind.py MANIFEST BUILD_JSON BINARY
 """
 import base64,calendar,copy,datetime,hashlib,json,os,pathlib,subprocess,sys,time,traceback,urllib.request
@@ -14,6 +14,9 @@ runid=next(a.split('=',1)[1] for a in args if a.startswith('--run-id='))
 selected=next(a.split('=',1)[1].split(',') for a in args if a.startswith('--select='))
 jobname=jobRequest['metadata']['name']
 proxyPod=os.environ.get('RUNNER_PROXY_POD','recovery-proxy-022-r6')
+proxyControl=os.environ.get('RUNNER_PROXY_CONTROL_URL','http://127.0.0.1:18033')
+proxyCA=os.environ.get('RUNNER_PROXY_CA_FILE','/private/tmp/recovery-proxy-022-r6-tls/tls.crt')
+proxyAPI=next(a.split('=',1)[1] for a in args if a.startswith('--fault-proxy-api='))
 out=root/'artifacts/environment-022'/(runid+'-control');out.mkdir()
 target=root/'artifacts'/runid
 assert not target.exists()
@@ -34,7 +37,7 @@ def api(args,obj=None):return json.loads(run(args,obj))
 def save(name,value):
     with (out/name).open('x') as f:json.dump(value,f,indent=2);f.write('\n')
 def state():
-    req=urllib.request.Request('http://127.0.0.1:18033/v1/state',headers={'Authorization':'Bearer '+token})
+    req=urllib.request.Request(proxyControl+'/v1/state',headers={'Authorization':'Bearer '+token})
     with urllib.request.urlopen(req,timeout=10) as response:return json.load(response)
 def nanos(value):
     seconds=calendar.timegm(time.strptime(value[:19],"%Y-%m-%dT%H:%M:%S"))
@@ -61,8 +64,8 @@ try:
     baseline=json.loads((root/'artifacts/proxy-controller-pause-r5/controller-restored.json').read_text())
     assert original['metadata']['uid']==baseline['metadata']['uid'] and original['spec']==baseline['spec']
     save('controller-before.json',original)
-    cert=pathlib.Path('/private/tmp/recovery-proxy-022-r6-tls/tls.crt').read_bytes()
-    kc={'apiVersion':'v1','kind':'Config','clusters':[{'name':'proxy','cluster':{'server':'https://recovery-proxy-022-r6.rollout-runner.svc:8080','certificate-authority-data':base64.b64encode(cert).decode()}}],'users':[{'name':'controller','user':{'tokenFile':'/var/run/secrets/kubernetes.io/serviceaccount/token'}}],'contexts':[{'name':'proxy','context':{'cluster':'proxy','user':'controller'}}],'current-context':'proxy'}
+    cert=pathlib.Path(proxyCA).read_bytes()
+    kc={'apiVersion':'v1','kind':'Config','clusters':[{'name':'proxy','cluster':{'server':proxyAPI,'certificate-authority-data':base64.b64encode(cert).decode()}}],'users':[{'name':'controller','user':{'tokenFile':'/var/run/secrets/kubernetes.io/serviceaccount/token'}}],'contexts':[{'name':'proxy','context':{'cluster':'proxy','user':'controller'}}],'current-context':'proxy'}
     config=api(['create','-f','-','-o','json'],{'apiVersion':'v1','kind':'ConfigMap','metadata':{'name':cmname,'namespace':'kthena-system','labels':{'rollout-runner/run':runid}},'immutable':True,'data':{'kubeconfig':json.dumps(kc)}})
     save('proxy-config.json',config)
     template=copy.deepcopy(original['spec']['template'])

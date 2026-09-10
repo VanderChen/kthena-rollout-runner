@@ -115,11 +115,12 @@ func TestEquivalentCollisionRequiresOneConsumedReadAndLivePostHold(t *testing.T)
 	state := faultproxy.State{Rules: []faultproxy.RuleStatus{
 		{Rule: faultproxy.Rule{ID: "read", Mode: "error", StatusCode: 404, Count: 1}, Hits: 1, EndReason: "count-exhausted"},
 		{Rule: faultproxy.Rule{ID: "post", Mode: "hold"}, Active: true, Hits: 1},
+		{Rule: faultproxy.Rule{ID: "list", Mode: "omit-list-object"}, Active: true, Hits: 1},
 	}}
-	if !equivalentCollisionHeld(state, "read", "post") {
+	if !equivalentCollisionHeld(state, "read", "post", "list") {
 		t.Fatal("expected consumed single read followed by a held real POST")
 	}
-	for _, failure := range []string{"expired-read", "unhit-read", "extra-read", "released-post", "expired-post"} {
+	for _, failure := range []string{"expired-read", "unhit-read", "extra-read", "released-post", "expired-post", "unhit-list", "expired-list"} {
 		changed := faultproxy.State{Rules: append([]faultproxy.RuleStatus{}, state.Rules...)}
 		switch failure {
 		case "expired-read":
@@ -132,8 +133,12 @@ func TestEquivalentCollisionRequiresOneConsumedReadAndLivePostHold(t *testing.T)
 			changed.Rules[1].Released = 1
 		case "expired-post":
 			changed.Rules[1].Active = false
+		case "unhit-list":
+			changed.Rules[2].Hits = 0
+		case "expired-list":
+			changed.Rules[2].Active = false
 		}
-		if equivalentCollisionHeld(changed, "read", "post") {
+		if equivalentCollisionHeld(changed, "read", "post", "list") {
 			t.Fatal("accepted", failure)
 		}
 	}

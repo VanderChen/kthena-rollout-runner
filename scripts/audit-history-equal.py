@@ -18,6 +18,14 @@ def audit_case(p,trace):
     assert case['id']==source['id']=='RUN-610'
     raw=(ROOT.parent/'issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json').read_bytes()
     assert hashlib.sha256(raw).hexdigest()=='757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5' and source==next(r for r in json.loads(raw)['cases'] if r['id']==case['id'])
+    if result['status']=='INCONCLUSIVE' and 'pause state not established: context deadline exceeded' in result.get('error','') and not (p/'step-01-collision-rule-2.json').exists():
+        pre=m.yaml(p/'step-01-equivalent-precreated-server.yaml');original=m.yaml(p/'before-server.yaml');rule=m.read(p/'step-01-collision-rule-1.json')
+        assert m.owned(pre,original['metadata']['uid']) and pre['data']['data']==m.yaml(p/'step-01-B-dry-run-admitted.yaml')['spec']['template']['roles']
+        hits=[r for r in trace if r.get('ruleID')==rule['id'] and r['action']=='error-request'];assert len(hits)==1 and hits[0]['status']==404
+        post=m.read(p/'step-01-collision-rule-0.json');assert not any(r.get('ruleID')==post['id'] and r['action']=='hold-request' for r in trace)
+        proxy=m.read(p/'fault-proxy-final.json');assert next(r for r in proxy['rules'] if r['id']==post['id'])['hits']==0
+        rows=[json.loads(s) for s in open(p/'observations.jsonl')];assert [r['sequence'] for r in rows]==list(range(1,len(rows)+1)) and not any(r['event']=='GAP' for r in rows)
+        return {'id':case['id'],'classification':'RUNNER_INJECTION_MISS','failure':'EQUIVALENT_LIST_REUSE_BYPASSED_NATIVE_POST','watchRows':len(rows),'singleInjectedRead':hits[0],'precreatedOwnedHistoryUID':pre['metadata']['uid'],'limitation':'Production can select equivalent history from List before reaching Create. A named GET404 alone did not establish the intended race; zero held POST and zero native collision credit. Preserve this attempt pending a narrowly scoped stale List supplement.'}
     if result['status']=='INCONCLUSIVE' and 'equal-stale-read (count-exhausted)' in result.get('error',''):
         pre=m.yaml(p/'step-01-equivalent-precreated-server.yaml');admitted=m.yaml(p/'step-01-B-dry-run-admitted.yaml');initial=m.yaml(p/'before-server.yaml');owner=initial['metadata']['uid']
         assert m.owned(pre,owner) and pre['data']['data']==admitted['spec']['template']['roles']
@@ -40,11 +48,14 @@ def audit_case(p,trace):
     post=m.read(p/'step-01-collision-rule-0.json');get=m.read(p/'step-01-collision-rule-1.json')
     for rule in (post,get):assert rule['namespace']==result['namespace'] and rule['resource']=='controllerrevisions' and rule['name']==name
     assert post['mode']=='hold' and post['methods']==['POST'] and get['mode']=='error' and get['methods']==['GET'] and get['statusCode']==404 and get['count']==1
+    listing=m.read(p/'step-01-collision-rule-2.json');assert listing['mode']=='omit-list-object' and listing['collectionOnly'] and listing['listLimit']==0 and listing['labelSelector']=='modelserving.volcano.sh/name=model' and listing['omitObject']=={'name':name,'uid':cruid,'ownerUID':owner}
+    omissions=[t for t in trace if t.get('ruleID')==listing['id'] and t['action']=='omit-list-object-response'];assert omissions and all(t['uid']==cruid and t['status']==200 for t in omissions)
     injected=[t for t in trace if t.get('ruleID')==get['id'] and t['action']=='error-request'];assert len(injected)==1 and injected[0]['status']==404
     held=[t for t in trace if t.get('ruleID')==post['id'] and t['action']=='hold-request'];released=[t for t in trace if t.get('ruleID')==post['id'] and t['action']=='release-request'];assert len(held)==len(released)==1 and held[0]['request']==released[0]['request']
     responses={t['request']:t for t in trace if t['action']=='response'};native=responses[held[0]['request']]
     assert native['status']==409 and native['method']=='POST' and native['path']=='/apis/apps/v1/namespaces/'+result['namespace']+'/controllerrevisions'
     assert m.ts(injected[0]['at'])<m.ts(held[0]['at'])<m.ts(released[0]['at'])<m.ts(native['at'])
+    assert any(m.ts(t['at'])<m.ts(injected[0]['at']) for t in omissions)
     assert m.read(p/'step-01-native-already-exists.json')['response']==native
     reads=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='controllerrevisions' and t.get('name')==name and t['method']=='GET' and m.ts(t['at'])>m.ts(native['at']) and responses.get(t['request'],{}).get('status')==200];assert reads
     assert not any(t.get('ruleID')==post['id'] and t['action']=='error-request' for t in trace)
@@ -79,7 +90,7 @@ def audit_case(p,trace):
         assert set(m.mine(state,'pods',owner))==set(pods) and all(m.ready(o) for o in m.mine(state,'pods',owner).values());h.plugins(state,owner,server['spec'])
     before=m.yaml(p/'case-controller-before.yaml');after=m.yaml(p/'fault-controller-after.yaml');assert before['metadata']['uid']==after['metadata']['uid'] and after['status']['containerStatuses'][0]['restartCount']==0
     proxy=m.read(p/'fault-proxy-final.json');assert not proxy['errors'] and not any(r['active'] for r in proxy.get('rules') or [])
-    return {'id':case['id'],'classification':'PASS','watchRows':len(rows),'equivalentHistoryUID':cruid,'injectedControllerRead404':injected[0],'nativeAlreadyExists':native,'nativeSuccessfulReadAfter409':reads[0],'actualBPodUIDs':born,'healthyDeletionChecks':deletions,'finalStableNanos':cp['elapsedStableNanos'],'limitation':'One explicit controller-only stale GET404 opened the Create race. The held POST was forwarded to the real API and returned native409. The precreated equivalent owned CR retained its exact UID/Data/owner throughout; B converged without duplicate Pods.'}
+    return {'id':case['id'],'classification':'PASS','watchRows':len(rows),'equivalentHistoryUID':cruid,'injectedListOmissions':omissions,'injectedControllerRead404':injected[0],'nativeAlreadyExists':native,'nativeSuccessfulReadAfter409':reads[0],'actualBPodUIDs':born,'healthyDeletionChecks':deletions,'finalStableNanos':cp['elapsedStableNanos'],'limitation':'Explicit controller-only stale List omission of one exact owned UID and one GET404 opened the Create race. The held POST was forwarded to the real API and returned native409. The precreated equivalent owned CR retained its exact UID/Data/owner throughout; B converged without duplicate Pods.'}
 
 
 def main():

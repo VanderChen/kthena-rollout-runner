@@ -58,6 +58,11 @@
       "run": "history-equal-r2",
       "audit": "independent-history-equal-audit/summary.json",
       "sha256": "c7d917f286eb8cfd612da740cf24e7f56a5860a2dc537a72ca9b669d6d767aec"
+    },
+    {
+      "run": "boundary-completion-r3",
+      "audit": "independent-completion-boundary-audit/summary.json",
+      "sha256": "59f3821bb30059a659082a721b9c50be32411d94d1a034593dcb5f140b559f55"
     }
   ]
 }

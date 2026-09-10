@@ -59,6 +59,13 @@ def ids(items):return {(i['metadata']['namespace'],i['metadata']['name']):i['met
 try:
     initial=state();assert not initial['errors'] and not any(r['active'] for r in initial.get('rules') or [])
     save('proxy-before.json',initial)
+    proxyActual=api(['-n','rollout-runner','get','pod',proxyPod,'-o','json'])
+    assert len(proxyActual['status']['containerStatuses'])==1 and proxyActual['status']['containerStatuses'][0]['ready'] and proxyActual['status']['containerStatuses'][0]['restartCount']==0
+    save('proxy-active-pod.json',proxyActual)
+    if os.environ.get('RUNNER_PROXY_BUILD_EVIDENCE'):
+        proxyBuild=json.loads((root/os.environ['RUNNER_PROXY_BUILD_EVIDENCE']).read_text())
+        assert proxyBuild['workingTree']=='' and proxyActual['status']['containerStatuses'][0]['imageID']==proxyBuild['imageID']
+        save('proxy-build.json',proxyBuild)
     history=api(['get','modelservings','-A','-o','json']);assert len(history['items'])==9;save('history-before.json',history)
     original=api(['-n','kthena-system','get','deployment','kthena-controller-manager','-o','json'])
     baseline=json.loads((root/'artifacts/proxy-controller-pause-r5/controller-restored.json').read_text())
@@ -147,6 +154,8 @@ try:
     assert token.encode() not in trace and b'Bearer ' not in trace
     with (out/'proxy-trace.jsonl').open('xb') as f:f.write(trace)
     proxyState=state();save('proxy-after.json',proxyState)
+    proxyAfter=api(['-n','rollout-runner','get','pod',proxyPod,'-o','json']);save('proxy-after-pod.json',proxyAfter)
+    assert proxyAfter['metadata']['uid']==proxyActual['metadata']['uid'] and proxyAfter['status']['containerStatuses'][0]['restartCount']==0 and proxyAfter['status']['containerStatuses'][0]['imageID']==proxyActual['status']['containerStatuses'][0]['imageID']
     proof.update(status='COLLECTED_PENDING_CASE_REVIEW',completed=len(summary['results']),rawPassed=summary['passed'],rawFailures=[r for r in summary['results'] if r['status']!='PASS'],proxyErrors=proxyState['errors'])
 except Exception as e:
     proof.update(status='EXECUTION_ERROR',error=str(e),traceback=traceback.format_exc())

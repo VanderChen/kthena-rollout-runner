@@ -18,7 +18,7 @@ func (s *Server) omitListObject(response *http.Response, x requestContext) error
 	s.mu.Lock()
 	var selected *RuleStatus
 	for _, rule := range s.rules {
-		if rule.Mode == "omit-list-object" && s.activeLocked(rule) && rule.matchesRequest(x.meta) {
+		if has(x.listOmissionRules, rule.ID) && rule.Mode == "omit-list-object" && s.activeLocked(rule) && rule.matchesRequest(x.meta) {
 			selected = rule
 			break
 		}

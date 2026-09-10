@@ -73,8 +73,9 @@ type Server struct {
 
 type contextKey struct{}
 type requestContext struct {
-	id   uint64
-	meta requestMeta
+	id                uint64
+	meta              requestMeta
+	listOmissionRules []string
 }
 
 func New(upstream *url.URL, transport http.RoundTripper, controlToken string, journal io.Writer) (*Server, error) {
@@ -154,12 +155,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, rule := range s.rules {
 		if s.activeLocked(rule) && rule.Mode == "omit-list-object" && rule.matchesRequest(x.meta) {
 			listOmission = true
+			x.listOmissionRules = append(x.listOmissionRules, rule.ID)
 		}
 		if s.activeLocked(rule) && rule.matchesRequest(x.meta) && rule.needsObject(x.meta) {
 			needIdentity = true
 		}
 	}
 	s.mu.Unlock()
+	r = r.WithContext(context.WithValue(r.Context(), contextKey{}, x))
 	if needIdentity && r.Body != nil {
 		var err error
 		body, err = io.ReadAll(io.LimitReader(r.Body, (8<<20)+1))

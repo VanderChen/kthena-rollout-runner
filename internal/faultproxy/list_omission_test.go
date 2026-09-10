@@ -96,3 +96,35 @@ func TestListOmissionRejectsBroadOrUnboundedRules(t *testing.T) {
 		}
 	}
 }
+
+func TestNewListRuleCannotRetroactivelyAlterInFlightNativeResponse(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	s, api, _ := fixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+		w.Header().Set("Content-Type", "application/vnd.kubernetes.protobuf")
+		io.WriteString(w, "native-binary-response")
+	}))
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		r, err := http.Get(api.URL + "/apis/apps/v1/namespaces/test/controllerrevisions?labelSelector=modelserving.volcano.sh%2Fname%3Dmodel")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+		if r.StatusCode != 200 || string(body) != "native-binary-response" {
+			t.Error("preexisting request changed", r.StatusCode, string(body))
+		}
+	}()
+	<-started
+	control(t, s, "POST", "/v1/rules", omissionRule(), 201)
+	close(release)
+	<-done
+	actual := state(t, s)
+	if actual.Rules[0].Hits != 0 || len(actual.Errors) != 0 {
+		t.Fatal("new rule consumed an earlier request", actual)
+	}
+}

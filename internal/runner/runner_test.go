@@ -84,6 +84,10 @@ func TestCoreCatalogue(t *testing.T) {
 	}
 }
 func makePod(mode, role string, n int, version string, ready bool, member string) *unstructured.Unstructured {
+	entry := "false"
+	if member == "entry" || member == "true" {
+		entry = "true"
+	}
 	group := fmt.Sprintf("model-%d", n)
 	roleID := role + "-0"
 	if mode == "Role" {
@@ -93,7 +97,7 @@ func makePod(mode, role string, n int, version string, ready bool, member string
 	name := group + "-" + roleID + "-" + member + "-" + version
 	p := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test", UID: types.UID(name),
 		OwnerReferences: []metav1.OwnerReference{{UID: "owner", Kind: "ModelServing", Name: "model"}},
-		Labels:          map[string]string{LabelGroup: group, LabelRole: role, LabelRoleID: roleID, LabelEntry: member}},
+		Labels:          map[string]string{LabelGroup: group, LabelRole: role, LabelRoleID: roleID, LabelEntry: entry}},
 		Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "workload", Env: []corev1.EnvVar{{Name: "ROLLOUT_VERSION", Value: version}}}}},
 		Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}}},
 	}
@@ -366,6 +370,27 @@ func TestRevisionHashResolvesToOwnedControllerRevisionName(t *testing.T) {
 	objects["controllerrevisions"]["revision"] = cr
 	if !finalFacts(l, objects, 2) {
 		t.Fatal("must resolve status hash abc123 to model-abc123")
+	}
+	// Count, readiness, versions, status and PG associations still converge
+	// after this shift; the endpoint ordinal invariant must catch it.
+	shifted := map[string]map[string]*unstructured.Unstructured{}
+	for kind, objectsByUID := range objects {
+		shifted[kind] = map[string]*unstructured.Unstructured{}
+		for uid, object := range objectsByUID {
+			p := object.DeepCopy()
+			if kind == "pods" {
+				labels := p.GetLabels()
+				labels[LabelGroup] = fmt.Sprintf("model-%d", ordinal(labels[LabelGroup])+1)
+				p.SetLabels(labels)
+				p.SetAnnotations(map[string]string{"scheduling.k8s.io/group-name": labels[LabelGroup]})
+			} else if kind == "podgroups" {
+				p.SetName(fmt.Sprintf("model-%d", ordinal(p.GetName())+1))
+			}
+			shifted[kind][uid] = p
+		}
+	}
+	if finalFacts(l, shifted, 2) {
+		t.Fatal("completed core rollout accepted final 123 at desired replicas 3")
 	}
 	cr.SetOwnerReferences([]metav1.OwnerReference{{UID: "different-owner"}})
 	if finalFacts(l, objects, 2) {

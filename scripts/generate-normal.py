@@ -343,9 +343,8 @@ def plan(row):
             t={'versions':{v:list(ords.values()).count(v) for v in sorted(set(ords.values()))},'ordinals':ords}
             if mode(current)=='SG':t['scope']='SG'
             else:t['role']='frontend'
-            # With surge the catalog permits sparse target ordinals; protected
-            # A ordinals remain exact and the total A/B count is still checked.
-            if effective_budget(current,'maxSurge')>0:t['ordinals']={str(i):'A' for i in range(old)}
+            # Surge may introduce extra ordinals in flight. Every settled
+            # normal endpoint must restore the current desired 0..D-1 set.
             p['expect']['targets']=[t]
     if n==153:
         for p in steps:p['expect']['noNewRevision']=True

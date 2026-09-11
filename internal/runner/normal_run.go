@@ -84,6 +84,9 @@ func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
 func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res Result) {
 	start := time.Now()
 	res = Result{ID: c.ID, Status: "ERROR", Started: start.UTC(), Namespace: "rr-" + r.opt.RunID + "-" + strings.ToLower(c.ID)}
+	if c.normalFlow() {
+		res.OrdinalContract = NormalOrdinalContract
+	}
 	dir := filepath.Join(r.root, c.ID)
 	if attempt > 0 {
 		dir = filepath.Join(dir, fmt.Sprintf("attempt-%d", attempt))

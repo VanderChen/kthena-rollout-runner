@@ -120,6 +120,21 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 			return false, fmt.Sprintf("group %d has wrong versions/layout", group)
 		}
 	}
+	if e.c.normalFlow() && !expect.NoFullPromotion && !expect.BlockedByBudget {
+		layouts := map[int]map[string]int{}
+		for group, model := range effective {
+			layouts[group] = map[string]int{}
+			for name, role := range model.Roles {
+				if current, ok := l.Model.Roles[name]; ok {
+					role.R = current.R
+				}
+				layouts[group][name] = role.R
+			}
+		}
+		if err := canonicalOrdinalFacts(l.Model.N, layouts, l.Owner, obj["pods"]); err != nil {
+			return false, err.Error()
+		}
+	}
 	for _, t := range expect.Targets {
 		if t.Scope == "SG" {
 			var units []NormalUnit

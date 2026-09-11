@@ -50,6 +50,9 @@ Watch从List的resourceVersion开始，无法连续恢复的观察缺口判INCON
 
 ## 触发和终态契约
 
+- RUN-001～303 共用起止序号检查，无需逐例开启。正常基线及每个 `settled` 完成阶段，SG 必须为 `0..N-1`，每组内每种 Role 必须为 `0..R-1`；按该阶段当前副本数和有效历史 Role 布局判断，缺失、越界、重复实例身份均不能通过。worker 不重复计为 Role 副本，Kubernetes List 的返回顺序不影响集合判断。
+- 中间 `conditions` 停点和 Watch 过程允许合法 surge/暂时稀疏集合，仍检查原预算、Ready、partition 和 UID 约束。101 的旧依赖停点明确报告未完成，不能套用全量完成条件；其正常基线仍检查连续序号。partition 灰度滚动的完成停点需要连续集合，不因保留 A 版本或 maxSurge 非零而豁免。
+- 新结果的 `ordinalContract=normal-endpoints/ordinals-0-to-replicas-minus-1/v1` 标识新增要求。序号不收敛在阶段有界超时中记录 `FINAL_ORDINAL_MISMATCH`，不是在每条中间事件出现额外序号时立即失败。原始 708 项及稀疏故障源/边界场景仍保留原契约，不能据旧 PASS 推断通过新增正常流程检查。
 - HOLD_READY的全部A/B entry/worker出生时不创建ready文件；基线和后续单位分别按UID
   放行。每个目录要求的10秒停点和30秒终态窗口持续运行断言。
 - AUTO_READY_INTERLEAVE的Pod自然Ready，不使用Ready门控、延迟、finalizer或暂停

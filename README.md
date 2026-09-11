@@ -7,7 +7,7 @@
 当前验证统一使用 Kthena production `538b2825c06bc1e8c5392d18f18f84faee9fca95`，未修改 Kthena 源码。
 参见[完整用例集及证据复核](docs/EXPANDED_SUITE.md)和[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。
 
-2026-09-11 补充：全部正常流程已增加通用起止序号检查，SG 和各组内每种 Role 在正常基线及每个完成阶段必须为 `0..replicas-1`，过程仍允许 surge。上面的 708 项统计属于新增检查前的历史验收，不能作为新增检查的通过证明。新执行的结果带有 `ordinalContract`，详见正常流程契约和任务 031 的补充验证记录。
+2026-09-11 补充：全部正常流程已增加通用起止序号检查，SG 和各组内每种 Role 在正常基线及每个完成阶段必须为 `0..replicas-1`，过程仍允许 surge。上面的 708 项统计属于新增检查前的历史验收，不能作为新增检查的通过证明。新执行的结果带有 `ordinalContract`；[补充验证](docs/ORDINAL_VERIFICATION.md)记录 10 项新 Kind 执行（6 PASS/4 FAIL）及全部 303 项历史起止快照中发现的 86 项旧 PASS 序号问题。
 
 原 `cases/core/` 的60份输入及历史验收结果保留不变。以下核心过程和旧Kind结果描述
 对应原60项；新集群验证必须显式传入当前production镜像及 `--controller-commit`。

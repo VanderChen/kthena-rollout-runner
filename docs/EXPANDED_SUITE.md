@@ -6,7 +6,9 @@
 | --- | --- | --- |
 | 正常流程 | RUN-001～303 | Kind 266 PASS、37 产品 FAIL |
 | 故障恢复 | RUN-304～539 | Kind 128 PASS、108 产品 FAIL |
-| 边界与拒绝 | RUN-540～611、DENY-001～097 | 169 项已实现且通过本地门禁，Kind 验证进行中 |
+| 边界与拒绝 | RUN-540～611、DENY-001～097 | Kind 158 PASS、11 产品 FAIL |
+
+三类 708 项均已完成实现及真实 Kind 独立复核，合计 552 PASS、156 项产品 FAIL。总报告位于 `artifacts/expanded-suite-final-verification/`；完成表示每项都有有效结论，产品失败仍保留。
 
 当前控制器基线为 production `538b2825c06bc1e8c5392d18f18f84faee9fca95`，镜像 `kthena-controller-manager:normal-022-538b2825`，实际摘要 `sha256:7c6ed6c78b37d7afaf104381351554ad75aed56c64d0aca2ec941ce652756265`。测试集群为 arm64 Kind `kthena-resync-010`，工作负载使用 Volcano。源码未修改。
 
@@ -43,7 +45,7 @@
 
 原始 `result.json`、连续 List/Watch、真实请求与响应、Pod/CR UID、版本及时间窗口由 `scripts/audit-*.py` 独立复核。超预算、错误删除次序或实际不收敛都保留为产品失败；runner 注入或判定问题允许修正后在新的 attempt 补充验证。已确认的有效产品失败不通过重跑覆盖。复合用例在早期失败时，未执行的后续重启、恢复或稳定阶段没有覆盖信用。
 
-第一、二类最终报告分别位于 `artifacts/category1-final-verification/`、`artifacts/category2-final-verification/`。第二类汇总由 `cases/category2-verification-manifest.json` 固定独立审计 SHA256，`scripts/summarize-category2.py` 检查全部唯一 ID，保留早期 runner 与源准备发现，拒绝缺项、待复核结果及重复有效结论。第三类尚无完成报告。
+三个分类报告位于 `artifacts/category1-final-verification/`、`artifacts/category2-final-verification/` 和 `artifacts/category3-final-verification/`。第二类汇总由 `cases/category2-verification-manifest.json` 固定独立审计 SHA256，`scripts/summarize-category2.py` 检查全部唯一 ID，保留早期 runner 与源准备发现，拒绝缺项、待复核结果及重复有效结论。各分类报告中的早期阶段状态按原生成时点保留，以总报告为最终验收状态。
 
 第三类使用 `cases/category3-verification-manifest.json` 与 `scripts/summarize-category3.py`，额外核对不可变构建、实际镜像/二进制和完整环境恢复。三个分类报告均完成后，`scripts/summarize-expanded-suite.py` 才可输出 `artifacts/expanded-suite-final-verification/`；它要求 708 个唯一结论、统一 production 基线和最终环境核对，不把未命中或 runner 中止算成 PASS/产品 FAIL。
 

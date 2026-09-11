@@ -54,6 +54,7 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	CanonicalEndpoints     bool                   `json:"canonicalEndpoints,omitempty"`
 	ForeignResidueUIDs     map[string]string      `json:"foreignResidueUIDs,omitempty"`
 	RejectedSpec           map[string]interface{} `json:"acceptedSpecAfterRejection,omitempty"`
 	RejectedGeneration     int64                  `json:"acceptedGenerationAfterRejection,omitempty"`
@@ -402,7 +403,7 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 				active++
 			}
 		}
-		temporaryTarget := u.Ordinal >= d && active > d && l.unitTarget(u)
+		temporaryTarget := u.Ordinal >= d && (active > d || l.CanonicalEndpoints) && l.unitTarget(u)
 		// Already-issued deletion commitments survive new partition/budget values.
 		for _, pod := range u.Pods {
 			uid := string(pod.UID)
@@ -493,7 +494,15 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !scale && active > d && l.unitTarget(u) {
 		reason = "surge-cleanup"
 	}
-	if !scale && !reservedEarlier && active <= d && u.Ready && l.unitTarget(u) {
+	// A target outside 0..D-1 is still temporary, even if the old slot has
+	// disappeared and active has fallen to D. Normalization may retire it
+	// within U before filling that slot; the availability and protection
+	// checks above still apply. In-range target churn remains forbidden.
+	ordinalCleanup := l.CanonicalEndpoints && u.Ordinal >= d && l.unitTarget(u)
+	if !scale && ordinalCleanup {
+		reason = "ordinal-cleanup"
+	}
+	if !scale && !reservedEarlier && !ordinalCleanup && active <= d && u.Ready && l.unitTarget(u) {
 		l.fail("UNEXPECTED_TARGET_REPLACED: " + key)
 	}
 	// Already unavailable old units may be replaced before healthy old units.

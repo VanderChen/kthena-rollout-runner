@@ -207,3 +207,62 @@ func TestNormalSettledRejectsShiftedFinalOrdinals(t *testing.T) {
 		})
 	}
 }
+
+func TestCanonicalNormalizationRetiresOnlyOutOfRangeTargetsWithinBudget(t *testing.T) {
+	for _, id := range []string{"RUN-195", "RUN-071"} {
+		for _, variant := range []string{"allowed", "zero-budget", "in-range", "no-replacement", "legacy-fixture"} {
+			t.Run(id+"/"+variant, func(t *testing.T) {
+				l, objects := normalFixture(t, id)
+				for _, p := range objects["pods"] {
+					labels := p.GetLabels()
+					if l.Model.Mode == "SG" {
+						labels[LabelGroup] = fmt.Sprintf("model-%d", ordinal(labels[LabelGroup])+1)
+					} else if labels[LabelRole] == "frontend" {
+						labels[LabelRoleID] = fmt.Sprintf("frontend-%d", ordinal(labels[LabelRoleID])+1)
+					}
+					p.SetLabels(labels)
+				}
+				spec := cloneMap(l.Model.Spec)
+				if variant == "zero-budget" {
+					if l.Model.Mode == "SG" {
+						mapValue(mapValue(spec, "rolloutStrategy"), "rollingUpdateConfiguration")["maxUnavailable"] = float64(0)
+					} else {
+						for _, raw := range listValue(mapValue(spec, "template"), "roles") {
+							raw.(map[string]interface{})["maxUnavailable"] = float64(0)
+						}
+					}
+				}
+				if variant == "legacy-fixture" {
+					l.CanonicalEndpoints = false
+				}
+				expect := ScenarioExpectation{NoReplacement: variant == "no-replacement"}
+				if err := l.Transition(spec, "normalize-after-budget-change", expect, objects); err != nil {
+					t.Fatal(err)
+				}
+				n := 3
+				if variant == "in-range" {
+					n = 1
+				}
+				if l.Model.Mode == "SG" {
+					deleteNormal(l, objects, "frontend", n, 0)
+				} else {
+					deleteNormal(l, objects, "frontend", 0, n)
+				}
+				if variant == "allowed" {
+					if l.error() != nil {
+						t.Fatal("legal ordinal cleanup rejected", l.error())
+					}
+					if len(l.Starts) != 1 || l.Starts[0].Reason != "ordinal-cleanup" {
+						t.Fatal(l.Starts)
+					}
+				} else {
+					code := "PROTECTED_REPLACED"
+					if variant == "zero-budget" {
+						code = "BUDGET_VIOLATION"
+					}
+					requireNormalViolation(t, l, code)
+				}
+			})
+		}
+	}
+}

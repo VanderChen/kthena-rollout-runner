@@ -336,6 +336,7 @@ func (e *normalExecution) execute(ctx context.Context) error {
 		return err
 	}
 	e.l = l
+	l.CanonicalEndpoints = e.c.normalFlow()
 	// Account for any readiness event that arrived between Create and arming.
 	if err = e.locked(func() error {
 		e.o.normal = l

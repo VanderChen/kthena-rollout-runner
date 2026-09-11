@@ -68,6 +68,26 @@
       "run": "boundary-identity-r3",
       "audit": "independent-identity-boundary-audit/summary.json",
       "sha256": "760a287a06da523cc22e3f413f58e68a1a91e5fb9463ac1ff5231c5fbdf914b6"
+    },
+    {
+      "run": "rejection-remaining-r2",
+      "audit": "independent-rejection-audit/summary.json",
+      "sha256": "7fdbf42ea16b04f9624ab5a33601d4ef0f3c0b75f91f720bbee95654362ed94f"
+    },
+    {
+      "run": "boundary-sparse-r2",
+      "audit": "independent-sparse-boundary-audit-r3/summary.json",
+      "sha256": "cb89508587814e557d890efa3c7c238cbe56896bb01942897757cd6860db10d1"
+    },
+    {
+      "run": "history-equal-r4",
+      "audit": "independent-history-equal-audit/summary.json",
+      "sha256": "4e1e27e286a979dcbcc07fef73dee26dc9698323b6ff42cf72929825201562fd"
+    },
+    {
+      "run": "boundary-completion-r4",
+      "audit": "independent-completion-boundary-audit/summary.json",
+      "sha256": "6a330fec7ebde8eb3e4edf3a4ec3c4a2450af117ba92fead10b0f3ac19ff4c95"
     }
   ]
 }

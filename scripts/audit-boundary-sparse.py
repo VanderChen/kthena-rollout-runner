@@ -37,7 +37,7 @@ def audit_case(p,trace):
     expected_old=sum(o['metadata']['labels'][m.R]=='frontend' for o in protected.values());counts={}
     if expected_old:counts['A']=expected_old
     if expected_old<3:counts['B']=3-expected_old
-    state=collections.defaultdict(dict);history={};deletions=[];budget_bad=[];order_bad=[];pg_bad=[]
+    state=collections.defaultdict(dict);history={};deletions=[];budget_bad=[];order_bad=[];pg_bad=[];low_a=[]
     source_pgs=m.mine(m.yaml(p/'baseline-resources.yaml'),'podgroups',owner)
     for row in rows:
         o=row['object'];uid=o['metadata']['uid'];kind=row['kind'];at=m.ts(row['received']);prev=state[kind].get(uid)
@@ -52,13 +52,20 @@ def audit_case(p,trace):
                 pg_bad.append({'sequence':row['sequence'],'at':row['received'],'podGroupUID':uid,'podGroupName':o['metadata']['name'],'originalReadyMemberUIDs':list(members),'readyBefore':len(ready),'minimum':max(0,d-u),'actualDELETE':native,'nativeResponse':response})
         if row['sequence']>prep['lastPreparationSequence'] and kind=='pods' and m.owned(o,owner):
             if uid in protected:assert row['event']!='DELETED' and not o['metadata'].get('deletionTimestamp') and m.version(o)=='A'
-            if uid not in base:assert (m.version(o)=='B' or sg and ordinal(o)<part and m.version(o)=='A') and o['metadata']['labels'][m.R]=='frontend' and not identical and not trap
+            # Restoring a missing slot below partition may use A for either
+            # rollout granularity. It supplies budget only when actually Ready;
+            # the original sparse high ordinals still require correct rollout.
+            if uid not in base:assert (m.version(o)=='B' or ordinal(o)<part and m.version(o)=='A') and o['metadata']['labels'][m.R]=='frontend' and not identical and not trap
+            if uid not in base and row['event']=='ADDED' and m.version(o)=='A':low_a.append({'sequence':row['sequence'],'at':row['received'],'uid':uid,'name':o['metadata']['name'],'ordinal':ordinal(o),'ready':m.ready(o)})
             if prev and m.ready(prev) and (row['event']=='DELETED' or o['metadata'].get('deletionTimestamp')):
                 assert at>m.ts(receipt['sent']) and o['metadata']['labels'][m.R]=='frontend' and ordinal(o)>=part
                 ready={key:pod for key,pod in m.mine(state,'pods',owner).items() if pod['metadata']['labels'][m.R]=='frontend' and m.ready(pod)}
                 proof={'sequence':row['sequence'],'at':row['received'],'uid':uid,'name':o['metadata']['name'],'ordinal':ordinal(o),'readyUIDsBefore':list(ready),'readyBefore':len(ready),'minimum':max(0,d-u)}
                 deletions.append(proof)
-                if len(ready)-1<max(0,d-u):budget_bad.append(proof)
+                if len(ready)-1<max(0,d-u):
+                    requests=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='pods' and t.get('method')=='DELETE' and t.get('name')==o['metadata']['name'] and m.ts(receipt['sent'])<m.ts(t['at'])<=at]
+                    assert requests;native=min(requests,key=lambda t:m.ts(t['at']));response=next(t for t in trace if t['action']=='response' and t['request']==native['request']);assert response['status']==200
+                    proof.update(actualDELETE=native,nativeResponse=response);budget_bad.append(proof)
                 higher={key:pod for key,pod in ready.items() if key in base and m.version(pod)=='A' and ordinal(pod)>ordinal(o) and ordinal(pod)>=part}
                 if higher:
                     requests=[t for t in trace if t['action']=='request' and t.get('namespace')==result['namespace'] and t.get('resource')=='pods' and t.get('method')=='DELETE' and t.get('name')==o['metadata']['name'] and m.ts(receipt['sent'])<m.ts(t['at'])<=at]
@@ -72,10 +79,11 @@ def audit_case(p,trace):
             assert len(front)<=d+s
     if pg_bad:
         assert result['status']=='FAIL' and 'PodGroup deletion exceeds released capacity' in result.get('error','')
-        return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'ORIGINAL_SG_REPLACEMENT_STARTED_WITHOUT_READY_BUDGET','watchRows':len(rows),'sourcePreparation':prep,'firstViolation':pg_bad[0],'limitation':'Native API200 and full Watch prove deletion of a second original healthy SG PodGroup while only2 Ready source units remain and U1 requires2. The prior replacement has no Ready credit. The final journal freezes on PG deletion before that groups Pod deletion notification, so no later Pod Watch/convergence credit is claimed. New low-ordinal A creation is recorded but not alone treated as the budget failure.'}
+        first=pg_bad[0];later=[{'sequence':r['sequence'],'at':r['received'],'uid':r['object']['metadata']['uid'],'event':r['event']} for r in rows if r['sequence']>first['sequence'] and r['kind']=='pods' and r['object']['metadata']['uid'] in first['originalReadyMemberUIDs'] and (r['event']=='DELETED' or r['object']['metadata'].get('deletionTimestamp'))]
+        return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'ORIGINAL_SG_REPLACEMENT_STARTED_WITHOUT_READY_BUDGET','watchRows':len(rows),'sourcePreparation':prep,'firstViolation':first,'subsequentMemberDeletionObservations':later,'lowOrdinalACreations':low_a,'limitation':f"Native API200 and Watch prove original healthy SG replacement started with Ready={first['readyBefore']} and minimum={first['minimum']}; removing its {len(first['originalReadyMemberUIDs'])} Ready member exceeds the budget. {len(later)} subsequent member-deletion Watch observations are explicitly retained. Low-ordinal A creation is not alone a failure or Ready credit. Final convergence did not execute."}
     if budget_bad or order_bad:
         assert result['status']=='FAIL'
-        return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_SPARSE_BOUNDARY_BUDGET' if budget_bad else 'LOWER_ORDINAL_DELETED_BEFORE_READY_ELIGIBLE_HIGHER_SOURCE','watchRows':len(rows),'sourcePreparation':prep,'firstViolation':(budget_bad or order_bad)[0],'budgetViolations':budget_bad,'orderViolations':order_bad,'limitation':'Actual accepted boundary and original sparse identities verified; failure before final convergence, no later completion credit.'}
+        return {'id':case['id'],'classification':'KTHENA_BEHAVIOR_FAILURE','failure':'HEALTHY_DELETION_BELOW_SPARSE_BOUNDARY_BUDGET' if budget_bad else 'LOWER_ORDINAL_DELETED_BEFORE_READY_ELIGIBLE_HIGHER_SOURCE','watchRows':len(rows),'sourcePreparation':prep,'firstViolation':(budget_bad or order_bad)[0],'budgetViolations':budget_bad,'orderViolations':order_bad,'lowOrdinalACreations':low_a,'limitation':'Actual accepted boundary, original sparse identities, native DELETE and Watch verified. A missing low-ordinal slot may be recreated as A, but a NotReady Pod contributes no Ready credit. Failure before final convergence, no later completion credit.'}
     assert result['status']=='PASS' and not result.get('violations')
     cp=next(m.read(x) for x in p.glob('checkpoint-*.json') if m.read(x)['phase']==step['name'])
     assert cp['elapsedStableNanos']>=30_000_000_000 and m.ts(cp['stableSince'])>=m.ts(receipt['received'])

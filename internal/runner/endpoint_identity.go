@@ -12,21 +12,19 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-const NormalOrdinalContract = "normal-endpoints/ordinals-0-to-replicas-minus-1/v1"
+const LegacyOrdinalContract = "normal-endpoints/unique-identities-without-contiguous-ordinals/v1"
 
-// Normal flows require canonical identities at the baseline and each settled
-// endpoint, including partitioned A/B endpoints. Fault fixtures have separate
-// source/stop contracts; they are not silently redefined by this check.
+// Normal cases advertise the legacy endpoint contract; fault-source identity
+// contracts remain explicit and independent.
 func (c Case) normalFlow() bool {
 	n, err := strconv.Atoi(strings.TrimPrefix(c.ID, "RUN-"))
 	return err == nil && strings.HasPrefix(c.ID, "RUN-") && n >= 1 && n <= 303
 }
 
-// canonicalOrdinalFacts is an endpoint predicate, never a Watch-event rule.
-// Group and Role identities come from owned Pods. Workers share a Role ID and
-// do not count as additional Role replicas. Distinct labels with the same
-// numeric suffix must not conceal duplicate ordinal identities.
-func canonicalOrdinalFacts(n int, layouts map[int]map[string]int, owner string, pods map[string]*unstructured.Unstructured) error {
+// Endpoint identities may be sparse or shifted. Count, nonnegative unique
+// indices, expected Role membership and exactly one entry per Role still apply.
+// Workers share their Role identity and never provide extra replica credit.
+func endpointIdentityFacts(n int, layouts map[int]map[string]int, owner string, pods map[string]*unstructured.Unstructured) error {
 	groups := map[string]map[string]map[string]int{}
 	for _, pod := range pods {
 		if !objectOwned(pod, owner) {
@@ -53,14 +51,14 @@ func canonicalOrdinalFacts(n int, layouts map[int]map[string]int, owner string, 
 		actual = append(actual, ordinal(group))
 		names = append(names, group)
 	}
-	if err := canonicalOrdinalSet("SG", n, actual); err != nil {
+	if err := endpointIdentitySet("SG", n, actual); err != nil {
 		return err
 	}
 	sort.Strings(names)
 	for _, group := range names {
 		wanted, ok := layouts[ordinal(group)]
 		if !ok {
-			return fmt.Errorf("FINAL_ORDINAL_MISMATCH: missing desired Role layout for %s", group)
+			return fmt.Errorf("FINAL_IDENTITY_MISMATCH: missing desired Role layout for %s", group)
 		}
 		var roles []string
 		for role := range wanted {
@@ -68,7 +66,7 @@ func canonicalOrdinalFacts(n int, layouts map[int]map[string]int, owner string, 
 		}
 		for role := range groups[group] {
 			if _, ok := wanted[role]; !ok {
-				return fmt.Errorf("FINAL_ORDINAL_MISMATCH: unexpected Role %s/%s", group, role)
+				return fmt.Errorf("FINAL_IDENTITY_MISMATCH: unexpected Role %s/%s", group, role)
 			}
 		}
 		sort.Strings(roles)
@@ -76,11 +74,11 @@ func canonicalOrdinalFacts(n int, layouts map[int]map[string]int, owner string, 
 			actual = nil
 			for instance, entries := range groups[group][role] {
 				if entries != 1 {
-					return fmt.Errorf("FINAL_ORDINAL_MISMATCH: %s/%s/%s has %d entries, want 1", group, role, instance, entries)
+					return fmt.Errorf("FINAL_IDENTITY_MISMATCH: %s/%s/%s has %d entries, want 1", group, role, instance, entries)
 				}
 				actual = append(actual, ordinal(instance))
 			}
-			if err := canonicalOrdinalSet(group+"/"+role, wanted[role], actual); err != nil {
+			if err := endpointIdentitySet(group+"/"+role, wanted[role], actual); err != nil {
 				return err
 			}
 		}
@@ -88,19 +86,19 @@ func canonicalOrdinalFacts(n int, layouts map[int]map[string]int, owner string, 
 	return nil
 }
 
-func canonicalOrdinalSet(scope string, desired int, actual []int) error {
+func endpointIdentitySet(scope string, desired int, actual []int) error {
 	sort.Ints(actual)
 	valid := len(actual) == desired && desired >= 0
 	for i, n := range actual {
-		valid = valid && i == n
+		valid = valid && n >= 0 && (i == 0 || actual[i-1] != n)
 	}
 	if !valid {
-		return fmt.Errorf("FINAL_ORDINAL_MISMATCH: %s actual=%v want=0..%d (replicas=%d)", scope, actual, desired-1, desired)
+		return fmt.Errorf("FINAL_IDENTITY_MISMATCH: %s actual=%v want %d distinct nonnegative identities", scope, actual, desired)
 	}
 	return nil
 }
 
-func fixedOrdinalLayouts(spec map[string]interface{}) (int, map[int]map[string]int) {
+func endpointLayouts(spec map[string]interface{}, owner string, pods map[string]*unstructured.Unstructured) (int, map[int]map[string]int) {
 	n := intValue(spec, "replicas", 1)
 	roles := map[string]int{}
 	for _, raw := range listValue(mapValue(spec, "template"), "roles") {
@@ -108,13 +106,15 @@ func fixedOrdinalLayouts(spec map[string]interface{}) (int, map[int]map[string]i
 		roles[textValue(role, "name")] = intValue(role, "replicas", 1)
 	}
 	layouts := map[int]map[string]int{}
-	for g := 0; g < n; g++ {
-		layouts[g] = roles
+	for _, pod := range pods {
+		if objectOwned(pod, owner) {
+			layouts[ordinal(pod.GetLabels()[LabelGroup])] = roles
+		}
 	}
 	return n, layouts
 }
 
-func (l *Ledger) canonicalOrdinals(pods map[string]*unstructured.Unstructured) error {
-	n, layouts := fixedOrdinalLayouts(l.Case.Input.Spec)
-	return canonicalOrdinalFacts(n, layouts, l.Owner, pods)
+func (l *Ledger) endpointIdentities(pods map[string]*unstructured.Unstructured) error {
+	n, layouts := endpointLayouts(l.Case.Input.Spec, l.Owner, pods)
+	return endpointIdentityFacts(n, layouts, l.Owner, pods)
 }

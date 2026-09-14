@@ -340,11 +340,11 @@ def plan(row):
             d=desired(current);old=min(d,effective_budget(current,'partition'))
             if n in (211,217,219,223) and idx>0:old=2
             ords={str(i):'A' if i<old else 'B' for i in range(d)}
-            t={'versions':{v:list(ords.values()).count(v) for v in sorted(set(ords.values()))},'ordinals':ords}
+            t={'versions':{v:list(ords.values()).count(v) for v in sorted(set(ords.values()))},'ordinals':{k:v for k,v in ords.items() if v=='A'}}
             if mode(current)=='SG':t['scope']='SG'
             else:t['role']='frontend'
-            # Surge may introduce extra ordinals in flight. Every settled
-            # normal endpoint must restore the current desired 0..D-1 set.
+            # Legacy endpoints may retain sparse target identities. Keep exact
+            # protected A identities and total A/B counts regardless of budget.
             p['expect']['targets']=[t]
     if n==153:
         for p in steps:p['expect']['noNewRevision']=True
@@ -356,7 +356,7 @@ def plan(row):
             p['expect']['targets']=[{'group':g,'role':'frontend','versions':{'A' if g==0 else 'B':role(current)['replicas']},'workers':{'A':role(a)['workerReplicas'],'B':role(current)['workerReplicas']}} for g in range(current['replicas'])]
     if n in (231,233,257,273):
         final=steps[-1]['spec'];r=role(final)['replicas']
-        steps[-1]['expect']['targets']=[{'group':g,'role':'frontend','versions':({'A':1,'B':r-1} if g<2 else {'B':r}),'ordinals':{'0':'A' if g<2 else 'B'}} for g in range(3)]
+        steps[-1]['expect']['targets']=[{'group':g,'role':'frontend','versions':({'A':1,'B':r-1} if g<2 else {'B':r}),'ordinals':{'0':'A'} if g<2 else {}} for g in range(3)]
     if 154<=n<=159:
         for p in steps:p['expect']['targets']=[{'role':r,'versions':{'B':2},'ordinals':{'0':'B','1':'B'}} for r in ('frontend','backend')]
     if profile=='auto':

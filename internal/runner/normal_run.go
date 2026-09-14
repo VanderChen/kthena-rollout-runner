@@ -85,7 +85,7 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 	start := time.Now()
 	res = Result{ID: c.ID, Status: "ERROR", Started: start.UTC(), Namespace: "rr-" + r.opt.RunID + "-" + strings.ToLower(c.ID)}
 	if c.normalFlow() {
-		res.OrdinalContract = NormalOrdinalContract
+		res.OrdinalContract = LegacyOrdinalContract
 	}
 	dir := filepath.Join(r.root, c.ID)
 	if attempt > 0 {
@@ -336,7 +336,6 @@ func (e *normalExecution) execute(ctx context.Context) error {
 		return err
 	}
 	e.l = l
-	l.CanonicalEndpoints = e.c.normalFlow()
 	// Account for any readiness event that arrived between Create and arming.
 	if err = e.locked(func() error {
 		e.o.normal = l

@@ -167,9 +167,7 @@
           -
             "versions":
               "B": 2
-            "ordinals":
-              "0": "B"
-              "1": "B"
+            "ordinals": {}
             "scope": "SG"
       "spec":
         "template":

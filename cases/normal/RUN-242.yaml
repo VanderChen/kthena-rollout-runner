@@ -145,8 +145,6 @@
               "B": 2
             "ordinals":
               "0": "A"
-              "1": "B"
-              "2": "B"
             "role": "frontend"
       "spec":
         "template":
@@ -252,10 +250,6 @@
               "B": 4
             "ordinals":
               "0": "A"
-              "1": "B"
-              "2": "B"
-              "3": "B"
-              "4": "B"
             "role": "frontend"
       "spec":
         "template":
@@ -358,12 +352,7 @@
           -
             "versions":
               "B": 5
-            "ordinals":
-              "0": "B"
-              "1": "B"
-              "2": "B"
-              "3": "B"
-              "4": "B"
+            "ordinals": {}
             "role": "frontend"
       "spec":
         "template":

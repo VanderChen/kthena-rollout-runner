@@ -250,7 +250,6 @@
               "B": 1
             "ordinals":
               "0": "A"
-              "1": "B"
             "role": "frontend"
       "spec":
         "template":

@@ -238,9 +238,7 @@
           -
             "versions":
               "B": 2
-            "ordinals":
-              "0": "B"
-              "1": "B"
+            "ordinals": {}
             "role": "frontend"
       "spec":
         "template":

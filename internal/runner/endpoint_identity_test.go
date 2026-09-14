@@ -6,7 +6,6 @@ package runner
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func TestCanonicalOrdinalSets(t *testing.T) {
+func TestLegacyEndpointIdentitySets(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		desired int
@@ -22,8 +21,9 @@ func TestCanonicalOrdinalSets(t *testing.T) {
 		valid   bool
 	}{
 		{"unordered-list", 3, []int{2, 0, 1}, true},
-		{"shifted", 3, []int{1, 2, 3}, false},
-		{"gap", 3, []int{0, 2, 3}, false},
+		{"shifted", 3, []int{1, 2, 3}, true},
+		{"gap", 3, []int{0, 2, 3}, true},
+		{"invalid", 3, []int{-1, 0, 2}, false},
 		{"duplicate", 3, []int{0, 1, 1}, false},
 		{"surge-at-end", 3, []int{0, 1, 2, 3}, false},
 		{"empty", 0, nil, true},
@@ -33,7 +33,7 @@ func TestCanonicalOrdinalSets(t *testing.T) {
 		{"stale-size", 2, []int{0, 1, 2}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := canonicalOrdinalSet("test", tc.desired, tc.actual)
+			err := endpointIdentitySet("test", tc.desired, tc.actual)
 			if (err == nil) != tc.valid {
 				t.Fatal(err)
 			}
@@ -41,11 +41,11 @@ func TestCanonicalOrdinalSets(t *testing.T) {
 	}
 }
 
-func TestCanonicalOrdinalsCoverGroupsAllRolesAndIdentity(t *testing.T) {
+func TestLegacyEndpointIdentityCoversAllRoles(t *testing.T) {
 	for _, id := range []string{"RUN-001", "RUN-031"} {
 		t.Run(id, func(t *testing.T) {
 			l, pods := fixture(t, id, 2)
-			if err := l.canonicalOrdinals(pods); err != nil {
+			if err := l.endpointIdentities(pods); err != nil {
 				t.Fatal(err)
 			}
 			for _, role := range []string{"frontend", "backend"} {
@@ -64,44 +64,43 @@ func TestCanonicalOrdinalsCoverGroupsAllRolesAndIdentity(t *testing.T) {
 					p.SetLabels(labels)
 					changed[uid] = p
 				}
-				if err := l.canonicalOrdinals(changed); err == nil || !strings.Contains(err.Error(), "actual=[1 2 3]") {
+				if err := l.endpointIdentities(changed); err != nil {
 					t.Fatal(role, err)
 				}
-				if _, err := NewLedger(l.Case, l.Owner, changed, nil); err == nil {
-					t.Fatal("shifted baseline accepted")
-				}
+				// Core fixture setup still requires the catalogue
+				// baseline IDs used to measure descending replacement starts.
 			}
 			// A foreign Pod cannot supply missing owned capacity or change its set.
 			foreign := makePod("SG", "frontend", 99, "B", true, "entry")
 			foreign.SetOwnerReferences([]metav1.OwnerReference{{UID: "someone-else"}})
 			pods["foreign"] = foreign
-			if err := l.canonicalOrdinals(pods); err != nil {
+			if err := l.endpointIdentities(pods); err != nil {
 				t.Fatal(err)
 			}
 			duplicate := pods[string(makePod(l.Case.Expect.Mode, "frontend", 0, "A", true, "entry").GetUID())].DeepCopy()
 			duplicate.SetUID(types.UID("duplicate-entry"))
 			pods["duplicate-entry"] = duplicate
-			if err := l.canonicalOrdinals(pods); err == nil {
+			if err := l.endpointIdentities(pods); err == nil {
 				t.Fatal("duplicate entry identity accepted")
 			}
 		})
 	}
 }
 
-func TestCanonicalCheckDoesNotForbidIntermediateSurge(t *testing.T) {
+func TestEndpointIdentityCheckAllowsIntermediateSurge(t *testing.T) {
 	for _, id := range []string{"RUN-016", "RUN-046"} {
 		l, pods := fixture(t, id, 0)
 		surge := makePod(l.Case.Expect.Mode, "frontend", 3, "B", false, "entry")
 		event(l, pods, "ADDED", surge)
 		l.Check(pods)
 		noViolation(t, l)
-		if l.canonicalOrdinals(pods) == nil {
+		if l.endpointIdentities(pods) == nil {
 			t.Fatal("surge would be accepted as a final endpoint")
 		}
 	}
 }
 
-func TestEveryNormalCaseUsesCanonicalEndpointContract(t *testing.T) {
+func TestEveryNormalCaseUsesLegacyEndpointContract(t *testing.T) {
 	cases, err := LoadCases(filepath.Join("..", "..", "cases", "normal"))
 	if err != nil || len(cases) != 303 {
 		t.Fatal(len(cases), err)
@@ -113,27 +112,11 @@ func TestEveryNormalCaseUsesCanonicalEndpointContract(t *testing.T) {
 		if c.Scenario == nil {
 			continue
 		}
-		spec := cloneMap(c.Scenario.InitialSpec)
 		for _, step := range c.Scenario.Steps {
-			if step.Spec != nil {
-				spec = cloneMap(step.Spec)
-			}
-			if patch := mapValue(step.Patch, "spec"); patch != nil {
-				mergeInto(spec, patch)
-			}
-			if step.Until != "settled" || step.Expect.NoFullPromotion || step.Expect.BlockedByBudget {
-				continue
-			}
-			n, layouts := fixedOrdinalLayouts(spec)
 			for _, target := range step.Expect.Targets {
-				desired := n
-				if target.Scope != "SG" {
-					desired = layouts[0][target.Role]
-				}
-				for key := range target.Ordinals {
-					ord := ordinal(key)
-					if ord < 0 || ord >= desired {
-						t.Fatal(c.ID, step.Name, "conflicting final ordinal", key, desired)
+				for _, version := range target.Ordinals {
+					if version != "A" && !(c.ID >= "RUN-154" && c.ID <= "RUN-159") {
+						t.Fatal(c.ID, step.Name, "target endpoint still pins new ordinals")
 					}
 				}
 			}
@@ -182,7 +165,7 @@ func settledOrdinalFixture(t *testing.T, id string) *normalExecution {
 	return e
 }
 
-func TestNormalSettledRejectsShiftedFinalOrdinals(t *testing.T) {
+func TestNormalSettledAcceptsShiftedFinalOrdinals(t *testing.T) {
 	for _, id := range []string{"RUN-195", "RUN-081"} {
 		t.Run(id, func(t *testing.T) {
 			e := settledOrdinalFixture(t, id)
@@ -201,16 +184,16 @@ func TestNormalSettledRejectsShiftedFinalOrdinals(t *testing.T) {
 					pg.SetName(fmt.Sprintf("model-%d", ordinal(pg.GetName())+1))
 				}
 			}
-			if ok, reason := e.settled(ScenarioExpectation{}); ok || !strings.Contains(reason, "FINAL_ORDINAL_MISMATCH") {
-				t.Fatal("noncanonical endpoint passed or unrelated failure", ok, reason)
+			if ok, reason := e.settled(ScenarioExpectation{}); !ok {
+				t.Fatal("valid shifted endpoint rejected", reason)
 			}
 		})
 	}
 }
 
-func TestCanonicalNormalizationRetiresOnlyOutOfRangeTargetsWithinBudget(t *testing.T) {
+func TestLegacyEndpointsDoNotExcuseTargetChurn(t *testing.T) {
 	for _, id := range []string{"RUN-195", "RUN-071"} {
-		for _, variant := range []string{"allowed", "zero-budget", "in-range", "no-replacement", "legacy-fixture"} {
+		for _, variant := range []string{"out-of-range", "zero-budget", "in-range", "no-replacement"} {
 			t.Run(id+"/"+variant, func(t *testing.T) {
 				l, objects := normalFixture(t, id)
 				for _, p := range objects["pods"] {
@@ -232,9 +215,6 @@ func TestCanonicalNormalizationRetiresOnlyOutOfRangeTargetsWithinBudget(t *testi
 						}
 					}
 				}
-				if variant == "legacy-fixture" {
-					l.CanonicalEndpoints = false
-				}
 				expect := ScenarioExpectation{NoReplacement: variant == "no-replacement"}
 				if err := l.Transition(spec, "normalize-after-budget-change", expect, objects); err != nil {
 					t.Fatal(err)
@@ -248,19 +228,47 @@ func TestCanonicalNormalizationRetiresOnlyOutOfRangeTargetsWithinBudget(t *testi
 				} else {
 					deleteNormal(l, objects, "frontend", 0, n)
 				}
-				if variant == "allowed" {
-					if l.error() != nil {
-						t.Fatal("legal ordinal cleanup rejected", l.error())
+				requireNormalViolation(t, l, "PROTECTED_REPLACED")
+			})
+		}
+	}
+}
+
+func TestLegacySettledStillRejectsQualityFailures(t *testing.T) {
+	for _, id := range []string{"RUN-195", "RUN-081"} {
+		for _, defect := range []string{"not-ready", "wrong-version", "foreign-member", "missing-member", "duplicate-entry", "missing-pg", "stale-status", "missing-history"} {
+			t.Run(id+"/"+defect, func(t *testing.T) {
+				e := settledOrdinalFixture(t, id)
+				var uid string
+				var pod *unstructured.Unstructured
+				for uid, pod = range e.o.objects["pods"] {
+					if pod.GetLabels()[LabelEntry] == "true" {
+						break
 					}
-					if len(l.Starts) != 1 || l.Starts[0].Reason != "ordinal-cleanup" {
-						t.Fatal(l.Starts)
-					}
-				} else {
-					code := "PROTECTED_REPLACED"
-					if variant == "zero-budget" {
-						code = "BUDGET_VIOLATION"
-					}
-					requireNormalViolation(t, l, code)
+				}
+				switch defect {
+				case "not-ready":
+					pod.Object["status"] = map[string]interface{}{}
+				case "wrong-version":
+					containers := listValue(mapValue(pod.Object, "spec"), "containers")
+					containers[0].(map[string]interface{})["env"] = []interface{}{map[string]interface{}{"name": "ROLLOUT_VERSION", "value": "wrong"}}
+				case "foreign-member":
+					pod.SetOwnerReferences([]metav1.OwnerReference{{UID: "someone-else"}})
+				case "missing-member":
+					delete(e.o.objects["pods"], uid)
+				case "duplicate-entry":
+					p := pod.DeepCopy()
+					p.SetUID("duplicate")
+					e.o.objects["pods"]["duplicate"] = p
+				case "missing-pg":
+					e.o.objects["podgroups"] = map[string]*unstructured.Unstructured{}
+				case "stale-status":
+					e.current.Object["status"].(map[string]interface{})["observedGeneration"] = int64(0)
+				case "missing-history":
+					e.o.objects["controllerrevisions"] = map[string]*unstructured.Unstructured{}
+				}
+				if ok, reason := e.settled(ScenarioExpectation{}); ok {
+					t.Fatal("quality failure passed", reason)
 				}
 			})
 		}

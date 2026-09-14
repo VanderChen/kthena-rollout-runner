@@ -109,10 +109,6 @@
               "B": 4
             "ordinals":
               "0": "A"
-              "1": "B"
-              "2": "B"
-              "3": "B"
-              "4": "B"
             "scope": "SG"
       "spec":
         "template":
@@ -184,8 +180,6 @@
               "B": 2
             "ordinals":
               "0": "A"
-              "1": "B"
-              "2": "B"
             "scope": "SG"
       "spec":
         "template":

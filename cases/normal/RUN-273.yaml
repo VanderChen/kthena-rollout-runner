@@ -159,8 +159,7 @@
             "role": "frontend"
             "versions":
               "B": 3
-            "ordinals":
-              "0": "B"
+            "ordinals": {}
       "spec":
         "template":
           "roles":

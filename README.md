@@ -7,7 +7,9 @@
 当前验证统一使用 Kthena production `538b2825c06bc1e8c5392d18f18f84faee9fca95`，未修改 Kthena 源码。
 参见[完整用例集及证据复核](docs/EXPANDED_SUITE.md)和[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。
 
-2026-09-11 补充：全部正常流程已增加通用起止序号检查，SG 和各组内每种 Role 在正常基线及每个完成阶段必须为 `0..replicas-1`，过程仍允许 surge。上面的 708 项统计属于新增检查前的历史验收，不能作为新增检查的通过证明。新执行的结果带有 `ordinalContract`；[补充验证](docs/ORDINAL_VERIFICATION.md)记录 10 项新 Kind 执行（6 PASS/4 FAIL）及全部 303 项历史起止快照中发现的 86 项旧 PASS 序号问题。
+当前为低版本兼容分支 `fix/032-runner-legacy-quality`：正常完成端点允许 `012 → 123` 等非连续身份集合，仍检查精确副本数、合法且唯一身份、entry/worker 完整性及全部过程质量约束。结果通过 `ordinalContract` 标识兼容契约。连续序号版本保存在原分支及 `runner-canonical-20260915` 标签；[检查点](docs/CHECKPOINT_20260915.md)记录原提交和时间，[兼容契约及验证](docs/LEGACY_QUALITY.md)说明具体范围。
+
+上面的 708 项统计是历史验收，本分支不会重写或自动转换旧 verdict。[历史序号补充验证](docs/ORDINAL_VERIFICATION.md)中的 86 项序号发现仍保留，但不属于本分支要求的连续编号标准。
 
 原 `cases/core/` 的60份输入及历史验收结果保留不变。以下核心过程和旧Kind结果描述
 对应原60项；新集群验证必须显式传入当前production镜像及 `--controller-commit`。

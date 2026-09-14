@@ -1,6 +1,6 @@
 # 完整用例集及证据复核
 
-2026-09-11 补充：以下 708 项统计保留新增序号要求前的结论。正常流程现在统一要求起止序号为 `0..replicas-1`，新增检查及历史漏判见 [序号补充验证](ORDINAL_VERIFICATION.md)，不能用以下旧 PASS 推断已满足新增检查。
+Current branch uses the [legacy endpoint contract](LEGACY_QUALITY.md). The following 708-case results are historical evidence, not a fresh run of this branch. The [canonical ordinal report](ORDINAL_VERIFICATION.md) remains available for the preserved canonical branch.
 
 本轮以原始矩阵 `issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json` 为语义契约，SHA256 为 `757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5`。共 708 个唯一 ID；`cases/core` 的旧 60 项以及同 ID 的修正源准备目录不重复计数。
 

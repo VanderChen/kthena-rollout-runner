@@ -131,7 +131,7 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 				layouts[group][name] = role.R
 			}
 		}
-		if err := canonicalOrdinalFacts(l.Model.N, layouts, l.Owner, obj["pods"]); err != nil {
+		if err := endpointIdentityFacts(l.Model.N, layouts, l.Owner, obj["pods"]); err != nil {
 			return false, err.Error()
 		}
 	}

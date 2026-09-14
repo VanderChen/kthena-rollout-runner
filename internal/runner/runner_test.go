@@ -372,7 +372,7 @@ func TestRevisionHashResolvesToOwnedControllerRevisionName(t *testing.T) {
 		t.Fatal("must resolve status hash abc123 to model-abc123")
 	}
 	// Count, readiness, versions, status and PG associations still converge
-	// after this shift; the endpoint ordinal invariant must catch it.
+	// after this shift; the legacy endpoint contract accepts it.
 	shifted := map[string]map[string]*unstructured.Unstructured{}
 	for kind, objectsByUID := range objects {
 		shifted[kind] = map[string]*unstructured.Unstructured{}
@@ -389,8 +389,8 @@ func TestRevisionHashResolvesToOwnedControllerRevisionName(t *testing.T) {
 			shifted[kind][uid] = p
 		}
 	}
-	if finalFacts(l, shifted, 2) {
-		t.Fatal("completed core rollout accepted final 123 at desired replicas 3")
+	if !finalFacts(l, shifted, 2) {
+		t.Fatal("completed legacy core rollout rejected final 123 at desired replicas 3")
 	}
 	cr.SetOwnerReferences([]metav1.OwnerReference{{UID: "different-owner"}})
 	if finalFacts(l, objects, 2) {

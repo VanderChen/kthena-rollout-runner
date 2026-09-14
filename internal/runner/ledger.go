@@ -151,7 +151,7 @@ func NewLedger(c Case, owner string, pods, pgs map[string]*unstructured.Unstruct
 	l := &Ledger{Case: c, Owner: owner, Baseline: map[string]Unit{}, ProtectedUIDs: map[string]string{}, BaselinePG: map[string]string{}, PodUnit: map[string]string{}, Started: map[string]bool{}, PGStarted: map[string]bool{}, Released: map[string]bool{}}
 	l.ReleasedUnits = map[string]bool{}
 	l.Baseline = l.units(pods)
-	if err := l.canonicalOrdinals(pods); err != nil {
+	if err := l.endpointIdentities(pods); err != nil {
 		return nil, fmt.Errorf("baseline: %w", err)
 	}
 	if len(l.Baseline) != c.Expect.Desired {

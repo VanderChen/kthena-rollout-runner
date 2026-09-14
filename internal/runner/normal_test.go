@@ -39,7 +39,6 @@ func normalFixture(t *testing.T, id string) (*NormalLedger, Objects) {
 		t.Fatal(err)
 	}
 	l.RevisionLayouts["fixture-A"] = l.Model
-	l.CanonicalEndpoints = c.normalFlow()
 	o := Objects{"pods": {}, "podgroups": {}, "controllerrevisions": {}}
 	for g := 0; g < l.Model.N; g++ {
 		for name, r := range l.Model.Roles {

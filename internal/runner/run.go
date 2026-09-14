@@ -279,7 +279,7 @@ func (r *Runner) preflight(ctx context.Context) error {
 func (r *Runner) runCase(ctx context.Context, c Case) (res Result) {
 	started := time.Now()
 	res = Result{ID: c.ID, Status: "ERROR", Started: started.UTC(), Namespace: "rr-" + r.opt.RunID + "-" + strings.ToLower(c.ID)}
-	res.OrdinalContract = NormalOrdinalContract
+	res.OrdinalContract = LegacyOrdinalContract
 	dir := filepath.Join(r.root, c.ID)
 	if err := os.Mkdir(dir, 0755); err != nil {
 		res.Error = err.Error()
@@ -575,7 +575,7 @@ func (r *Runner) await(ctx context.Context, o *Observer, name string, check func
 		case <-deadline.C:
 			if name == "next blocked target or completion" {
 				_, diagnostic := o.Inspect(func(l *Ledger, obj map[string]map[string]*unstructured.Unstructured) (bool, error) {
-					return false, l.canonicalOrdinals(obj["pods"])
+					return false, l.endpointIdentities(obj["pods"])
 				})
 				if diagnostic != nil {
 					return fmt.Errorf("TIMEOUT: %s (%v)", name, diagnostic)
@@ -640,7 +640,7 @@ func (r *Runner) release(ctx context.Context, u Unit, dir string, index int) err
 }
 func finalFacts(l *Ledger, obj map[string]map[string]*unstructured.Unstructured, generation int64) bool {
 	e := l.Case.Expect
-	if l.canonicalOrdinals(obj["pods"]) != nil {
+	if l.endpointIdentities(obj["pods"]) != nil {
 		return false
 	}
 	units := l.units(obj["pods"])

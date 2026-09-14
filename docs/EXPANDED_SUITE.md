@@ -1,6 +1,6 @@
 # 完整用例集及证据复核
 
-Current branch uses the [legacy endpoint contract](LEGACY_QUALITY.md). The following 708-case results are historical evidence, not a fresh run of this branch. The [canonical ordinal report](ORDINAL_VERIFICATION.md) remains available for the preserved canonical branch.
+当前分支采用[低版本端点契约](LEGACY_QUALITY.md)。以下 708 项统计属于历史执行，不能作为当前分支重新运行的证明。[连续编号报告](ORDINAL_VERIFICATION.md)继续保留，适用于已保存的保序分支。
 
 本轮以原始矩阵 `issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json` 为语义契约，SHA256 为 `757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5`。共 708 个唯一 ID；`cases/core` 的旧 60 项以及同 ID 的修正源准备目录不重复计数。
 

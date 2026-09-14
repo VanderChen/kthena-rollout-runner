@@ -1,6 +1,6 @@
 # 正常流程序号检查补充验证
 
-Historical canonical-branch report. Current legacy policy: [LEGACY_QUALITY.md](LEGACY_QUALITY.md).
+本文保留保序分支的历史验证。当前分支的要求见[低版本质量契约](LEGACY_QUALITY.md)。
 
 2026-09-11：全部 RUN-001～303 已接入公共起止检查。SG 和各 SG 内的每种 Role 在正常基线及每个完成阶段要求 `0..replicas-1`，按阶段最新副本数判断；中间允许合法 surge。RUN-101 的明确未完成依赖停点不当作全量完成。原 708 项报告保留为新增要求前的历史结果。
 

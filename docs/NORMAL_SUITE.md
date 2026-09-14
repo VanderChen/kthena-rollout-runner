@@ -50,8 +50,8 @@ Watch从List的resourceVersion开始，无法连续恢复的观察缺口判INCON
 
 ## 触发和终态契约
 
-- Legacy branch endpoint policy: SG and Role identities may be sparse or shifted; replica counts, nonnegative unique identities and exactly one entry per Role remain mandatory. All normal cases declare `ordinalContract=normal-endpoints/unique-identities-without-contiguous-ordinals/v1`.
-- Final target B ordinal ranges are unconstrained. Explicit fixture identities, protected A/UIDs, descending old replacement starts, budget and cleanup checks remain enforced. There is no target deletion exception for ordinal normalization. See [legacy quality contract](LEGACY_QUALITY.md).
+- 低版本兼容分支允许完成后的 SG 和 Role 身份集合稀疏或偏移；副本数、非负且唯一身份和每个 Role 恰有一个 entry 仍须正确。全部正常用例标记 `ordinalContract=normal-endpoints/unique-identities-without-contiguous-ordinals/v1`。
+- 不限制最终目标 B 的连续编号范围。明确的准备数据身份、受保护 A/UID、旧实例下降启动顺序、预算和清理仍须通过检查；不再因恢复连续编号而豁免目标实例删除。详见[低版本质量契约](LEGACY_QUALITY.md)。
 - HOLD_READY的全部A/B entry/worker出生时不创建ready文件；基线和后续单位分别按UID
   放行。每个目录要求的10秒停点和30秒终态窗口持续运行断言。
 - AUTO_READY_INTERLEAVE的Pod自然Ready，不使用Ready门控、延迟、finalizer或暂停

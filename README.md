@@ -7,7 +7,7 @@
 当前验证统一使用 Kthena production `538b2825c06bc1e8c5392d18f18f84faee9fca95`，未修改 Kthena 源码。
 参见[完整用例集及证据复核](docs/EXPANDED_SUITE.md)和[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。
 
-当前为低版本兼容分支 `fix/032-runner-legacy-quality`：正常完成端点允许 `012 → 123` 等非连续身份集合，仍检查精确副本数、合法且唯一身份、entry/worker 完整性及全部过程质量约束。结果通过 `ordinalContract` 标识兼容契约。连续序号版本保存在原分支及 `runner-canonical-20260915` 标签；[检查点](docs/CHECKPOINT_20260915.md)记录原提交和时间，[兼容契约及验证](docs/LEGACY_QUALITY.md)说明具体范围。
+当前为低版本兼容分支 `legacy`（原 `fix/032-runner-legacy-quality`）：正常完成端点允许 `012 → 123` 等非连续身份集合，仍检查精确副本数、合法且唯一身份、entry/worker 完整性及全部过程质量约束。结果通过 `ordinalContract` 标识兼容契约。全量检查及连续序号要求已合入 `main`，原保序分支及 `runner-canonical-20260915` 标签继续保留；[检查点](docs/CHECKPOINT_20260915.md)记录原提交和时间，[兼容契约及验证](docs/LEGACY_QUALITY.md)说明具体范围。
 
 上面的 708 项统计是历史验收，本分支不会重写或自动转换旧 verdict。[历史序号补充验证](docs/ORDINAL_VERIFICATION.md)中的 86 项序号发现仍保留，但不属于本分支要求的连续编号标准。
 

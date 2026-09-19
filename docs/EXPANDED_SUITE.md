@@ -33,7 +33,7 @@
 
 ## 本轮 Kind 编排
 
-`scripts/run-history-kind.py MANIFEST BUILD_JSON BINARY` 是本轮环境专用的串行批次编排器，固定了 kubeconfig、原控制器 spec 和 9 个历史 ModelServing UID；不是任意新集群的初始化工具。默认使用已验证的 R6 代理，可通过 `RUNNER_PROXY_POD`、`RUNNER_PROXY_CONTROL_URL`、`RUNNER_PROXY_CA_FILE` 指定经过组件验证的独立代理实例；控制器连接地址取自 manifest 的 `--fault-proxy-api`。专用 Dockerfile、二进制 SHA256、镜像 ID 和构建记录位于 `artifacts/environment-022/`。
+`scripts/run-history-kind.py MANIFEST BUILD_JSON BINARY` 是本轮环境专用的串行批次编排器，固定了 kubeconfig、原控制器 spec 和 9 个历史 ModelServing UID；不是任意新集群的初始化工具。默认使用已验证的 R6 代理，可通过 `RUNNER_PROXY_POD`、`RUNNER_PROXY_CONTROL_URL`、`RUNNER_PROXY_CA_FILE` 指定经过组件验证的独立代理实例；控制器连接地址取自 manifest 的 `--fault-proxy-api`。当时的专用 Dockerfile 可从 Git 历史取回；二进制 SHA256、镜像 ID 和构建记录位于 `artifacts/environment-022/`。
 
 编排器先核对原环境，建立每批独立且不可变的代理 ConfigMap，验证控制器实际挂载内容和代理原生启动请求，再创建唯一用例 Job。结束后收集原始输出和请求 trace，恢复原完整控制器 spec，核对全部历史 UID 和代理状态。只有前一批完成收集及恢复后才能开始下一批；不能并发修改共享控制器。
 

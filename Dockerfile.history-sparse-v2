@@ -1,4 +1,0 @@
-FROM busybox:1.36
-COPY --chmod=0755 bin/rollout-runner-history-sparse-v2 /usr/local/bin/rollout-runner
-COPY cases/history-sparse /cases/history-sparse
-ENTRYPOINT ["/usr/local/bin/rollout-runner"]

@@ -1,5 +1,0 @@
-FROM busybox:1.36
-COPY bin/rollout-runner-container-restart /usr/local/bin/rollout-runner
-COPY cases/container-restart/RUN-*.yaml /cases/recovery-extra/
-COPY cases/protected-recovery/RUN-*.yaml /cases/recovery-extra/
-ENTRYPOINT ["/usr/local/bin/rollout-runner"]

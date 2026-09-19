@@ -4,11 +4,10 @@
 
 **从这里开始：**[使用指南](docs/USER_GUIDE.md)给出从当前源码构建通用镜像、在专用 Kind
 集群运行一个用例、导出和判读结果的完整步骤；[开发指南](docs/DEVELOPER_GUIDE.md)
-解释代码、用例、43 个 Dockerfile 及扩展/验证流程。默认 `Dockerfile` 打包当前
-`bin/rollout-runner` 和整个 `cases/`；`Makefile image` 只使用它。
-`Dockerfile.fault-proxy` 对应独立故障代理，其余带后缀文件主要是历史专项或候选镜像配方，
-不需要逐一构建。`deploy/*.yaml` 多为既有 attempt，重新执行应使用新的 Job 名、镜像 tag
-和 `--run-id`。
+解释代码、用例及扩展/验证流程。根目录只保留两个镜像入口：默认 `Dockerfile` 打包当前
+`bin/rollout-runner` 和整个 `cases/`，`Dockerfile.fault-proxy` 打包独立故障代理。
+历史专项镜像配方可从 Git 历史取回，详见开发指南。`deploy/*.yaml` 多为既有 attempt，
+重新执行应使用新的 Job 名、镜像 tag 和 `--run-id`。
 
 分支约定：`main` 保留全量用例及正常滚动完成后的保序检查；`legacy` 为低版本兼容分支，取消完成后必须为 `0..replicas-1` 的要求，保留其他质量检查。
 

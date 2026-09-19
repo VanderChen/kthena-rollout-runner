@@ -21,20 +21,16 @@ deploy/                          已运行的 Job、fixture 和代理部署记�
 
 `LoadCases` 只读取传入目录中的 `RUN-*.yaml` 与 `DENY-*.yaml`，按文件名排序、拒绝重复 ID 或不支持的输入。`Run` 先建立唯一结果目录，再检查 controller 镜像、Ready、CRD、Volcano 与 fixture；v3/v4 还检查故障代理。每例先记录基线与原始观察，然后执行请求、持续断言并按 UID 清理自己的 namespace。过程违规会锁存；最终健康状态不能抹去违例。`summary.json` 和 JUnit 随执行更新，清理失败阻止后续执行。
 
-## 为什么有 43 个 Dockerfile
+## 镜像构建入口与历史配方
 
-`Makefile image` 只调用根目录的 `Dockerfile`。大部分带后缀的 Dockerfile 是 022 扩展测试期间保留下来的**当时镜像构建配方**：把某一版 `bin/rollout-runner-...` 复制到统一入口 `/usr/local/bin/rollout-runner`，只带对应场景目录，便于将镜像、Job、二进制 SHA256 和原始结果关联。`-r2`、`-v3` 等表示迭代 attempt；它们不是 runner 的运行开关，也不保证是当前源码的可重现构建。仓库不追踪 `bin/`，没有 Makefile 目标去重建每个历史名称。
+根目录只保留两个 Dockerfile。`Makefile image` 调用默认 `Dockerfile`；故障代理从当前源码单独构建后使用 `Dockerfile.fault-proxy`。
 
 | 文件 | 用途 |
 | --- | --- |
 | `Dockerfile` | 当前通用 runner：`bin/rollout-runner` + 整个 `cases/`；新执行优先使用 |
 | `Dockerfile.fault-proxy` | 当前源码构建出的 `bin/fault-proxy`；供 v3/v4 故障注入另行部署 |
-| `Dockerfile.fault-proxy-r4`～`r8` | 历史代理候选，绑定各自命名的二进制 |
-| `Dockerfile.api-*`、`container-restart`、`controller-restart`、`deletion-replay`、`eviction`、`grace`、`initial-sync*`、`leader-switch`、`lost-deletion`、`midrollout`、`pending`、`plugin-retry`、`recovery`、`rejection*` | 各故障/拒绝族当时的 runner 镜像，通常只复制该族用例 |
-| `Dockerfile.boundary-*`、`history-*` | 边界与历史对象/稀疏源/碰撞等专用 attempt；带 `-v2`、`-v3` 的是候选迭代 |
-| `Dockerfile.boundary-fixes`、`Dockerfile.history-fixed` | 修正验证时合并若干目录的历史镜像 |
 
-这些文件统一使用 BusyBox 基础镜像；真正的 Go 二进制由镜像构建前的 `go build` 产生。`deploy/*.yaml` 也保留旧镜像 tag、run ID、控制器 commit 和选择集，作为已发生的实验记录。新实验不要直接 `kubectl apply` 旧 Job，也不要为了看似相近的场景误选旧 Dockerfile。先用默认镜像；若确需复现特定历史候选，核对当时的源码提交、二进制 SHA、镜像 ID、用例 SHA 和独立 Job 证据。
+此前根目录的 41 个 `Dockerfile.*` 是 022 扩展测试期间的专项或迭代镜像配方，各自 `COPY` 当时命名的 `bin/rollout-runner-*` 或 `bin/fault-proxy-r*`，有的只带一个场景目录。它们未被当前构建脚本调用，且 `bin/` 不纳入 Git，不能从干净克隆直接重建对应旧镜像。清理后仍可用 `git show 376a38a:Dockerfile.history-fixed` 这类命令读取原文；精确文件清单见 issues 任务 035 的 `PROPOSAL_COMMIT.md`。历史 `deploy/*.yaml`、镜像身份、二进制 SHA256 和原始结果仍按原样保存。新实验使用当前入口和新的 Job、镜像 tag 与 run ID；复核旧候选时需同时核对当时源码、二进制、镜像与用例输入。
 
 ## 构建、测试和架构
 

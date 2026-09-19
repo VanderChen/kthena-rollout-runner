@@ -1,4 +1,0 @@
-FROM busybox:1.36
-COPY --chmod=0755 bin/rollout-runner-initial-sync /usr/local/bin/rollout-runner
-COPY cases/initial-sync /cases/initial-sync
-ENTRYPOINT ["/usr/local/bin/rollout-runner"]

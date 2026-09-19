@@ -47,7 +47,7 @@ docker build --platform "linux/$NODE_ARCH" -f Dockerfile -t "$RUNNER_IMAGE" .
 kind load docker-image "$RUNNER_IMAGE" --name "$KIND_CLUSTER"
 ```
 
-`make build` 产生 Linux 二进制 `bin/rollout-runner`。默认 `Dockerfile` 将它和整个 `cases/` 复制进镜像。`make image GOARCH=... IMAGE=...` 是本机与 Kind 节点同架构时的捷径；跨架构时使用上面的显式 `docker build --platform`。构建上下文应为仓库根目录，不需要也不应先逐个构建 `Dockerfile.*`。
+`make build` 产生 Linux 二进制 `bin/rollout-runner`。默认 `Dockerfile` 将它和整个 `cases/` 复制进镜像。`make image GOARCH=... IMAGE=...` 是本机与 Kind 节点同架构时的捷径；跨架构时使用上面的显式 `docker build --platform`。构建上下文应为仓库根目录；故障代理需要时再单独使用 `Dockerfile.fault-proxy`。
 
 安装 runner 的测试权限、结果 PVC/reader 和 ranktable fixture：
 

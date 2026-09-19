@@ -11,6 +11,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
@@ -33,7 +34,38 @@ func actualContainerFault(pod *corev1.Pod, kind string) bool {
 	return false
 }
 
-func (e *normalExecution) dropReady(ctx context.Context, prefix string) error {
+func (e *normalExecution) restoreOrReplaceReadiness(ctx context.Context, prefix string) error {
+	if e.readinessPod == nil {
+		return fmt.Errorf("INCONCLUSIVE: exact readiness fault UID not recorded")
+	}
+	target := e.readinessPod
+	current, err := e.r.kube.CoreV1().Pods(e.namespace).Get(ctx, target.Name, metav1.GetOptions{})
+	mode := "controller-replaced-faulted-old"
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("INCONCLUSIVE: faulted old Pod GET: %w", err)
+	}
+	if err == nil && current.UID == target.UID && current.DeletionTimestamp == nil {
+		if podReady(current) {
+			return fmt.Errorf("INCONCLUSIVE: faulted old Pod recovered without declared release")
+		}
+		mode = "same-uid-readiness-restore"
+		e.res.Releases++
+		if err := e.r.release(ctx, Unit{Key: target.Name, Pods: []*corev1.Pod{target}}, e.dir, e.res.Releases); err != nil {
+			return err
+		}
+	}
+	return writeJSON(filepath.Join(e.dir, prefix+"-fault-recovery-choice.json"), map[string]interface{}{
+		"at": time.Now().UTC(), "mode": mode, "faultedUID": target.UID,
+		"currentUID": func() string {
+			if current == nil {
+				return ""
+			}
+			return string(current.UID)
+		}(),
+	})
+}
+
+func (e *normalExecution) dropReady(ctx context.Context, step ScenarioStep, prefix string) error {
 	pods, err := e.r.kube.CoreV1().Pods(e.namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -51,6 +83,17 @@ func (e *normalExecution) dropReady(ctx context.Context, prefix string) error {
 		if podVersion(pod) == "A" {
 			healthyOld++
 		}
+		if step.ReadinessTarget != nil {
+			t := step.ReadinessTarget
+			if podVersion(pod) != t.Version || ordinal(pod.Labels[LabelGroup]) != *t.Group || ordinal(pod.Labels[LabelRoleID]) != *t.Ordinal {
+				continue
+			}
+			if target != nil {
+				return fmt.Errorf("TRIGGER_MISSED: old readiness target is ambiguous")
+			}
+			target = pod
+			continue
+		}
 		if podVersion(pod) == "B" {
 			if target != nil {
 				return fmt.Errorf("TRIGGER_MISSED: more than one B was Ready before readiness withdrawal")
@@ -59,7 +102,7 @@ func (e *normalExecution) dropReady(ctx context.Context, prefix string) error {
 		}
 	}
 	if target == nil || healthyOld == 0 {
-		return fmt.Errorf("TRIGGER_MISSED: first Ready B and healthy A must coexist")
+		return fmt.Errorf("TRIGGER_MISSED: Ready fault target and healthy old A must coexist")
 	}
 	e.readinessPod = target.DeepCopy()
 	command := []string{"rm", "-f", "/tmp/ready"}

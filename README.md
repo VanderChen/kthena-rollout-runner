@@ -12,6 +12,7 @@
 分支约定：`main` 保留全量用例及正常滚动完成后的保序检查；`legacy` 为低版本兼容分支，取消完成后必须为 `0..replicas-1` 的要求，保留其他质量检查。
 
 执行集已扩展为 **708 个唯一用例**：正常流程 RUN-001～303、故障恢复 RUN-304～539、边界 RUN-540～611 和拒绝 DENY-001～097。
+另有独立补充回归 `cases/rollout-blocking/RUN-612～617`，验证新版本无法 Ready 及滚动中注入 Ready 故障后的阻塞，不计入历史 708 项统计。
 708 项均已完成 Kind 独立复核：第一类 266 PASS/37 产品 FAIL，第二类 128 PASS/108 产品 FAIL，第三类 158 PASS/11 产品 FAIL；合计 **552 PASS、156 项产品 FAIL**。Kthena production 源码未修改，失败与无效尝试保留。完整报告见 `artifacts/expanded-suite-final-verification/` 和 issues 任务 022 的 `FINAL_VERIFICATION.md`。
 当前验证统一使用 Kthena production `538b2825c06bc1e8c5392d18f18f84faee9fca95`，未修改 Kthena 源码。
 参见[完整用例集及证据复核](docs/EXPANDED_SUITE.md)和[303项执行契约和运行方式](docs/NORMAL_SUITE.md)。

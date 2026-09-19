@@ -64,11 +64,14 @@ docker build --platform linux/arm64 -f Dockerfile.fault-proxy -t kthena-fault-pr
 | 格式 | 范围 | 主要字段 |
 | --- | --- | --- |
 | `rollout-runner/v1` | 原 `core` 60 项，亦在 `normal` 前 60 项 | `input.spec`、`update`、`expect`、`process` |
-| `rollout-runner/v2` | 正常流程扩展及部分数值边界 | `scenario.source`、`profile`、`initialSpec`、`steps` |
+| `rollout-runner/v2` | 正常流程扩展、部分数值边界及滚动阻塞补充集 | `scenario.source`、`profile`、`initialSpec`、`steps` |
 | `rollout-runner/v3` | 故障恢复和部分边界 | v2 阶段结构，加故障动作与代理证据 |
 | `rollout-runner/v4` | `DENY-001`～097 | 拒绝请求与旧状态保持检查 |
 
 以 `cases/normal/RUN-061.yaml` 为例，`scenario.source` 是审阅者理解目标的来源描述，不由 runner 解释成动作；`initialSpec` 和每个 `steps[].action/spec/patch/until/release/expect` 才是执行契约。以 `RUN-001` 为例，v1 的 `expect.maxUnavailable/maxSurge/partition/startOrder` 明确预算与次序。拒绝类 `DENY-001` 必须观察真实 API 响应，而不是只看终态。修改时保留省略、`null`、空对象的区别，以及原始请求和 defaulted server 对象的区别。
+
+`cases/rollout-blocking/RUN-612～617` 独立于历史 708 项。`hold-block` 将当前健康旧 A 的精确 UID 冻结在 ledger 中；`preserveHealthyOld` 在 Watch 删除事件和每秒一次的直接 Pod GET 上检查这些 UID。RUN-616/617 的 `readinessTarget` 精确选中旧 A，要求同 UID 的真实 Ready 回退后才建立阻塞基线。通过结果必须同时具备故障停点、至少 30 秒阻塞观察和恢复后至少 30 秒的终态观察。
+这六项的来源契约位于工作区 `issues/features/037-rollout-blocking-scenarios-DONE/`，不改写 feature 020 的历史 708 项矩阵。
 
 新增/修订目录用例时先更新并审阅源矩阵和设计，再用对应 `scripts/generate-*.py` 显式 ID 映射生成，查看 YAML diff，核对唯一 ID、来源 SHA、期望和每个阶段。生成脚本可能依赖相邻的 `issues/` 目录；不要在没有该源时盲目重新生成。针对新的判定逻辑加入能拒绝错误轨迹的定向测试，运行 `make test`。不把 controller 的候选选择或预算函数导入 runner 作为 oracle；断言应来自目录语义和可观测资源。正常流程 `main` 的基线及每个 settled 完成阶段还必须满足 `0..replicas-1` 的 SG/Role ordinal；中途仍允许合法 surge。细节见 [正常流程契约](NORMAL_SUITE.md)和 [原 60 项契约](CONTRACT.md)。
 

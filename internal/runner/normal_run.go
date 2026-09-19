@@ -567,14 +567,40 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 			return err
 		}
 	case "observe":
-		if err := e.locked(func() error { e.l.Phase = p.Name; e.l.Expected = p.Expect; return nil }); err != nil {
+		if err := e.locked(func() error {
+			e.l.Phase = p.Name
+			e.l.Expected = p.Expect
+			if !p.Expect.PreserveHealthyOld {
+				e.l.BlockedOld = map[string]string{}
+			}
+			return nil
+		}); err != nil {
 			return err
+		}
+	case "drop-ready":
+		beforeFault := p.Expect
+		beforeFault.PreserveHealthyOld = false
+		if err := e.locked(func() error { return e.l.Transition(e.l.Model.Spec, p.Name, beforeFault, e.o.objects) }); err != nil {
+			return err
+		}
+		if err := e.specialAction(ctx, p, prefix); err != nil {
+			return err
+		}
+		if p.Expect.PreserveHealthyOld {
+			if err := e.locked(func() error { return e.l.Transition(e.l.Model.Spec, p.Name, p.Expect, e.o.objects) }); err != nil {
+				return err
+			}
 		}
 	default:
 		if err := e.locked(func() error { return e.l.Transition(e.l.Model.Spec, p.Name, p.Expect, e.o.objects) }); err != nil {
 			return err
 		}
 		if err := e.specialAction(ctx, p, prefix); err != nil {
+			return err
+		}
+	}
+	if p.Expect.PreserveHealthyOld && p.Action != "observe" {
+		if err := e.recordBlockedOld(prefix); err != nil {
 			return err
 		}
 	}
@@ -634,8 +660,15 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 	defer tick.Stop()
 	var stableAt time.Time
 	var releaseAfter time.Time
+	var lastBlockProbe time.Time
 	lastReason := ""
 	for {
+		if time.Since(lastBlockProbe) >= time.Second {
+			if err := e.verifyBlockedOld(ctx); err != nil {
+				return err
+			}
+			lastBlockProbe = time.Now()
+		}
 		if e.completionStatusProbe && time.Since(e.completionStatusChecked) >= time.Second {
 			if err := e.probeCompletionStatus(ctx); err != nil {
 				return err

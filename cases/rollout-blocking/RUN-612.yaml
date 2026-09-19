@@ -1,0 +1,244 @@
+{
+  "format": "rollout-runner/v2",
+  "id": "RUN-612",
+  "baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "scenario": {
+    "source": {
+      "id": "RUN-612",
+      "group": "滚动阻塞补充回归",
+      "kind": "运行",
+      "mode": "SG",
+      "initial": "A 全 Ready，连续 ordinal",
+      "action": "提交持续 NotReady 的 B，观察预算耗尽后的阻塞，再恢复同一 B",
+      "expect": "故障期间无新增健康旧实例删除；恢复后自动收敛",
+      "verification": "NOT_RUN"
+    },
+    "profile": "controlled",
+    "initialSpec": {
+      "template": {
+        "roles": [
+          {
+            "name": "frontend",
+            "replicas": 1,
+            "workerReplicas": 0,
+            "entryTemplate": {
+              "metadata": {
+                "annotations": {
+                  "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                }
+              },
+              "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "containers": [
+                  {
+                    "name": "workload",
+                    "image": "busybox:1.36",
+                    "imagePullPolicy": "IfNotPresent",
+                    "command": [
+                      "sh",
+                      "-c",
+                      "sleep 3600"
+                    ],
+                    "env": [
+                      {
+                        "name": "ROLLOUT_VERSION",
+                        "value": "A"
+                      }
+                    ],
+                    "readinessProbe": {
+                      "exec": {
+                        "command": [
+                          "test",
+                          "-f",
+                          "/tmp/ready"
+                        ]
+                      },
+                      "periodSeconds": 1,
+                      "failureThreshold": 1
+                    },
+                    "resources": {
+                      "requests": {
+                        "cpu": "5m",
+                        "memory": "4Mi"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "replicas": 4,
+      "schedulerName": "volcano",
+      "plugins": [
+        {
+          "name": "headless-service",
+          "type": "BuiltIn"
+        },
+        {
+          "name": "ranktable",
+          "type": "BuiltIn",
+          "config": {
+            "template": "production020-ranktable-template"
+          }
+        }
+      ],
+      "rolloutStrategy": {
+        "type": "ServingGroupRollingUpdate",
+        "rollingUpdateConfiguration": {
+          "partition": 0,
+          "maxSurge": 1,
+          "maxUnavailable": 0
+        }
+      }
+    },
+    "steps": [
+      {
+        "name": "submit-B-and-observe-real-running-not-ready",
+        "action": "update",
+        "until": "conditions",
+        "release": "none",
+        "holdSeconds": 0,
+        "stableSeconds": 0,
+        "expect": {
+        },
+        "spec": {
+          "template": {
+            "roles": [
+              {
+                "name": "frontend",
+                "replicas": 1,
+                "workerReplicas": 0,
+                "entryTemplate": {
+                  "metadata": {
+                    "annotations": {
+                      "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                    }
+                  },
+                  "spec": {
+                    "terminationGracePeriodSeconds": 1,
+                    "containers": [
+                      {
+                        "name": "workload",
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "command": [
+                          "sh",
+                          "-c",
+                          "sleep 3600"
+                        ],
+                        "env": [
+                          {
+                            "name": "ROLLOUT_VERSION",
+                            "value": "B"
+                          }
+                        ],
+                        "readinessProbe": {
+                          "exec": {
+                            "command": [
+                              "test",
+                              "-f",
+                              "/tmp/ready"
+                            ]
+                          },
+                          "periodSeconds": 1,
+                          "failureThreshold": 1
+                        },
+                        "resources": {
+                          "requests": {
+                            "cpu": "5m",
+                            "memory": "4Mi"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "replicas": 4,
+          "schedulerName": "volcano",
+          "plugins": [
+            {
+              "name": "headless-service",
+              "type": "BuiltIn"
+            },
+            {
+              "name": "ranktable",
+              "type": "BuiltIn",
+              "config": {
+                "template": "production020-ranktable-template"
+              }
+            }
+          ],
+          "rolloutStrategy": {
+            "type": "ServingGroupRollingUpdate",
+            "rollingUpdateConfiguration": {
+              "partition": 0,
+              "maxSurge": 1,
+              "maxUnavailable": 0
+            }
+          }
+        },
+        "conditions": [
+          {
+            "kind": "running-not-ready",
+            "role": "frontend",
+            "version": "B",
+            "count": 1
+          }
+        ],
+        "timeoutSeconds": 420
+      },
+      {
+        "name": "B-not-ready-blocks-further-old-deletion",
+        "action": "hold-block",
+        "until": "conditions",
+        "conditions": [
+          {
+            "kind": "running-not-ready",
+            "role": "frontend",
+            "version": "B",
+            "count": 1
+          },
+          {
+            "kind": "unit",
+            "role": "frontend",
+            "version": "A",
+            "count": 4,
+            "ready": true
+          }
+        ],
+        "release": "none",
+        "holdSeconds": 30,
+        "stableSeconds": 0,
+        "expect": {
+          "preserveHealthyOld": true
+        },
+        "timeoutSeconds": 420
+      },
+      {
+        "name": "restore-B-readiness-and-complete",
+        "action": "observe",
+        "until": "settled",
+        "release": "one",
+        "holdSeconds": 0,
+        "stableSeconds": 30,
+        "expect": {
+          "targets": [
+            {
+              "scope": "SG",
+              "role": "",
+              "versions": {
+                "B": 4
+              }
+            }
+          ]
+        },
+        "timeoutSeconds": 420
+      }
+    ]
+  }
+}

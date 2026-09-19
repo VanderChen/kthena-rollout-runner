@@ -12,8 +12,11 @@
 | 正常流程 | `cases/normal` | RUN-001～303；选 RUN-001 入门，选 RUN-061 看 v2 多阶段输入 |
 | 故障恢复 | `cases/recovery` 及其他按故障命名的目录 | RUN-304～539；v3/v4 需要故障代理、控制器路由和独立审计 |
 | 边界与拒绝 | `cases/boundary-*`、`cases/history-equal`、`cases/rejection` | RUN-540～611、DENY-001～097；拒绝类检查实际 API 拒绝及旧状态保持 |
+| 滚动阻塞补充回归 | `cases/rollout-blocking` | RUN-612～617；B 持续 NotReady 与滚动中旧 A Ready 故障，需匹配固定 production 控制器基线 |
 
 `cases/` 中的 YAML 总数高于 708，因为 `core` 与 `normal` 重复前 60 项，且某些 ID 有准备方式修正目录。不要把文件数、某一目录的 `suite.json` 或旧 Job 的 PASS 相加当成当前有效覆盖；完整目录和证据口径见 [完整用例集](EXPANDED_SUITE.md)。历史 708 项结果发生在新增正常起止 ordinal 检查之前，当前契约见 [序号验证](ORDINAL_VERIFICATION.md)。
+
+`cases/rollout-blocking` 是 708 项历史目录以外的独立补充集。前四项在新 B 实际 Running/NotReady 后冻结健康旧 Pod 的 UID，观察至少 30 秒；后两项先完成一次替换，再让仍在服务的旧 A 同 UID Ready 回退，放行下一个 B 并检查故障期间的旧 UID。检查点保存 `step-*-blocked-old.json`，连续 Watch 和直接 Pod GET 都用于判定是否出现新的健康旧实例删除。外部故障本身造成的 Ready 损失不能算成 controller 主动删除。
 
 ## 从源码到一个 Kind Job
 

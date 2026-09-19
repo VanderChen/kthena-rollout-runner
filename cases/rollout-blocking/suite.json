@@ -1,0 +1,13 @@
+{
+  "format": "rollout-runner/supplemental-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "scope": "six rollout blocking cases outside the historical 708-case catalogue",
+  "ids": [
+    "RUN-612",
+    "RUN-613",
+    "RUN-614",
+    "RUN-615",
+    "RUN-616",
+    "RUN-617"
+  ]
+}

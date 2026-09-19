@@ -25,6 +25,7 @@ type ScenarioStep struct {
 	HistoryFault           string                 `json:"historyFault,omitempty"`
 	ContainerRestart       *PodFaultAction        `json:"containerRestart,omitempty"`
 	PodFault               *PodFaultAction        `json:"podFault,omitempty"`
+	ReadinessTarget        *ScenarioCondition     `json:"readinessTarget,omitempty"`
 	RequireLiveTerminating bool                   `json:"requireLiveTerminating,omitempty"`
 	Name                   string                 `json:"name"`
 	Action                 string                 `json:"action"`
@@ -49,12 +50,13 @@ type ScenarioCondition struct {
 	Count   int    `json:"count"`
 }
 type ScenarioExpectation struct {
-	RequireCompleted bool             `json:"requireCompleted,omitempty"`
-	BlockedByBudget  bool             `json:"blockedByBudget,omitempty"`
-	NoFullPromotion  bool             `json:"noFullPromotion,omitempty"`
-	NoReplacement    bool             `json:"noReplacement,omitempty"`
-	NoNewRevision    bool             `json:"noNewRevision,omitempty"`
-	Targets          []ScenarioTarget `json:"targets,omitempty"`
+	RequireCompleted   bool             `json:"requireCompleted,omitempty"`
+	BlockedByBudget    bool             `json:"blockedByBudget,omitempty"`
+	NoFullPromotion    bool             `json:"noFullPromotion,omitempty"`
+	NoReplacement      bool             `json:"noReplacement,omitempty"`
+	NoNewRevision      bool             `json:"noNewRevision,omitempty"`
+	PreserveHealthyOld bool             `json:"preserveHealthyOld,omitempty"`
+	Targets            []ScenarioTarget `json:"targets,omitempty"`
 }
 type ScenarioTarget struct {
 	MinVersions map[string]int    `json:"minVersions,omitempty"`
@@ -85,6 +87,7 @@ func (c Case) validateScenario() error {
 	recovery := n >= 304 && n <= 388 && c.Format == "rollout-runner/v3"
 	restart := n >= 389 && n <= 400 && c.Format == "rollout-runner/v3"
 	midRollout := n >= 401 && n <= 430 && c.Format == "rollout-runner/v3"
+	blocking := n >= 612 && n <= 617 && c.Format == "rollout-runner/v2"
 	graceRestart := n >= 431 && n <= 432 && c.Format == "rollout-runner/v3"
 	controllerRestart := n >= 435 && n <= 440 && c.Format == "rollout-runner/v3"
 	apiRetry := n >= 455 && n <= 462 && c.Format == "rollout-runner/v3"
@@ -105,7 +108,7 @@ func (c Case) validateScenario() error {
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !blocking && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	s := c.Scenario
@@ -126,6 +129,12 @@ func (c Case) validateScenario() error {
 		return fmt.Errorf("missing executable steps")
 	}
 	for _, p := range s.Steps {
+		if p.Expect.PreserveHealthyOld && (!blocking || p.HoldSeconds < 30 && p.Action == "hold-block") {
+			return fmt.Errorf("healthy-old blocking guard requires a blocking case and 30-second hold")
+		}
+		if p.ReadinessTarget != nil && (!blocking || p.Action != "drop-ready" || p.ReadinessTarget.Kind != "unit" || p.ReadinessTarget.Version != "A" || p.ReadinessTarget.Role != "frontend" || p.ReadinessTarget.Group == nil || p.ReadinessTarget.Ordinal == nil || p.ReadinessTarget.Ready == nil || !*p.ReadinessTarget.Ready || p.ReadinessTarget.Count != 1) {
+			return fmt.Errorf("invalid old-readiness fault target")
+		}
 		if p.Expect.RequireCompleted && !completionBoundary {
 			return fmt.Errorf("explicit complete-state guard is restricted to sparse completion boundaries")
 		}
@@ -259,8 +268,16 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("resource fault not declared by this case")
 			}
 		case "drop-ready", "restore-ready":
-			if !midRollout || n > 424 || (n-401)%4 != 2 {
+			if !(midRollout && n <= 424 && (n-401)%4 == 2) && !(blocking && n >= 616) {
 				return fmt.Errorf("readiness fault not declared by this case")
+			}
+		case "restore-ready-or-replaced":
+			if !blocking || n < 616 || p.Release != "one" || p.StableSeconds < 30 {
+				return fmt.Errorf("old-readiness fault recovery requires same-UID repair or observed replacement")
+			}
+		case "hold-block":
+			if !blocking || !p.Expect.PreserveHealthyOld || p.HoldSeconds < 30 {
+				return fmt.Errorf("blocking hold must protect healthy old UIDs for 30 seconds")
 			}
 		case "restart-container":
 			f := p.ContainerRestart

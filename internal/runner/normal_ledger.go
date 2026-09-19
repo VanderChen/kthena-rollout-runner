@@ -80,6 +80,7 @@ type NormalLedger struct {
 	Released               map[string]bool        `json:"released"`
 	Committed              map[string]bool        `json:"committedUIDs"`
 	Protected              map[string]string      `json:"protectedUIDs"`
+	BlockedOld             map[string]string      `json:"blockedHealthyOldUIDs,omitempty"`
 	Starts                 []NormalStart          `json:"starts"`
 	Violations             []string               `json:"violations"`
 	ScaleUIDs              map[string]bool        `json:"scaleUIDs"`
@@ -97,7 +98,7 @@ func newNormalLedger(spec map[string]interface{}, owner, profile string) (*Norma
 	if e != nil {
 		return nil, e
 	}
-	return &NormalLedger{PGScale: map[string]bool{}, PGPhase: map[string]string{}, BornRanktable: map[string]bool{}, Served: map[string]bool{}, RevisionLayouts: map[string]NormalModel{}, PGCommitted: map[string]bool{}, PGPods: map[string]bool{}, RevisionData: map[string]string{}, Owner: owner, Profile: profile, Model: m, Base: m, History: []NormalModel{m}, Released: map[string]bool{}, Committed: map[string]bool{}, Protected: map[string]string{}, ScaleUIDs: map[string]bool{}, ScaleGroups: map[int]bool{}, Ceiling: map[string]int{}, Revisions: map[string]bool{}}, nil
+	return &NormalLedger{PGScale: map[string]bool{}, PGPhase: map[string]string{}, BornRanktable: map[string]bool{}, Served: map[string]bool{}, RevisionLayouts: map[string]NormalModel{}, PGCommitted: map[string]bool{}, PGPods: map[string]bool{}, RevisionData: map[string]string{}, Owner: owner, Profile: profile, Model: m, Base: m, History: []NormalModel{m}, Released: map[string]bool{}, Committed: map[string]bool{}, Protected: map[string]string{}, BlockedOld: map[string]string{}, ScaleUIDs: map[string]bool{}, ScaleGroups: map[int]bool{}, Ceiling: map[string]int{}, Revisions: map[string]bool{}}, nil
 }
 func (l *NormalLedger) fail(s string) {
 	for _, v := range l.Violations {
@@ -390,7 +391,17 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 	l.Model = next
 	l.History = append(l.History, next)
 	l.Protected = map[string]string{}
+	l.BlockedOld = map[string]string{}
 	for _, u := range before {
+		if e.PreserveHealthyOld && u.Active && u.Ready && u.Version == "A" {
+			for _, pod := range u.Pods {
+				uid := string(pod.UID)
+				if pod.DeletionTimestamp != nil || l.Committed[uid] || l.PGPods[uid] {
+					return fmt.Errorf("TRIGGER_MISSED: healthy old Pod has an in-flight deletion: %s", pod.Name)
+				}
+				l.BlockedOld[uid] = pod.Name
+			}
+		}
 		_, _, _, p := l.scopeBudget(u)
 		unchanged := sameTemplates(old, next)
 		if old.Mode == "Role" && next.Mode == "Role" {
@@ -437,6 +448,18 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	l.roleScaleBefore(kind, event, o, objects)
 	l.coordinationBefore(kind, event, o, objects)
 	l.podGroupBefore(kind, event, o, objects)
+	if kind == "pods" && (event == "DELETED" || o.GetDeletionTimestamp() != nil) {
+		if name, ok := l.BlockedOld[string(o.GetUID())]; ok {
+			l.fail("ROLLOUT_BLOCK_VIOLATION: healthy old Pod deleted during fault: " + name)
+		}
+	}
+	if kind == "podgroups" && (event == "DELETED" || o.GetDeletionTimestamp() != nil) {
+		for uid, pod := range objects["pods"] {
+			if _, ok := l.BlockedOld[uid]; ok && pod.GetLabels()[LabelGroup] == o.GetName() {
+				l.fail("ROLLOUT_BLOCK_VIOLATION: healthy old PodGroup deleted during fault: " + o.GetName())
+			}
+		}
+	}
 	if kind != "pods" || (event != "DELETED" && o.GetDeletionTimestamp() == nil) {
 		return
 	}

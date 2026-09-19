@@ -19,18 +19,22 @@ import (
 
 func (e *normalExecution) specialAction(ctx context.Context, p ScenarioStep, prefix string) error {
 	switch p.Action {
+	case "hold-block":
+		return nil
 	case "terminate-controller":
 		return e.terminateController(ctx, prefix)
 	case "verify-resource-stop":
 		return e.verifyResourceStop(ctx, prefix)
 	case "drop-ready":
-		return e.dropReady(ctx, prefix)
+		return e.dropReady(ctx, p, prefix)
 	case "restore-ready":
 		if e.readinessPod == nil {
 			return fmt.Errorf("INCONCLUSIVE: exact readiness fault UID not recorded")
 		}
 		e.res.Releases++
 		return e.r.release(ctx, Unit{Key: e.readinessPod.Name, Pods: []*corev1.Pod{e.readinessPod}}, e.dir, e.res.Releases)
+	case "restore-ready-or-replaced":
+		return e.restoreOrReplaceReadiness(ctx, prefix)
 	case "block-resources":
 		return e.blockResources(ctx, prefix)
 	case "restore-resources":

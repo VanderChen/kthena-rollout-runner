@@ -2,6 +2,14 @@
 
 内部开发/CI工具：Go + client-go，一个Kubernetes Job，逐用例串行执行。
 
+**从这里开始：**[使用指南](docs/USER_GUIDE.md)给出从当前源码构建通用镜像、在专用 Kind
+集群运行一个用例、导出和判读结果的完整步骤；[开发指南](docs/DEVELOPER_GUIDE.md)
+解释代码、用例、43 个 Dockerfile 及扩展/验证流程。默认 `Dockerfile` 打包当前
+`bin/rollout-runner` 和整个 `cases/`；`Makefile image` 只使用它。
+`Dockerfile.fault-proxy` 对应独立故障代理，其余带后缀文件主要是历史专项或候选镜像配方，
+不需要逐一构建。`deploy/*.yaml` 多为既有 attempt，重新执行应使用新的 Job 名、镜像 tag
+和 `--run-id`。
+
 分支约定：`main` 保留全量用例及正常滚动完成后的保序检查；`legacy` 为低版本兼容分支，取消完成后必须为 `0..replicas-1` 的要求，保留其他质量检查。
 
 执行集已扩展为 **708 个唯一用例**：正常流程 RUN-001～303、故障恢复 RUN-304～539、边界 RUN-540～611 和拒绝 DENY-001～097。
@@ -41,7 +49,7 @@ A全Ready → 建立UID基线 → 提交B（从出生NotReady）→ 检查初始
 
 详见[60项计数与过程预期](docs/CORE_EXPECTATIONS.md)和[配置与观察契约](docs/CONTRACT.md)。
 
-## 构建和测试
+## 历史core构建和测试示例
 
 需要本机Go（版本见go.mod）、Docker、Kind、kubectl。使用主机Go缓存：
 
@@ -60,7 +68,7 @@ kind load docker-image kthena-rollout-runner:dev-021-r4 --name kthena-resync-010
 检查器测试包含超预算删除、Ready信用撤销、surge合法信用、worker完整性、保护范围、
 PG提前删除、Watch事件不合并、410观察缺口以及revision hash/name映射。
 
-## Kind Job运行
+## 历史core Kind Job运行示例
 
 下面的权限仅适用于可破坏的开发/CI集群。首次初始化：
 

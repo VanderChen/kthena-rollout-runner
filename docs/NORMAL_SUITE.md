@@ -9,7 +9,10 @@
 目录基线；`--controller-commit` 单独记录本次实际被测版本。runner不调用controller
 内部预算、模板比较或协调函数。
 
-当前r10完整303项Kind验证仍在运行。配置存在不表示Kind通过；完整验收结果另行记录。
+以下 r10 等批次为实施阶段记录。303 项的最终 Kind 结论见
+[完整用例集](EXPANDED_SUITE.md)和 issues 任务 022 的 `FINAL_VERIFICATION.md`；
+2026-09-11 新增起止序号检查后的补充验证见[序号验证](ORDINAL_VERIFICATION.md)。
+配置存在不表示当前版本已通过 Kind。
 
 | 目录范围 | 能力 |
 | --- | --- |

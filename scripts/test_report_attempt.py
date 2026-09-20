@@ -49,10 +49,12 @@ class AttemptReportTest(unittest.TestCase):
         self.job(0, "Complete")
         self.assertEqual(report_attempt.main(["--attempt", str(self.root)]), 0)
         report = json.loads((self.root / "failure-report.json").read_text())
+        self.assertEqual(report["schema"], "rollout-runner/offline-attempt-report/v2")
         self.assertEqual(report["overall"], "PASS")
         self.assertEqual(report["counts"], {"PASS": 2})
         self.assertEqual(report["job"]["status"], "VERIFIED")
-        self.assertIn("| RUN-001 | PASS | PASS |", (self.root / "failure-report.md").read_text())
+        self.assertIn("| 用例 | 是否通过 | 原始状态 |", (self.root / "failure-report.md").read_text())
+        self.assertIn("| RUN-001 | 通过 | PASS |", (self.root / "failure-report.md").read_text())
 
     def test_product_failure_keeps_reason(self):
         self.results("PASS", "FAIL")
@@ -63,6 +65,9 @@ class AttemptReportTest(unittest.TestCase):
         self.assertEqual(report["cases"][1]["status"], "FAIL")
         self.assertIn("COMPOUND_READY_BUDGET", report["cases"][1]["reason"])
         self.assertEqual(report["cases"][1]["failureCodes"], ["COMPOUND_READY_BUDGET"])
+        self.assertEqual(report["cases"][1]["verdict"], "未通过")
+        self.assertIn("| RUN-002 | 未通过 | FAIL | COMPOUND_READY_BUDGET |",
+                      (self.root / "failure-report.md").read_text())
 
     def test_inconclusive_is_not_product_failure(self):
         self.results("PASS", "INCONCLUSIVE")
@@ -71,7 +76,7 @@ class AttemptReportTest(unittest.TestCase):
         self.assertEqual(report["overall"], "INCONCLUSIVE")
         self.assertEqual(report["cases"][1]["status"], "INCONCLUSIVE")
         self.assertFalse(report["cases"][1]["passed"])
-        self.assertEqual(report["cases"][1]["verdict"], "FAILED")
+        self.assertEqual(report["cases"][1]["verdict"], "未通过")
 
     def test_missing_result_is_explicit(self):
         self.results("PASS")
@@ -79,7 +84,9 @@ class AttemptReportTest(unittest.TestCase):
         report = report_attempt.build_report(self.root)
         self.assertEqual(report["overall"], "INCOMPLETE")
         self.assertEqual(report["cases"][1]["status"], "MISSING_RESULT")
-        self.assertEqual(report["cases"][1]["verdict"], "FAILED")
+        self.assertEqual(report["cases"][1]["verdict"], "未通过")
+        self.assertIn("| RUN-002 | 未通过 | MISSING_RESULT |",
+                      report_attempt.markdown(report, self.root, self.root))
         self.assertEqual(report["job"]["status"], "TERMINAL_ONLY")
 
     def test_summary_and_case_conflict_cannot_pass(self):

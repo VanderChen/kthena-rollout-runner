@@ -99,7 +99,18 @@ kubectl -n rollout-runner get "pod/$POD_NAME" -o json > "artifacts/$RUN_ID/runne
 python3 scripts/report_attempt.py --attempt "artifacts/$RUN_ID"
 ```
 
-最后一条命令只读本地 JSON，**不连接 Kubernetes，也不调用 AI**。它总会先写 `failure-report.json` 与 `failure-report.md`；全通过且 Job/Pod 证据一致时退出 0，否则退出 1。输入无法解析时退出 2。打开 `failure-report.md` 先看整体结论，再看每例的验收列 `PASS/FAILED`、runner 原始状态、原因和 `result.json` 链接。`INCONCLUSIVE`、`ERROR`、`NOT_RUN`、`MISSING_RESULT`、`EVIDENCE_CONFLICT` 都是未通过，但不会伪装成产品 FAIL。
+最后一条命令只读本地 JSON，**不连接 Kubernetes，也不调用 AI**。它总会先写 `failure-report.json` 与 `failure-report.md`；全通过且 Job/Pod 证据一致时退出 0，否则退出 1。输入无法解析时退出 2。打开 `failure-report.md` 先看整体结论，再看每例的“是否通过”“原始状态”“原因”和 `result.json` 链接。“是否通过”只回答这一例有没有通过；“原始状态”说明原因类别：
+
+| 是否通过 | 原始状态 | 如何理解 |
+| --- | --- | --- |
+| 通过 | `PASS` | 用例断言通过 |
+| 未通过 | `FAIL` | 已观察到违反用例断言的行为，应按违规代码和原始证据定位 |
+| 未通过 | `INCONCLUSIVE` | 证据不足，无法判定是否违反断言 |
+| 未通过 | `ERROR` | runner 执行出错，需要排查执行环境或工具 |
+| 未通过 | `NOT_RUN` / `MISSING_RESULT` | 用例没有执行，或没有拿到结果；先排查预检查和 Job 退出原因 |
+| 未通过 | `EVIDENCE_CONFLICT` | 汇总与逐例结果等证据互相矛盾，先排查导出文件 |
+
+例如，RUN-625 显示“未通过 + `FAIL`”表示观察到违约；预检查失败时 RUN-630 显示“未通过 + `MISSING_RESULT`”表示该例还没有执行。报告 JSON 的 `passed` 布尔值和 `verdict` 字段对应“是否通过”，`status` 对应“原始状态”。`verdict` 从报告格式 v2 起使用“通过/未通过”。
 
 定位时按报告中的 ID 查 `artifacts/$RUN_ID/<ID>/`：
 

@@ -207,7 +207,7 @@ def build_report(attempt):
             issues.append(f"{case_id}: {reason}")
         codes = sorted(set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}(?=:)", reason)))
         cases.append({"id": case_id, "status": status, "runnerStatus": source_status,
-                      "verdict": "PASS" if status == "PASS" else "FAILED",
+                      "verdict": "通过" if status == "PASS" else "未通过",
                       "passed": status == "PASS", "failureCodes": codes, "reason": reason,
                       "evidence": f"{case_id}/result.json" if path.is_file() else None})
     counts = dict(sorted(collections.Counter(row["status"] for row in cases).items()))
@@ -225,7 +225,7 @@ def build_report(attempt):
         overall = "FAIL"
     else:
         overall = "INCONCLUSIVE"
-    return {"schema": "rollout-runner/offline-attempt-report/v1", "runID": run_id,
+    return {"schema": "rollout-runner/offline-attempt-report/v2", "runID": run_id,
             "controllerCommit": environment.get("baseline"), "expected": len(expected),
             "counts": counts, "overall": overall, "job": job, "runError": run_error, "issues": issues,
             "inputsSHA256": dict(sorted(inputs.items())), "cases": cases}
@@ -238,7 +238,7 @@ def markdown(report, attempt, out):
     lines = [f"# Runner attempt {report['runID']} 故障报告", "",
              f"总体结论：**{report['overall']}**；Job 证据：**{report['job']['status']}**。", "",
              f"选中 {report['expected']} 项；" + "，".join(f"{key} {value}" for key, value in report["counts"].items()) + "。", "",
-             "| 用例 | 结论 | runner 状态 | 代码 | 原因 | 原始结果 |", "| --- | --- | --- | --- | --- | --- |"]
+             "| 用例 | 是否通过 | 原始状态 | 诊断代码 | 原因 | 原始结果 |", "| --- | --- | --- | --- | --- | --- |"]
     if report["runError"]:
         lines[4:4] = [f"Runner 退出原因：{report['runError']}", ""]
     for row in report["cases"]:
@@ -251,7 +251,7 @@ def markdown(report, attempt, out):
     if report["issues"]:
         lines.extend(["", "## 证据问题", ""])
         lines.extend("- " + issue for issue in report["issues"])
-    lines.extend(["", "验收列的 FAILED 表示该例未通过；runner 状态 FAIL 才是用例违约。INCONCLUSIVE、ERROR、NOT_RUN 和缺失结果均未通过，但不自动归为产品故障。", ""])
+    lines.extend(["", "“未通过”表示本次未达到通过条件。原始状态 FAIL 表示观察到用例违约；INCONCLUSIVE 表示证据不足；ERROR 表示执行错误；NOT_RUN 或 MISSING_RESULT 表示未执行或缺少结果；EVIDENCE_CONFLICT 表示结果互相矛盾。", ""])
     return "\n".join(lines)
 
 

@@ -13,24 +13,38 @@ RUN-625～640，P01～P11 对应 RUN-641～651，R01 对应 RUN-652。
 Deployment 镜像相符的 `--controller-image`，并显式传入同一
 `--controller-commit`。不能将旧套件的 PASS 数量用于推断 v2 覆盖。
 
-从 runner 仓库根目录，先在专用 Kind 集群安装
-`deploy/production-fixture.yaml`，再构建并执行：
+组合用例也通过通用 Job 入口运行；YAML 在构建镜像时复制到
+`/cases/servinggroup-compound-v2`，无需另行挂载。先按
+[使用指南](USER_GUIDE.md)核对集群、controller 镜像及架构、安装
+`deploy/runner.yaml` 与 `deploy/production-fixture.yaml`，然后选择一个
+匹配上述 baseline 的 case：
 
 ```sh
-go build -o /tmp/kthena-rollout-runner-compound ./cmd/rollout-runner
-/tmp/kthena-rollout-runner-compound \
-  --cases cases/servinggroup-compound-v2 \
-  --artifacts artifacts/compound-v2 \
-  --run-id compound-v2-001 \
-  --kubeconfig "$HOME/.kube/config" \
-  --controller-image kthena-controller-manager:dev-018-gapfill \
-  --controller-commit 6fea34e03a179b07686fd5415b83018e159b196b
+RUNNER_IMAGE=kthena-rollout-runner:compound-v2-001
+NODE_ARCH="$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
+make image GOARCH="$NODE_ARCH" IMAGE="$RUNNER_IMAGE"
+# Kind 使用 kind load docker-image "$RUNNER_IMAGE" --name "$KIND_CLUSTER"；
+# 其他集群先把该镜像推到节点可访问的 registry。
+CONTROLLER_IMAGE="$(kubectl -n kthena-system get deployment kthena-controller-manager -o jsonpath='{.spec.template.spec.containers[0].image}')"
+RUN_ID=compound-v2-001
+python3 scripts/render_job.py \
+  --runner-image "$RUNNER_IMAGE" \
+  --controller-image "$CONTROLLER_IMAGE" \
+  --controller-commit 6fea34e03a179b07686fd5415b83018e159b196b \
+  --case-dir servinggroup-compound-v2 --select RUN-625 \
+  --run-id "$RUN_ID" --phase-timeout-seconds 70 \
+  --out "/tmp/rollout-$RUN_ID.json"
+kubectl create -f "/tmp/rollout-$RUN_ID.json"
 ```
 
-这里的镜像 tag 是 issue 020 记录的该候选构建；运行前仍需核对当前
-Deployment、镜像 ID 和 Kind 节点架构。每个 case 创建自己的 namespace，
-按 UID 清理，并保存请求/响应、Pod/PodGroup/ControllerRevision 连续 Watch、
-阶段 checkpoint、账本、环境和结果。清理失败会中止后续 case。
+这里的 controller commit 和 `kthena-controller-manager:dev-018-gapfill`
+对应关系记录在 issue 020；运行前仍需核对当前 Deployment 的实际镜像。
+Job 结束后按[使用指南第 3 部分](USER_GUIDE.md#3-导出看结果定位失败)
+导出 attempt、Job/Pod JSON，并执行
+`python3 scripts/report_attempt.py --attempt artifacts/$RUN_ID`。
+`failure-report.md` 会逐例列出 PASS/FAIL/证据不足、违规代码和原始结果链接。
+每个 case 创建自己的 namespace，按 UID 清理，保存请求/响应、连续 Watch、
+阶段 checkpoint 与账本；清理失败会阻止后续 case。
 
 复合契约使用最新期望 N 计算整数或百分比 U/S/P。账本将删除中的组
 计入 C；在每次旧组替换前检查真实 Ready 底线、最高 eligible ordinal、

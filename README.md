@@ -19,4 +19,6 @@ runner 在已有 Kthena controller 的测试集群中逐例执行 ModelServing �
 
 一次 Job 只读一个 `--cases=/cases/<目录>`；`--select` 选择该目录内的 ID，省略则执行整个目录。`suite.json` 是索引，runner 不把它当成用例。修改 YAML 后须重新构建 runner 镜像。
 
+之前的 ServingGroup 组合滚动 35 项在 `cases/servinggroup-compound-v2/`（RUN-618～652），其匹配的 controller commit、Job 示例和判定边界见 [组合用例说明](docs/COMPOUND_V2.md)。
+
 报告保留原始状态：**PASS** 为通过，**FAIL** 为用例违约，**INCONCLUSIVE** 为证据不足，**ERROR** 为执行错误，**NOT_RUN** 为未执行。缺失文件和互相矛盾的结果会显示为 `MISSING_RESULT` 或 `EVIDENCE_CONFLICT`，不会被算作 PASS。

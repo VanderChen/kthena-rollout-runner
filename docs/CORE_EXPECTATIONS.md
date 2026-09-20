@@ -46,4 +46,4 @@ PG提供SG更早的删除证据；跨资源流不存在本工具可以依赖的�
 因此PG另有“U + 已显式放行单位数”的绝对上界，精确Ready预算在Pod流核算。
 观察缺口不能判PASS；已锁存的任何过程违例不能被健康终态覆盖。
 
-完整边界见 [CONTRACT.md](CONTRACT.md)，逐项实测见 [VERIFICATION.md](../VERIFICATION.md)。
+完整边界见 [CONTRACT.md](CONTRACT.md)。历史逐项实测已从当前仓库入口清理，可在 Git 历史中读取；新执行用 `scripts/report_attempt.py` 从本次 Job 产物生成报告。

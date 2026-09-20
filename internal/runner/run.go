@@ -72,7 +72,7 @@ type Runner struct {
 	root    string
 }
 
-func Run(ctx context.Context, opt Options) error {
+func Run(ctx context.Context, opt Options) (runErr error) {
 	cases, err := LoadCases(opt.CaseDir)
 	if err != nil {
 		return err
@@ -111,6 +111,11 @@ func Run(ctx context.Context, opt Options) error {
 	if err = os.Mkdir(root, 0755); err != nil {
 		return fmt.Errorf("refuse to overwrite attempt: %w", err)
 	}
+	defer func() {
+		if runErr != nil {
+			_ = writeJSON(filepath.Join(root, "run-error.json"), map[string]string{"error": runErr.Error()})
+		}
+	}()
 	inputs := map[string]string{}
 	paths, err := casePaths(opt.CaseDir)
 	if err != nil {

@@ -112,5 +112,6 @@ python3 scripts/report_attempt.py --attempt "artifacts/$RUN_ID"
 | `before*.yaml`、`after*.yaml`、请求/响应文件 | 实际提交给 API 的配置与回执 |
 | 根目录 `environment.json` | controller 镜像、runner 构建、case SHA 与集群身份 |
 | 根目录 `execution-plan.json` | 连接集群前写出的选中用例和输入 SHA；预检查失败时也能列出缺失结果 |
+| 根目录 `run-error.json` | runner 退出的顶层错误；预检查失败时报告直接显示原因 |
 
 报告会核对 `summary.json` 和逐例 `result.json`；结果缺失、重复或矛盾会明确显示，不需要人工读日志才知道哪一例没有结论。不要把本次报告与其他镜像、run ID 或旧目录的结果直接相加。

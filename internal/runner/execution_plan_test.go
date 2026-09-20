@@ -35,4 +35,8 @@ func TestExecutionPlanSurvivesPreflightFailure(t *testing.T) {
 	if plan.RunID != "plan-test" || len(plan.SelectedIDs) != 1 || plan.SelectedIDs[0] != "RUN-001" || plan.CaseSHA256["RUN-001.yaml"] == "" {
 		t.Fatalf("incomplete offline plan: %+v", plan)
 	}
+	data, err = os.ReadFile(filepath.Join(out, "plan-test", "run-error.json"))
+	if err != nil || !strings.Contains(string(data), missing) {
+		t.Fatalf("preflight failure was not persisted for offline diagnosis: %q, %v", data, err)
+	}
 }

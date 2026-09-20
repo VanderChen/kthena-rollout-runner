@@ -139,6 +139,13 @@ def build_report(attempt):
     if not expected:
         raise ValueError("no selected case IDs in attempt evidence")
     run_id = environment.get("options", {}).get("RunID")
+    run_error_path = attempt / "run-error.json"
+    run_error = ""
+    if run_error_path.is_file():
+        inputs["run-error.json"] = sha256(run_error_path)
+        run_error = load_json(run_error_path).get("error", "")
+        if not isinstance(run_error, str):
+            raise ValueError("run-error.json error must be a string")
     summary_path = attempt / "summary.json"
     summary = None
     by_id = {}
@@ -171,7 +178,7 @@ def build_report(attempt):
         records = by_id.get(case_id, [])
         path = attempt / case_id / "result.json"
         source_status = records[0].get("status") if len(records) == 1 else None
-        status, reason = "MISSING_RESULT", "no result in summary.json"
+        status, reason = "MISSING_RESULT", run_error or "no result in summary.json"
         if len(records) > 1:
             status, reason = "EVIDENCE_CONFLICT", "duplicate result IDs in summary.json"
         elif len(records) == 1:
@@ -206,6 +213,8 @@ def build_report(attempt):
     complete = summary is not None and len(by_id) == len(expected) and not any(
         row["status"] in {"MISSING_RESULT", "EVIDENCE_CONFLICT", "NOT_RUN"} for row in cases)
     all_pass = complete and all(row["passed"] for row in cases)
+    if all_pass and run_error:
+        issues.append("runner reported a fatal error despite all case results being PASS")
     job = job_evidence(attempt, environment, complete, all_pass, issues, inputs)
     if issues or not complete:
         overall = "INCOMPLETE"
@@ -217,7 +226,7 @@ def build_report(attempt):
         overall = "INCONCLUSIVE"
     return {"schema": "rollout-runner/offline-attempt-report/v1", "runID": run_id,
             "controllerCommit": environment.get("baseline"), "expected": len(expected),
-            "counts": counts, "overall": overall, "job": job, "issues": issues,
+            "counts": counts, "overall": overall, "job": job, "runError": run_error, "issues": issues,
             "inputsSHA256": dict(sorted(inputs.items())), "cases": cases}
 
 
@@ -229,6 +238,8 @@ def markdown(report, attempt, out):
              f"总体结论：**{report['overall']}**；Job 证据：**{report['job']['status']}**。", "",
              f"选中 {report['expected']} 项；" + "，".join(f"{key} {value}" for key, value in report["counts"].items()) + "。", "",
              "| 用例 | 结论 | runner 状态 | 代码 | 原因 | 原始结果 |", "| --- | --- | --- | --- | --- | --- |"]
+    if report["runError"]:
+        lines[4:4] = [f"Runner 退出原因：{report['runError']}", ""]
     for row in report["cases"]:
         verdict = "PASS" if row["passed"] else "FAIL" if row["status"] == "FAIL" else "未形成通过结论"
         link = ""

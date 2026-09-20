@@ -115,11 +115,13 @@ class AttemptReportTest(unittest.TestCase):
         self.write("execution-plan.json", {"runID": "attempt", "controllerCommit": "commit",
                                            "selectedIDs": self.ids,
                                            "caseSHA256": {f"{case}.yaml": "hash" for case in self.ids}})
+        self.write("run-error.json", {"error": "controller image mismatch"})
         self.job(1, "Failed")
         report = report_attempt.build_report(self.root)
         self.assertEqual(report["overall"], "INCOMPLETE")
         self.assertEqual(report["counts"], {"MISSING_RESULT": 2})
         self.assertEqual(report["job"]["status"], "TERMINAL_ONLY")
+        self.assertIn("controller image mismatch", report["cases"][0]["reason"])
 
 
 if __name__ == "__main__":

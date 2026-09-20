@@ -207,6 +207,7 @@ def build_report(attempt):
             issues.append(f"{case_id}: {reason}")
         codes = sorted(set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}(?=:)", reason)))
         cases.append({"id": case_id, "status": status, "runnerStatus": source_status,
+                      "verdict": "PASS" if status == "PASS" else "FAILED",
                       "passed": status == "PASS", "failureCodes": codes, "reason": reason,
                       "evidence": f"{case_id}/result.json" if path.is_file() else None})
     counts = dict(sorted(collections.Counter(row["status"] for row in cases).items()))
@@ -241,7 +242,7 @@ def markdown(report, attempt, out):
     if report["runError"]:
         lines[4:4] = [f"Runner 退出原因：{report['runError']}", ""]
     for row in report["cases"]:
-        verdict = "PASS" if row["passed"] else "FAIL" if row["status"] == "FAIL" else "未形成通过结论"
+        verdict = row["verdict"]
         link = ""
         if row["evidence"]:
             target = os.path.relpath(attempt / row["evidence"], out)
@@ -250,7 +251,7 @@ def markdown(report, attempt, out):
     if report["issues"]:
         lines.extend(["", "## 证据问题", ""])
         lines.extend("- " + issue for issue in report["issues"])
-    lines.extend(["", "FAIL 是 runner 的用例违约结论；INCONCLUSIVE、ERROR、NOT_RUN 和缺失结果均未通过，但不自动归为产品故障。", ""])
+    lines.extend(["", "验收列的 FAILED 表示该例未通过；runner 状态 FAIL 才是用例违约。INCONCLUSIVE、ERROR、NOT_RUN 和缺失结果均未通过，但不自动归为产品故障。", ""])
     return "\n".join(lines)
 
 

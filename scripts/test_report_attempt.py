@@ -71,6 +71,7 @@ class AttemptReportTest(unittest.TestCase):
         self.assertEqual(report["overall"], "INCONCLUSIVE")
         self.assertEqual(report["cases"][1]["status"], "INCONCLUSIVE")
         self.assertFalse(report["cases"][1]["passed"])
+        self.assertEqual(report["cases"][1]["verdict"], "FAILED")
 
     def test_missing_result_is_explicit(self):
         self.results("PASS")
@@ -78,6 +79,7 @@ class AttemptReportTest(unittest.TestCase):
         report = report_attempt.build_report(self.root)
         self.assertEqual(report["overall"], "INCOMPLETE")
         self.assertEqual(report["cases"][1]["status"], "MISSING_RESULT")
+        self.assertEqual(report["cases"][1]["verdict"], "FAILED")
         self.assertEqual(report["job"]["status"], "TERMINAL_ONLY")
 
     def test_summary_and_case_conflict_cannot_pass(self):

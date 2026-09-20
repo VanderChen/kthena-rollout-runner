@@ -99,7 +99,7 @@ kubectl -n rollout-runner get "pod/$POD_NAME" -o json > "artifacts/$RUN_ID/runne
 python3 scripts/report_attempt.py --attempt "artifacts/$RUN_ID"
 ```
 
-最后一条命令只读本地 JSON，**不连接 Kubernetes，也不调用 AI**。它总会先写 `failure-report.json` 与 `failure-report.md`；全通过且 Job/Pod 证据一致时退出 0，否则退出 1。输入无法解析时退出 2。打开 `failure-report.md` 先看整体结论，再看每例的状态、原因和 `result.json` 链接。`INCONCLUSIVE`、`ERROR`、`NOT_RUN`、`MISSING_RESULT`、`EVIDENCE_CONFLICT` 都是未通过，但不会伪装成产品 FAIL。
+最后一条命令只读本地 JSON，**不连接 Kubernetes，也不调用 AI**。它总会先写 `failure-report.json` 与 `failure-report.md`；全通过且 Job/Pod 证据一致时退出 0，否则退出 1。输入无法解析时退出 2。打开 `failure-report.md` 先看整体结论，再看每例的验收列 `PASS/FAILED`、runner 原始状态、原因和 `result.json` 链接。`INCONCLUSIVE`、`ERROR`、`NOT_RUN`、`MISSING_RESULT`、`EVIDENCE_CONFLICT` 都是未通过，但不会伪装成产品 FAIL。
 
 定位时按报告中的 ID 查 `artifacts/$RUN_ID/<ID>/`：
 

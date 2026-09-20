@@ -86,6 +86,53 @@ func Run(ctx context.Context, opt Options) error {
 	if opt.Timeout <= 0 {
 		opt.Timeout = 180 * time.Second
 	}
+	selected := map[string]bool{}
+	if opt.Select != "" {
+		for _, id := range strings.Split(opt.Select, ",") {
+			if id == "" || selected[id] {
+				return fmt.Errorf("duplicate/empty case selection")
+			}
+			selected[id] = true
+		}
+	}
+	selectedIDs := []string{}
+	for _, c := range cases {
+		if len(selected) == 0 || selected[c.ID] {
+			selectedIDs = append(selectedIDs, c.ID)
+		}
+	}
+	if len(selectedIDs) == 0 || len(selected) > 0 && len(selectedIDs) != len(selected) {
+		return fmt.Errorf("unknown/empty case selection")
+	}
+	root := filepath.Join(opt.OutDir, opt.RunID)
+	if err = os.MkdirAll(opt.OutDir, 0755); err != nil {
+		return err
+	}
+	if err = os.Mkdir(root, 0755); err != nil {
+		return fmt.Errorf("refuse to overwrite attempt: %w", err)
+	}
+	inputs := map[string]string{}
+	paths, err := casePaths(opt.CaseDir)
+	if err != nil {
+		return err
+	}
+	for _, path := range paths {
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		inputs[filepath.Base(path)] = fmt.Sprintf("%x", sha256.Sum256(data))
+	}
+	baseline := opt.ControllerCommit
+	if baseline == "" {
+		baseline = Baseline
+	}
+	if err = writeJSON(filepath.Join(root, "execution-plan.json"), map[string]interface{}{
+		"runID": opt.RunID, "controllerCommit": baseline, "selectedIDs": selectedIDs,
+		"caseSHA256": inputs,
+	}); err != nil {
+		return err
+	}
 	var cfg *rest.Config
 	if opt.Kubeconfig != "" {
 		cfg, err = clientcmd.BuildConfigFromFlags("", opt.Kubeconfig)
@@ -106,13 +153,6 @@ func Run(ctx context.Context, opt Options) error {
 	if err != nil {
 		return err
 	}
-	root := filepath.Join(opt.OutDir, opt.RunID)
-	if err = os.MkdirAll(opt.OutDir, 0755); err != nil {
-		return err
-	}
-	if err = os.Mkdir(root, 0755); err != nil {
-		return fmt.Errorf("refuse to overwrite attempt: %w", err)
-	}
 	r := &Runner{opt: opt, rest: cfg, kube: kube, dynamic: dyn, root: root}
 	if err = r.preflight(ctx); err != nil {
 		return err
@@ -125,22 +165,7 @@ func Run(ctx context.Context, opt Options) error {
 			break
 		}
 	}
-	selected := map[string]bool{}
-	if opt.Select != "" {
-		for _, id := range strings.Split(opt.Select, ",") {
-			selected[id] = true
-		}
-	}
-	summary := Summary{RunID: opt.RunID, Baseline: r.testedCommit(), Available: len(cases)}
-	for _, c := range cases {
-		if len(selected) > 0 && !selected[c.ID] {
-			continue
-		}
-		summary.Selected++
-	}
-	if summary.Selected == 0 || len(selected) > 0 && summary.Selected != len(selected) {
-		return fmt.Errorf("unknown/empty case selection")
-	}
+	summary := Summary{RunID: opt.RunID, Baseline: r.testedCommit(), Available: len(cases), Selected: len(selectedIDs)}
 	for index, c := range cases {
 		if len(selected) > 0 && !selected[c.ID] {
 			continue

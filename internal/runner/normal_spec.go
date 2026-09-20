@@ -15,17 +15,21 @@ import (
 const ProductionCommit = "538b2825c06bc1e8c5392d18f18f84faee9fca95"
 
 type Scenario struct {
+	Baseline    *ScenarioStep          `json:"baseline,omitempty"`
 	Fixture     string                 `json:"fixture,omitempty"`
+	DesignID    string                 `json:"designID,omitempty"`
 	Source      map[string]interface{} `json:"source"`
 	Profile     string                 `json:"profile"`
 	InitialSpec map[string]interface{} `json:"initialSpec"`
 	Steps       []ScenarioStep         `json:"steps"`
 }
 type ScenarioStep struct {
+	DeletionCosts          map[string]int         `json:"deletionCosts,omitempty"`
 	HistoryFault           string                 `json:"historyFault,omitempty"`
 	ContainerRestart       *PodFaultAction        `json:"containerRestart,omitempty"`
 	PodFault               *PodFaultAction        `json:"podFault,omitempty"`
 	ReadinessTarget        *ScenarioCondition     `json:"readinessTarget,omitempty"`
+	SourceState            bool                   `json:"sourceState,omitempty"`
 	RequireLiveTerminating bool                   `json:"requireLiveTerminating,omitempty"`
 	Name                   string                 `json:"name"`
 	Action                 string                 `json:"action"`
@@ -50,13 +54,28 @@ type ScenarioCondition struct {
 	Count   int    `json:"count"`
 }
 type ScenarioExpectation struct {
-	RequireCompleted   bool             `json:"requireCompleted,omitempty"`
-	BlockedByBudget    bool             `json:"blockedByBudget,omitempty"`
-	NoFullPromotion    bool             `json:"noFullPromotion,omitempty"`
-	NoReplacement      bool             `json:"noReplacement,omitempty"`
-	NoNewRevision      bool             `json:"noNewRevision,omitempty"`
-	PreserveHealthyOld bool             `json:"preserveHealthyOld,omitempty"`
-	Targets            []ScenarioTarget `json:"targets,omitempty"`
+	Compound           *CompoundExpectation `json:"compound,omitempty"`
+	RequireCompleted   bool                 `json:"requireCompleted,omitempty"`
+	BlockedByBudget    bool                 `json:"blockedByBudget,omitempty"`
+	NoFullPromotion    bool                 `json:"noFullPromotion,omitempty"`
+	NoReplacement      bool                 `json:"noReplacement,omitempty"`
+	NoNewRevision      bool                 `json:"noNewRevision,omitempty"`
+	PreserveHealthyOld bool                 `json:"preserveHealthyOld,omitempty"`
+	Targets            []ScenarioTarget     `json:"targets,omitempty"`
+}
+type CompoundExpectation struct {
+	Groups  []CompoundGroupExpectation `json:"groups"`
+	Active  int                        `json:"active"`
+	Ready   int                        `json:"ready"`
+	Blocked bool                       `json:"blocked,omitempty"`
+}
+type CompoundGroupExpectation struct {
+	Ordinal         int    `json:"ordinal"`
+	Version         string `json:"version"`
+	Ready           bool   `json:"ready"`
+	RunningNotReady bool   `json:"runningNotReady,omitempty"`
+	Members         int    `json:"members,omitempty"`
+	UIDSameAs       string `json:"uidSameAs,omitempty"`
 }
 type ScenarioTarget struct {
 	MinVersions map[string]int    `json:"minVersions,omitempty"`
@@ -88,6 +107,7 @@ func (c Case) validateScenario() error {
 	restart := n >= 389 && n <= 400 && c.Format == "rollout-runner/v3"
 	midRollout := n >= 401 && n <= 430 && c.Format == "rollout-runner/v3"
 	blocking := n >= 612 && n <= 617 && c.Format == "rollout-runner/v2"
+	compound := n >= 618 && n <= 652 && c.Format == "rollout-runner/compound-v2"
 	graceRestart := n >= 431 && n <= 432 && c.Format == "rollout-runner/v3"
 	controllerRestart := n >= 435 && n <= 440 && c.Format == "rollout-runner/v3"
 	apiRetry := n >= 455 && n <= 462 && c.Format == "rollout-runner/v3"
@@ -108,8 +128,13 @@ func (c Case) validateScenario() error {
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !blocking && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || c.Baseline != ProductionCommit {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !blocking && !compound && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || (!compound && c.Baseline != ProductionCommit) || (compound && len(c.Baseline) != 40) {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
+	}
+	if compound {
+		if c.Scenario.DesignID != compoundDesignID(n) || c.Scenario.Source["designID"] != c.Scenario.DesignID {
+			return fmt.Errorf("compound case design ID mismatch")
+		}
 	}
 	s := c.Scenario
 	sparseHistory := historyCreate && (n-463)%10 >= 5
@@ -122,23 +147,64 @@ func (c Case) validateScenario() error {
 	if s.Profile != "controlled" && s.Profile != "auto" {
 		return fmt.Errorf("unsupported readiness profile %q", s.Profile)
 	}
-	if _, err := readModel(s.InitialSpec); err != nil {
+	if _, err := readModelForContract(s.InitialSpec, compound); err != nil {
 		return fmt.Errorf("initial spec: %w", err)
 	}
 	if len(s.Steps) == 0 {
 		return fmt.Errorf("missing executable steps")
 	}
+	if s.Baseline != nil {
+		if !compound || s.Baseline.Action != "observe" || s.Baseline.Until != "compound" || s.Baseline.Expect.Compound == nil {
+			return fmt.Errorf("invalid compound baseline")
+		}
+		if err := validateCompoundExpectation(*s.Baseline.Expect.Compound); err != nil {
+			return fmt.Errorf("invalid compound baseline: %w", err)
+		}
+		initial, _ := readModelForContract(s.InitialSpec, true)
+		if s.Baseline.Expect.Compound.Active != initial.N {
+			return fmt.Errorf("compound baseline must observe all initial groups")
+		}
+		for _, group := range s.Baseline.Expect.Compound.Groups {
+			if group.Ordinal >= initial.N || group.Version != initial.Roles["frontend"].Entry {
+				return fmt.Errorf("compound baseline identity differs from initial spec")
+			}
+		}
+	}
+	seenStepNames := map[string]bool{"baseline": true}
 	for _, p := range s.Steps {
+		if p.SourceState && (!compound || p.Until != "compound" || p.TimeoutSeconds < 1) {
+			return fmt.Errorf("sourceState requires a bounded compound source checkpoint")
+		}
+		if compound && seenStepNames[p.Name] {
+			return fmt.Errorf("duplicate compound step name %q", p.Name)
+		}
+		if compound && p.Expect.Compound == nil {
+			return fmt.Errorf("compound step %s has no explicit group expectation", p.Name)
+		}
+		if compound && p.Expect.Compound != nil {
+			if err := validateCompoundExpectation(*p.Expect.Compound); err != nil {
+				return fmt.Errorf("compound step %s: %w", p.Name, err)
+			}
+			if p.Expect.Compound.Blocked && (p.StableSeconds < 30 || p.Release != "none") {
+				return fmt.Errorf("blocked compound checkpoint requires 30 stable seconds without release")
+			}
+			for _, group := range p.Expect.Compound.Groups {
+				if group.UIDSameAs != "" && !seenStepNames[group.UIDSameAs] {
+					return fmt.Errorf("compound step %s references unknown prior UID snapshot %s", p.Name, group.UIDSameAs)
+				}
+			}
+		}
+		seenStepNames[p.Name] = true
 		if p.Expect.PreserveHealthyOld && (!blocking || p.HoldSeconds < 30 && p.Action == "hold-block") {
 			return fmt.Errorf("healthy-old blocking guard requires a blocking case and 30-second hold")
 		}
-		if p.ReadinessTarget != nil && (!blocking || p.Action != "drop-ready" || p.ReadinessTarget.Kind != "unit" || p.ReadinessTarget.Version != "A" || p.ReadinessTarget.Role != "frontend" || p.ReadinessTarget.Group == nil || p.ReadinessTarget.Ordinal == nil || p.ReadinessTarget.Ready == nil || !*p.ReadinessTarget.Ready || p.ReadinessTarget.Count != 1) {
+		if p.ReadinessTarget != nil && (!(blocking || compound) || p.Action != "drop-ready" || p.ReadinessTarget.Kind != "unit" || p.ReadinessTarget.Version != "A" || p.ReadinessTarget.Role != "frontend" || p.ReadinessTarget.Group == nil || p.ReadinessTarget.Ordinal == nil || p.ReadinessTarget.Ready == nil || !*p.ReadinessTarget.Ready || p.ReadinessTarget.Count != 1) {
 			return fmt.Errorf("invalid old-readiness fault target")
 		}
 		if p.Expect.RequireCompleted && !completionBoundary {
 			return fmt.Errorf("explicit complete-state guard is restricted to sparse completion boundaries")
 		}
-		if p.Expect.BlockedByBudget && (!sparseBoundary || n != 592 && n != 598 || !p.Expect.NoReplacement || p.StableSeconds < 30) {
+		if p.Expect.BlockedByBudget && !compound && (!sparseBoundary || n != 592 && n != 598 || !p.Expect.NoReplacement || p.StableSeconds < 30) {
 			return fmt.Errorf("budget-blocked stop is only declared by the two sparse zero-budget traps")
 		}
 		if p.HistoryFault != "" && p.Action != "history-object-recovery" {
@@ -268,7 +334,7 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("resource fault not declared by this case")
 			}
 		case "drop-ready", "restore-ready":
-			if !(midRollout && n <= 424 && (n-401)%4 == 2) && !(blocking && n >= 616) {
+			if !(midRollout && n <= 424 && (n-401)%4 == 2) && !(blocking && n >= 616) && !(compound && p.Action == "drop-ready" && p.ReadinessTarget != nil) {
 				return fmt.Errorf("readiness fault not declared by this case")
 			}
 		case "restore-ready-or-replaced":
@@ -297,8 +363,12 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("recovery target: %w", err)
 			}
 		case "update":
-			if _, err := readModel(p.Spec); err != nil {
+			if _, err := readModelForContract(p.Spec, compound); err != nil {
 				return fmt.Errorf("%s: %w", p.Name, err)
+			}
+		case "set-deletion-cost":
+			if !compound || len(p.DeletionCosts) == 0 || len(p.Spec) != 0 {
+				return fmt.Errorf("invalid compound deletion cost action")
 			}
 		case "merge-patch":
 			if len(p.Patch) == 0 {
@@ -310,6 +380,10 @@ func (c Case) validateScenario() error {
 		}
 		switch p.Until {
 		case "settled":
+		case "compound":
+			if !compound {
+				return fmt.Errorf("compound predicate outside compound case")
+			}
 		case "conditions":
 			if len(p.Conditions) == 0 {
 				return fmt.Errorf("missing trigger conditions")
@@ -450,10 +524,41 @@ func (c Case) validateScenario() error {
 	if historyGC && (len(s.Steps) != 2 || s.Steps[0].Action != "update" || s.Steps[1].Action != "history-gc-list-error" || intValue(s.InitialSpec, "revisionHistoryLimit", -1) != 0) {
 		return fmt.Errorf("history GC requires limit zero, actual frontend B/backend A, then an exact live-reference List fault")
 	}
-	if s.Steps[len(s.Steps)-1].Until != "settled" {
+	if s.Steps[len(s.Steps)-1].Until != "settled" && !(compound && s.Steps[len(s.Steps)-1].Until == "compound") {
 		return fmt.Errorf("last step must verify a settled state")
 	}
 	return nil
+}
+
+func validateCompoundExpectation(expect CompoundExpectation) error {
+	if expect.Active < 0 || expect.Ready < 0 || expect.Ready > expect.Active || len(expect.Groups) == 0 {
+		return fmt.Errorf("invalid compound capacity")
+	}
+	seen := map[int]bool{}
+	for _, g := range expect.Groups {
+		if g.Ordinal < 0 || g.Version == "" || g.Members < 0 || g.Ready && g.RunningNotReady || seen[g.Ordinal] {
+			return fmt.Errorf("invalid/duplicate compound group")
+		}
+		seen[g.Ordinal] = true
+	}
+	if expect.Active != len(expect.Groups) {
+		return fmt.Errorf("compound active count differs from group identities")
+	}
+	return nil
+}
+
+func compoundDesignID(n int) string {
+	switch {
+	case n >= 618 && n <= 624:
+		return fmt.Sprintf("SG-S%02d", n-617)
+	case n >= 625 && n <= 640:
+		return fmt.Sprintf("SG-C%02d", n-624)
+	case n >= 641 && n <= 651:
+		return fmt.Sprintf("SG-P%02d", n-640)
+	case n == 652:
+		return "SG-R01"
+	}
+	return ""
 }
 func cloneMap(in map[string]interface{}) map[string]interface{} {
 	b, _ := json.Marshal(in)
@@ -487,6 +592,10 @@ func textValue(m map[string]interface{}, k string) string { v, _ := m[k].(string
 // Resolve percentages from desired capacity, never from the number of observed
 // Pods or surge objects. SG positive U has the documented minimum of one.
 func budget(m map[string]interface{}, k string, d int, sg bool) (int, error) {
+	return budgetForContract(m, k, d, sg, false)
+}
+
+func budgetForContract(m map[string]interface{}, k string, d int, sg, compound bool) (int, error) {
 	fallback := 0
 	if k == "maxUnavailable" {
 		fallback = 1
@@ -505,7 +614,7 @@ func budget(m map[string]interface{}, k string, d int, sg bool) (int, error) {
 		v := d * p / 100
 		if k != "maxUnavailable" {
 			v = (d*p + 99) / 100
-		} else if sg && d > 0 && p > 0 {
+		} else if sg && !compound && d > 0 && p > 0 {
 			v = max(v, 1)
 		}
 		return v, nil
@@ -542,6 +651,10 @@ func templateVersion(t map[string]interface{}) string {
 	return ""
 }
 func readModel(spec map[string]interface{}) (NormalModel, error) {
+	return readModelForContract(spec, false)
+}
+
+func readModelForContract(spec map[string]interface{}, compound bool) (NormalModel, error) {
 	m := NormalModel{Mode: "SG", N: intValue(spec, "replicas", 1), Roles: map[string]RoleLayout{}, Spec: cloneMap(spec)}
 	if spec == nil || m.N < 0 {
 		return m, fmt.Errorf("invalid spec/replicas")
@@ -553,7 +666,7 @@ func readModel(spec map[string]interface{}) (NormalModel, error) {
 	var err error
 	if m.Mode == "SG" {
 		b := mapValue(strategy, "rollingUpdateConfiguration")
-		m.U, err = budget(b, "maxUnavailable", m.N, true)
+		m.U, err = budgetForContract(b, "maxUnavailable", m.N, true, compound)
 		if err != nil {
 			return m, err
 		}

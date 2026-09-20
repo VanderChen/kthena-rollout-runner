@@ -104,6 +104,10 @@ func (o *Observer) stream(ctx context.Context, api dynamic.ResourceInterface, ki
 				}
 			}
 			if ev.Type == watch.Error {
+				if ctx.Err() != nil {
+					w.Stop()
+					return
+				}
 				o.broken(kind, fmt.Errorf("watch error: %v", apierrors.FromObject(ev.Object)))
 				w.Stop()
 				return

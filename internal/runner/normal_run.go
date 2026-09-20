@@ -20,6 +20,7 @@ import (
 )
 
 type normalExecution struct {
+	compoundSnapshots         map[string]map[int]map[string]bool
 	preparingCompletionSource bool
 	completionStatusProbe     bool
 	completionStatusProbes    int
@@ -52,7 +53,8 @@ type normalExecution struct {
 func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
 	retryTrigger := c.Scenario.Source["executionProfile"] == "AUTO_READY_INTERLEAVE"
 	for _, step := range c.Scenario.Steps {
-		retryTrigger = retryTrigger || step.RequireLiveTerminating
+		retryTrigger = retryTrigger || step.RequireLiveTerminating || step.SourceState
+		retryTrigger = retryTrigger || c.Format == "rollout-runner/compound-v2" && step.Until == "conditions"
 	}
 	if !retryTrigger {
 		return r.runNormalAttempt(ctx, c, 0)
@@ -71,6 +73,10 @@ func (r *Runner) runNormalCase(ctx context.Context, c Case) (res Result) {
 		}
 	}
 	res.Duration = time.Since(started).Seconds()
+	if c.Format == "rollout-runner/compound-v2" && res.Status == "TRIGGER_MISSED" {
+		res.Status = "INCONCLUSIVE"
+		res.Error = fmt.Sprintf("source trigger missed after %d attempts: %s", len(attempts), res.Error)
+	}
 	if err := writeJSON(filepath.Join(dir, "attempts.json"), attempts); err != nil {
 		res.Status = "ERROR"
 		res.Error = err.Error()
@@ -103,8 +109,8 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 			res.Error += "; " + err.Error()
 		}
 	}()
-	if r.testedCommit() != ProductionCommit {
-		res.Error = "normal suite requires --controller-commit=" + ProductionCommit
+	if r.testedCommit() != c.Baseline {
+		res.Error = "case requires --controller-commit=" + c.Baseline
 		return
 	}
 	if err := saveYAML(filepath.Join(dir, "case.yaml"), c); err != nil {
@@ -128,7 +134,7 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 		res.Error = err.Error()
 		return
 	}
-	e := &normalExecution{pinned: map[string]types.UID{}, tableVersion: "1.0", r: r, c: c, o: o, namespace: res.Namespace, dir: dir, res: &res}
+	e := &normalExecution{compoundSnapshots: map[string]map[int]map[string]bool{}, pinned: map[string]types.UID{}, tableVersion: "1.0", r: r, c: c, o: o, namespace: res.Namespace, dir: dir, res: &res}
 	defer e.finalizeRecoveryEvidence()
 	defer func() {
 		// Cancel and drain all already-delivered events before freezing the verdict.
@@ -331,7 +337,7 @@ func (e *normalExecution) execute(ctx context.Context) error {
 	if err = saveYAML(filepath.Join(e.dir, "before-server.yaml"), created.Object); err != nil {
 		return err
 	}
-	l, err := newNormalLedger(s.InitialSpec, string(created.GetUID()), s.Profile)
+	l, err := newNormalLedgerForContract(s.InitialSpec, string(created.GetUID()), s.Profile, e.c.Format == "rollout-runner/compound-v2")
 	if err != nil {
 		return err
 	}
@@ -353,8 +359,16 @@ func (e *normalExecution) execute(ctx context.Context) error {
 	if s.Profile == "auto" {
 		baseline.Release = "none"
 	}
+	if s.Baseline != nil {
+		baseline = *s.Baseline
+	}
 	if err = e.wait(ctx, baseline); err != nil {
 		return fmt.Errorf("baseline: %w", err)
+	}
+	if l.CompoundV2 {
+		if err = e.locked(func() error { e.rememberCompoundSnapshot("baseline"); return nil }); err != nil {
+			return err
+		}
 	}
 	if s.Fixture == "sparse-history-A" || s.Fixture == "sparse-boundary-A" {
 		if err = e.prepareSparseHistoryFixture(ctx); err != nil {
@@ -554,7 +568,7 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 				return err
 			}
 		}
-		server, err := readModel(mapValue(next.Object, "spec"))
+		server, err := readModelForContract(mapValue(next.Object, "spec"), e.l.CompoundV2)
 		if err != nil {
 			return err
 		}
@@ -610,6 +624,11 @@ func (e *normalExecution) finishStep(ctx context.Context, p ScenarioStep, prefix
 	if err := e.wait(ctx, p); err != nil {
 		return err
 	}
+	if e.l.CompoundV2 {
+		if err := e.locked(func() error { e.rememberCompoundSnapshot(p.Name); return nil }); err != nil {
+			return err
+		}
+	}
 	if p.Until == "settled" {
 		if err := e.locked(func() error { e.l.Base = e.l.Model; return nil }); err != nil {
 			return err
@@ -662,6 +681,7 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 	var releaseAfter time.Time
 	var lastBlockProbe time.Time
 	lastReason := ""
+	triggerSeen := false
 	for {
 		if time.Since(lastBlockProbe) >= time.Second {
 			if err := e.verifyBlockedOld(ctx); err != nil {
@@ -693,7 +713,13 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 			var reason string
 			if p.Until == "conditions" {
 				done = e.l.conditions(p.Conditions, e.o.objects)
+				triggerSeen = triggerSeen || done
 				reason = "waiting for declared conditions"
+				if done && e.l.CompoundV2 {
+					done, reason = e.compoundFacts(p.Expect.Compound)
+				}
+			} else if p.Until == "compound" {
+				done, reason = e.compoundFacts(p.Expect.Compound)
 			} else {
 				done, reason = e.settled(p.Expect)
 			}
@@ -713,10 +739,17 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 			if time.Since(stableAt) >= time.Duration(p.StableSeconds+p.HoldSeconds)*time.Second {
 				e.res.Checkpoints++
 				return e.locked(func() error {
-					return writeJSON(filepath.Join(e.dir, fmt.Sprintf("checkpoint-%03d.json", e.res.Checkpoints)), map[string]interface{}{"phase": p.Name, "stableSince": stableAt.UTC(), "completed": time.Now().UTC(), "elapsedStableNanos": time.Since(stableAt).Nanoseconds(), "holdSeconds": p.HoldSeconds, "stableSeconds": p.StableSeconds, "metrics": e.l.Metrics(e.o.objects["pods"]), "starts": e.l.Starts})
+					checkpoint := map[string]interface{}{"phase": p.Name, "stableSince": stableAt.UTC(), "completed": time.Now().UTC(), "elapsedStableNanos": time.Since(stableAt).Nanoseconds(), "holdSeconds": p.HoldSeconds, "stableSeconds": p.StableSeconds, "metrics": e.l.Metrics(e.o.objects["pods"]), "starts": e.l.Starts}
+					if e.l.CompoundV2 {
+						checkpoint["compoundBudget"] = e.l.compoundBudget(e.o.objects)
+					}
+					return writeJSON(filepath.Join(e.dir, fmt.Sprintf("checkpoint-%03d.json", e.res.Checkpoints)), checkpoint)
 				})
 			}
 		} else if !stableAt.IsZero() {
+			if e.l.CompoundV2 && (p.Until == "conditions" || p.SourceState) {
+				return fmt.Errorf("TRIGGER_MISSED: unstable source state: %s", lastReason)
+			}
 			return fmt.Errorf("STABILITY_VIOLATION: settled predicate regressed: %s", lastReason)
 		}
 		if len(candidates) > 0 {
@@ -745,6 +778,12 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline.C:
+			if e.l.CompoundV2 && p.SourceState {
+				return fmt.Errorf("TRIGGER_MISSED: source state absent: %s (%s)", p.Name, lastReason)
+			}
+			if e.l.CompoundV2 && p.Until == "conditions" && !triggerSeen {
+				return fmt.Errorf("TRIGGER_MISSED: source condition absent: %s", p.Name)
+			}
 			return fmt.Errorf("TIMEOUT: %s (%s)", p.Name, lastReason)
 		case <-tick.C:
 		}

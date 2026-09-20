@@ -19,6 +19,8 @@ import (
 
 func (e *normalExecution) specialAction(ctx context.Context, p ScenarioStep, prefix string) error {
 	switch p.Action {
+	case "set-deletion-cost":
+		return e.setCompoundDeletionCosts(ctx, p.DeletionCosts, prefix)
 	case "hold-block":
 		return nil
 	case "terminate-controller":

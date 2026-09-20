@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,6 +55,12 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	CompoundV2             bool                   `json:"compoundV2,omitempty"`
+	CompoundFormal         map[int]bool           `json:"compoundFormalOrdinals,omitempty"`
+	CompoundStarted        map[string]bool        `json:"compoundStarted,omitempty"`
+	CompoundPending        map[int]string         `json:"compoundPending,omitempty"`
+	CompoundReadyTargetUID map[string]bool        `json:"compoundReadyTargetUIDs,omitempty"`
+	CompoundPGVersion      map[string]string      `json:"compoundPodGroupVersion,omitempty"`
 	CanonicalEndpoints     bool                   `json:"canonicalEndpoints,omitempty"`
 	ForeignResidueUIDs     map[string]string      `json:"foreignResidueUIDs,omitempty"`
 	RejectedSpec           map[string]interface{} `json:"acceptedSpecAfterRejection,omitempty"`
@@ -94,11 +101,15 @@ type NormalLedger struct {
 }
 
 func newNormalLedger(spec map[string]interface{}, owner, profile string) (*NormalLedger, error) {
-	m, e := readModel(spec)
+	return newNormalLedgerForContract(spec, owner, profile, false)
+}
+
+func newNormalLedgerForContract(spec map[string]interface{}, owner, profile string, compound bool) (*NormalLedger, error) {
+	m, e := readModelForContract(spec, compound)
 	if e != nil {
 		return nil, e
 	}
-	return &NormalLedger{PGScale: map[string]bool{}, PGPhase: map[string]string{}, BornRanktable: map[string]bool{}, Served: map[string]bool{}, RevisionLayouts: map[string]NormalModel{}, PGCommitted: map[string]bool{}, PGPods: map[string]bool{}, RevisionData: map[string]string{}, Owner: owner, Profile: profile, Model: m, Base: m, History: []NormalModel{m}, Released: map[string]bool{}, Committed: map[string]bool{}, Protected: map[string]string{}, BlockedOld: map[string]string{}, ScaleUIDs: map[string]bool{}, ScaleGroups: map[int]bool{}, Ceiling: map[string]int{}, Revisions: map[string]bool{}}, nil
+	return &NormalLedger{CompoundV2: compound, CompoundFormal: map[int]bool{}, CompoundStarted: map[string]bool{}, CompoundPending: map[int]string{}, CompoundReadyTargetUID: map[string]bool{}, CompoundPGVersion: map[string]string{}, PGScale: map[string]bool{}, PGPhase: map[string]string{}, BornRanktable: map[string]bool{}, Served: map[string]bool{}, RevisionLayouts: map[string]NormalModel{}, PGCommitted: map[string]bool{}, PGPods: map[string]bool{}, RevisionData: map[string]string{}, Owner: owner, Profile: profile, Model: m, Base: m, History: []NormalModel{m}, Released: map[string]bool{}, Committed: map[string]bool{}, Protected: map[string]string{}, BlockedOld: map[string]string{}, ScaleUIDs: map[string]bool{}, ScaleGroups: map[int]bool{}, Ceiling: map[string]int{}, Revisions: map[string]bool{}}, nil
 }
 func (l *NormalLedger) fail(s string) {
 	for _, v := range l.Violations {
@@ -238,6 +249,14 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 				if count != layout.R {
 					matched = false
 				}
+				// A group that has received an added member must satisfy its
+				// applied membership target before it earns SG Ready credit.
+				// Groups still on the old membership retain their old target.
+				if l.CompoundV2 {
+					if current, ok := l.Model.Roles[name]; ok && count > readyMinimum {
+						readyMinimum = current.R
+					}
+				}
 				cohortReady = cohortReady && readyCount >= readyMinimum
 			}
 			// Newly added Roles/replicas can coexist with the old membership.
@@ -288,7 +307,7 @@ func (l *NormalLedger) Metrics(objects map[string]*unstructured.Unstructured) []
 	return out
 }
 func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e ScenarioExpectation, objects Objects) error {
-	next, err := readModel(spec)
+	next, err := readModelForContract(spec, l.CompoundV2)
 	if err != nil {
 		return err
 	}
@@ -328,11 +347,17 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 	}
 	sort.Slice(gs, func(i, j int) bool {
 		pi, pj := gs[i].Ordinal < next.P, gs[j].Ordinal < next.P
-		if old.Mode == "SG" && pi != pj {
+		if old.Mode == "SG" && !l.CompoundV2 && pi != pj {
 			return !pi
 		}
 		if gs[i].Ready != gs[j].Ready {
 			return !gs[i].Ready
+		}
+		if old.Mode == "SG" && l.CompoundV2 && pi != pj {
+			return !pi
+		}
+		if l.CompoundV2 && compoundDeletionCost(gs[i]) != compoundDeletionCost(gs[j]) {
+			return compoundDeletionCost(gs[i]) < compoundDeletionCost(gs[j])
 		}
 		return gs[i].Ordinal > gs[j].Ordinal
 	})
@@ -389,6 +414,13 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 		}
 	}
 	l.Model = next
+	if l.CompoundV2 {
+		for ordinal := range l.physicalGroups(objects) {
+			if ordinal < next.N {
+				l.CompoundFormal[ordinal] = true
+			}
+		}
+	}
 	l.History = append(l.History, next)
 	l.Protected = map[string]string{}
 	l.BlockedOld = map[string]string{}
@@ -415,6 +447,9 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 			}
 		}
 		temporaryTarget := u.Ordinal >= d && (active > d || l.CanonicalEndpoints) && l.unitTarget(u)
+		if l.CompoundV2 {
+			temporaryTarget = u.Ordinal >= d && !l.CompoundFormal[u.Ordinal] && l.unitTarget(u)
+		}
 		// Already-issued deletion commitments survive new partition/budget values.
 		for _, pod := range u.Pods {
 			uid := string(pod.UID)
@@ -448,6 +483,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	l.roleScaleBefore(kind, event, o, objects)
 	l.coordinationBefore(kind, event, o, objects)
 	l.podGroupBefore(kind, event, o, objects)
+	l.compoundBefore(kind, event, o, objects)
 	if kind == "pods" && (event == "DELETED" || o.GetDeletionTimestamp() != nil) {
 		if name, ok := l.BlockedOld[string(o.GetUID())]; ok {
 			l.fail("ROLLOUT_BLOCK_VIOLATION: healthy old Pod deleted during fault: " + name)
@@ -525,15 +561,15 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !scale && ordinalCleanup {
 		reason = "ordinal-cleanup"
 	}
-	if !scale && !reservedEarlier && !ordinalCleanup && active <= d && u.Ready && l.unitTarget(u) {
+	if !scale && !reservedEarlier && !ordinalCleanup && (active <= d || l.CompoundV2 && l.CompoundFormal[u.Ordinal]) && u.Ready && l.unitTarget(u) {
 		l.fail("UNEXPECTED_TARGET_REPLACED: " + key)
 	}
 	// Already unavailable old units may be replaced before healthy old units.
 	// Descending healthy replacement order applies when consuming capacity.
-	if !scale && !reservedEarlier && u.Ready && !l.unitTarget(u) {
+	if !scale && !reservedEarlier && (u.Ready || l.CompoundV2) && !l.unitTarget(u) {
 		_, _, _, partition := l.scopeBudget(u)
 		for _, other := range units {
-			if other.Scope != u.Scope || other.Ordinal <= u.Ordinal || other.Ordinal < partition || (other.Ordinal >= d && !l.isSourceAboveDesired(other)) || !other.Active || l.unitTarget(other) {
+			if other.Scope != u.Scope || other.Ordinal <= u.Ordinal || other.Ordinal < partition || (!l.CompoundV2 && other.Ordinal >= d && !l.isSourceAboveDesired(other)) || !other.Active || l.unitTarget(other) {
 				continue
 			}
 			available := true
@@ -654,16 +690,33 @@ func (l *NormalLedger) dynamicScaleBefore(kind, event string, o *unstructured.Un
 	}
 }
 func (l *NormalLedger) scaleLess(a, b NormalUnit, partition int, protect bool) bool {
-	if protect && (a.Ordinal < partition) != (b.Ordinal < partition) {
+	if protect && !l.CompoundV2 && (a.Ordinal < partition) != (b.Ordinal < partition) {
 		return a.Ordinal >= partition
 	}
 	if a.Ready != b.Ready {
 		return !a.Ready
 	}
+	if protect && l.CompoundV2 && (a.Ordinal < partition) != (b.Ordinal < partition) {
+		return a.Ordinal >= partition
+	}
+	if l.CompoundV2 && compoundDeletionCost(a) != compoundDeletionCost(b) {
+		return compoundDeletionCost(a) < compoundDeletionCost(b)
+	}
 	if len(a.Pods) != len(b.Pods) {
 		return len(a.Pods) < len(b.Pods)
 	}
 	return a.Ordinal > b.Ordinal
+}
+
+func compoundDeletionCost(unit NormalUnit) int {
+	result := 0
+	for _, pod := range unit.Pods {
+		value, err := strconv.Atoi(pod.Annotations[corev1.PodDeletionCost])
+		if err == nil {
+			result += value
+		}
+	}
+	return result
 }
 func (l *NormalLedger) unitTarget(u NormalUnit) bool {
 	if l.Model.Mode == "Role" {
@@ -700,6 +753,7 @@ func (l *NormalLedger) unitTarget(u NormalUnit) bool {
 	return true
 }
 func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	l.compoundAfter(kind, event, o, objects)
 	if oldOwner, ok := l.ForeignResidueUIDs[string(o.GetUID())]; ok && oldOwner != l.Owner && objectOwned(o, l.Owner) {
 		l.fail("FOREIGN_OWNER_ADOPTED: " + kind + "/" + o.GetName())
 	}

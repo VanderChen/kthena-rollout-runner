@@ -1,0 +1,584 @@
+{
+  "format": "rollout-runner/compound-v2",
+  "id": "RUN-618",
+  "baseline": "6fea34e03a179b07686fd5415b83018e159b196b",
+  "scenario": {
+    "designID": "SG-S01",
+    "source": {
+      "id": "RUN-618",
+      "designID": "SG-S01",
+      "design": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md"
+    },
+    "profile": "controlled",
+    "initialSpec": {
+      "template": {
+        "roles": [
+          {
+            "name": "frontend",
+            "replicas": 1,
+            "workerReplicas": 0,
+            "entryTemplate": {
+              "metadata": {
+                "annotations": {
+                  "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                }
+              },
+              "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "containers": [
+                  {
+                    "name": "workload",
+                    "image": "busybox:1.36",
+                    "imagePullPolicy": "IfNotPresent",
+                    "command": [
+                      "sh",
+                      "-c",
+                      "sleep 3600"
+                    ],
+                    "env": [
+                      {
+                        "name": "ROLLOUT_VERSION",
+                        "value": "A"
+                      }
+                    ],
+                    "readinessProbe": {
+                      "exec": {
+                        "command": [
+                          "test",
+                          "-f",
+                          "/tmp/ready"
+                        ]
+                      },
+                      "periodSeconds": 1,
+                      "failureThreshold": 1
+                    },
+                    "resources": {
+                      "requests": {
+                        "cpu": "5m",
+                        "memory": "4Mi"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "replicas": 4,
+      "schedulerName": "volcano",
+      "plugins": [
+        {
+          "name": "headless-service",
+          "type": "BuiltIn"
+        },
+        {
+          "name": "ranktable",
+          "type": "BuiltIn",
+          "config": {
+            "template": "production020-ranktable-template"
+          }
+        }
+      ],
+      "rolloutStrategy": {
+        "type": "ServingGroupRollingUpdate",
+        "rollingUpdateConfiguration": {
+          "partition": 0,
+          "maxSurge": 0,
+          "maxUnavailable": 1
+        }
+      }
+    },
+    "baseline": {
+      "name": "baseline",
+      "action": "observe",
+      "until": "compound",
+      "release": "all",
+      "stableSeconds": 1,
+      "holdSeconds": 0,
+      "expect": {
+        "compound": {
+          "active": 4,
+          "ready": 4,
+          "groups": [
+            {
+              "ordinal": 0,
+              "version": "A",
+              "ready": true
+            },
+            {
+              "ordinal": 1,
+              "version": "A",
+              "ready": true
+            },
+            {
+              "ordinal": 2,
+              "version": "A",
+              "ready": true
+            },
+            {
+              "ordinal": 3,
+              "version": "A",
+              "ready": true
+            }
+          ],
+          "blocked": false
+        }
+      }
+    },
+    "steps": [
+      {
+        "name": "set-explicit-deletion-costs",
+        "action": "set-deletion-cost",
+        "until": "compound",
+        "release": "none",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 4,
+            "ready": 4,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 1,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 2,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 3,
+                "version": "A",
+                "ready": true
+              }
+            ],
+            "blocked": false
+          }
+        },
+        "deletionCosts": {
+          "0": 100,
+          "1": -100,
+          "2": -100,
+          "3": 100
+        }
+      },
+      {
+        "name": "shrink-to-sparse-0-and-3",
+        "action": "update",
+        "until": "compound",
+        "release": "none",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 2,
+            "ready": 2,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              },
+              {
+                "ordinal": 3,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              }
+            ],
+            "blocked": false
+          }
+        },
+        "spec": {
+          "template": {
+            "roles": [
+              {
+                "name": "frontend",
+                "replicas": 1,
+                "workerReplicas": 0,
+                "entryTemplate": {
+                  "metadata": {
+                    "annotations": {
+                      "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                    }
+                  },
+                  "spec": {
+                    "terminationGracePeriodSeconds": 1,
+                    "containers": [
+                      {
+                        "name": "workload",
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "command": [
+                          "sh",
+                          "-c",
+                          "sleep 3600"
+                        ],
+                        "env": [
+                          {
+                            "name": "ROLLOUT_VERSION",
+                            "value": "A"
+                          }
+                        ],
+                        "readinessProbe": {
+                          "exec": {
+                            "command": [
+                              "test",
+                              "-f",
+                              "/tmp/ready"
+                            ]
+                          },
+                          "periodSeconds": 1,
+                          "failureThreshold": 1
+                        },
+                        "resources": {
+                          "requests": {
+                            "cpu": "5m",
+                            "memory": "4Mi"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "replicas": 2,
+          "schedulerName": "volcano",
+          "plugins": [
+            {
+              "name": "headless-service",
+              "type": "BuiltIn"
+            },
+            {
+              "name": "ranktable",
+              "type": "BuiltIn",
+              "config": {
+                "template": "production020-ranktable-template"
+              }
+            }
+          ],
+          "rolloutStrategy": {
+            "type": "ServingGroupRollingUpdate",
+            "rollingUpdateConfiguration": {
+              "partition": 0,
+              "maxSurge": 0,
+              "maxUnavailable": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "fill-only-lowest-hole-1",
+        "action": "update",
+        "until": "compound",
+        "release": "none",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 3,
+            "ready": 2,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              },
+              {
+                "ordinal": 1,
+                "version": "A",
+                "ready": false
+              },
+              {
+                "ordinal": 3,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              }
+            ],
+            "blocked": false
+          }
+        },
+        "spec": {
+          "template": {
+            "roles": [
+              {
+                "name": "frontend",
+                "replicas": 1,
+                "workerReplicas": 0,
+                "entryTemplate": {
+                  "metadata": {
+                    "annotations": {
+                      "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                    }
+                  },
+                  "spec": {
+                    "terminationGracePeriodSeconds": 1,
+                    "containers": [
+                      {
+                        "name": "workload",
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "command": [
+                          "sh",
+                          "-c",
+                          "sleep 3600"
+                        ],
+                        "env": [
+                          {
+                            "name": "ROLLOUT_VERSION",
+                            "value": "A"
+                          }
+                        ],
+                        "readinessProbe": {
+                          "exec": {
+                            "command": [
+                              "test",
+                              "-f",
+                              "/tmp/ready"
+                            ]
+                          },
+                          "periodSeconds": 1,
+                          "failureThreshold": 1
+                        },
+                        "resources": {
+                          "requests": {
+                            "cpu": "5m",
+                            "memory": "4Mi"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "replicas": 3,
+          "schedulerName": "volcano",
+          "plugins": [
+            {
+              "name": "headless-service",
+              "type": "BuiltIn"
+            },
+            {
+              "name": "ranktable",
+              "type": "BuiltIn",
+              "config": {
+                "template": "production020-ranktable-template"
+              }
+            }
+          ],
+          "rolloutStrategy": {
+            "type": "ServingGroupRollingUpdate",
+            "rollingUpdateConfiguration": {
+              "partition": 0,
+              "maxSurge": 0,
+              "maxUnavailable": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "first-expansion-stays-sparse",
+        "action": "observe",
+        "until": "compound",
+        "release": "all",
+        "stableSeconds": 30,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 3,
+            "ready": 3,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 1,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 3,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              }
+            ],
+            "blocked": false
+          }
+        }
+      },
+      {
+        "name": "fill-second-hole-2",
+        "action": "update",
+        "until": "compound",
+        "release": "none",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 4,
+            "ready": 3,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 1,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 2,
+                "version": "A",
+                "ready": false
+              },
+              {
+                "ordinal": 3,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              }
+            ],
+            "blocked": false
+          }
+        },
+        "spec": {
+          "template": {
+            "roles": [
+              {
+                "name": "frontend",
+                "replicas": 1,
+                "workerReplicas": 0,
+                "entryTemplate": {
+                  "metadata": {
+                    "annotations": {
+                      "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                    }
+                  },
+                  "spec": {
+                    "terminationGracePeriodSeconds": 1,
+                    "containers": [
+                      {
+                        "name": "workload",
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "command": [
+                          "sh",
+                          "-c",
+                          "sleep 3600"
+                        ],
+                        "env": [
+                          {
+                            "name": "ROLLOUT_VERSION",
+                            "value": "A"
+                          }
+                        ],
+                        "readinessProbe": {
+                          "exec": {
+                            "command": [
+                              "test",
+                              "-f",
+                              "/tmp/ready"
+                            ]
+                          },
+                          "periodSeconds": 1,
+                          "failureThreshold": 1
+                        },
+                        "resources": {
+                          "requests": {
+                            "cpu": "5m",
+                            "memory": "4Mi"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "replicas": 4,
+          "schedulerName": "volcano",
+          "plugins": [
+            {
+              "name": "headless-service",
+              "type": "BuiltIn"
+            },
+            {
+              "name": "ranktable",
+              "type": "BuiltIn",
+              "config": {
+                "template": "production020-ranktable-template"
+              }
+            }
+          ],
+          "rolloutStrategy": {
+            "type": "ServingGroupRollingUpdate",
+            "rollingUpdateConfiguration": {
+              "partition": 0,
+              "maxSurge": 0,
+              "maxUnavailable": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "second-expansion-ready",
+        "action": "observe",
+        "until": "compound",
+        "release": "all",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 4,
+            "ready": 4,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 1,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 2,
+                "version": "A",
+                "ready": true
+              },
+              {
+                "ordinal": 3,
+                "version": "A",
+                "ready": true,
+                "uidSameAs": "baseline"
+              }
+            ],
+            "blocked": false
+          }
+        }
+      }
+    ]
+  }
+}

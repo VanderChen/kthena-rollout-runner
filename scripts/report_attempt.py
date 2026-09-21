@@ -207,13 +207,12 @@ def build_report(attempt):
             issues.append(f"{case_id}: {reason}")
         codes = sorted(set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}(?=:)", reason)))
         cases.append({"id": case_id, "status": status, "runnerStatus": source_status,
-                      "verdict": "通过" if status == "PASS" else "未通过",
-                      "passed": status == "PASS", "failureCodes": codes, "reason": reason,
+                      "failureCodes": codes, "reason": reason,
                       "evidence": f"{case_id}/result.json" if path.is_file() else None})
     counts = dict(sorted(collections.Counter(row["status"] for row in cases).items()))
     complete = summary is not None and len(by_id) == len(expected) and not any(
         row["status"] in {"MISSING_RESULT", "EVIDENCE_CONFLICT", "NOT_RUN"} for row in cases)
-    all_pass = complete and all(row["passed"] for row in cases)
+    all_pass = complete and all(row["status"] == "PASS" for row in cases)
     if all_pass and run_error:
         issues.append("runner reported a fatal error despite all case results being PASS")
     job = job_evidence(attempt, environment, complete, all_pass, issues, inputs)
@@ -225,7 +224,7 @@ def build_report(attempt):
         overall = "FAIL"
     else:
         overall = "INCONCLUSIVE"
-    return {"schema": "rollout-runner/offline-attempt-report/v2", "runID": run_id,
+    return {"schema": "rollout-runner/offline-attempt-report/v3", "runID": run_id,
             "controllerCommit": environment.get("baseline"), "expected": len(expected),
             "counts": counts, "overall": overall, "job": job, "runError": run_error, "issues": issues,
             "inputsSHA256": dict(sorted(inputs.items())), "cases": cases}
@@ -238,20 +237,19 @@ def markdown(report, attempt, out):
     lines = [f"# Runner attempt {report['runID']} 故障报告", "",
              f"总体结论：**{report['overall']}**；Job 证据：**{report['job']['status']}**。", "",
              f"选中 {report['expected']} 项；" + "，".join(f"{key} {value}" for key, value in report["counts"].items()) + "。", "",
-             "| 用例 | 是否通过 | 原始状态 | 诊断代码 | 原因 | 原始结果 |", "| --- | --- | --- | --- | --- | --- |"]
+             "| 用例 | 结果状态 | 诊断代码 | 原因 | 原始结果 |", "| --- | --- | --- | --- | --- |"]
     if report["runError"]:
         lines[4:4] = [f"Runner 退出原因：{report['runError']}", ""]
     for row in report["cases"]:
-        verdict = row["verdict"]
         link = ""
         if row["evidence"]:
             target = os.path.relpath(attempt / row["evidence"], out)
             link = f"[result.json]({target})"
-        lines.append(f"| {row['id']} | {verdict} | {cell(row['status'])} | {cell(', '.join(row['failureCodes']))} | {cell(row['reason'])} | {link} |")
+        lines.append(f"| {row['id']} | {cell(row['status'])} | {cell(', '.join(row['failureCodes']))} | {cell(row['reason'])} | {link} |")
     if report["issues"]:
         lines.extend(["", "## 证据问题", ""])
         lines.extend("- " + issue for issue in report["issues"])
-    lines.extend(["", "“未通过”表示本次未达到通过条件。原始状态 FAIL 表示观察到用例违约；INCONCLUSIVE 表示证据不足；ERROR 表示执行错误；NOT_RUN 或 MISSING_RESULT 表示未执行或缺少结果；EVIDENCE_CONFLICT 表示结果互相矛盾。", ""])
+    lines.extend(["", "PASS：断言通过；FAIL：观察到用例违约；INCONCLUSIVE：证据不足；ERROR：执行错误；NOT_RUN：明确未执行；MISSING_RESULT：缺少结果，需结合退出原因判断是否执行；EVIDENCE_CONFLICT：结果证据互相矛盾。", ""])
     return "\n".join(lines)
 
 

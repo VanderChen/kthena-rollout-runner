@@ -20,7 +20,7 @@ internal/runner/run.go           预检查、逐例执行、结果和清理
 
 ## 增加或修改一例
 
-1. 在 workspace 的 `issues/` 中确认设计来源、前置条件、操作、允许轨迹、禁止轨迹和终态。先判断已有 case 是否覆盖；不要只因最终组数相同就复用另一个场景。
+1. 先核对本仓[滚动预期与 API reference](specs/README.md)，在 workspace 的 `issues/` 中记录适用版本、章节/设计 ID、前置条件、操作、允许轨迹、禁止轨迹和终态。先判断已有 case 是否覆盖；不要只因最终组数相同就复用另一个场景。改变核心预期须先提交具体旧/新差异并取得人工明确批准，再修改规范、case、生成器或判定；实现修复的批准不能代替规范修改批准。
 2. 选择合适 suite 和未使用 ID。优先复制同格式、同执行 profile 的邻近 case。`rollout-runner/v1` 使用 `input/update/expect/process`；`v2`、`v3`、`v4` 使用 `scenario.initialSpec` 与逐步 `steps[]`；拒绝类还必须校验实际 API 拒绝和旧状态保持。若 suite 有 `scripts/generate-*.py`，修改生成器/来源后重新生成，不能只手改生成结果。
 3. 每个 `steps[]` 写清实际 `action`、请求 `spec` 或 `patch`、`until` 条件、`release`、稳定窗口与 `expect`。对在途/故障源，要求实际 UID、状态、请求或代理命中；未建立源应是 INCONCLUSIVE，不能算 PASS。需要新的过程不变量时，在 `internal/runner/` 添加校验，且让违例锁存到最终结果。
 4. 核对 `baseline` 是被测 controller 镜像对应的源码 commit。`scenario.source`、`designID` 和 `suite.json` 记录可追溯来源，但执行依据仍是 YAML 可执行字段。保留原始请求中省略、null、空对象的区别；不要把 controller 的实现算法复制成预期 oracle。

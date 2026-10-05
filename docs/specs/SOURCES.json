@@ -1,0 +1,71 @@
+{
+  "importedOn": "2026-10-05",
+  "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
+  "approval": "User request in this chat to retain previous rollout expectations and API reference. Future contract changes require separate explicit human approval.",
+  "files": [
+    {
+      "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+      "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+      "sha256": "a22cb024bcd1e2f1d75d28b053e09878a1b8b26a55bed48d1079c72617e498b2",
+      "bytes": 17643,
+      "scope": "rollout-design",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+      "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+      "sha256": "9d700394fae571288ddb75dbfcb249c37e27f9ef4428a180c619b05cb74e002a",
+      "bytes": 55368,
+      "scope": "rollout-design",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "SERVINGGROUP_COMPOUND_ROLLOUT_PROCESS_TABLES.md",
+      "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_PROCESS_TABLES.md",
+      "sha256": "6e467991a7e4788e03b22985b30a40f20421d5f2f8ee7f77af2154acd9dafad6",
+      "bytes": 38775,
+      "scope": "rollout-design",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "modelserving-api-reference.en.v2.0.md",
+      "sourceWorkspacePath": "kthena/docs/kthena/docs/api/modelserving-api-reference.en.v2.0.md",
+      "sha256": "d6204f4251b6c050c1fd860741dd0f461feef518af0d1933d3d22e45a958e4df",
+      "bytes": 60372,
+      "scope": "api-reference",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "history/ROLLING_UPDATE_SCENARIOS.md",
+      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_SCENARIOS.md",
+      "sha256": "c4319b80d5fe22698a2a303c0cb56fcd1d59838add0d4f5f57e07660d8950cf7",
+      "bytes": 53975,
+      "scope": "historical-baseline",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "history/ROLLING_UPDATE_CASE_TABLE.md",
+      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASE_TABLE.md",
+      "sha256": "abc5d937f571f40244a581114d7cab7fe5cf94250632497e6da63f0fcf6034af",
+      "bytes": 399972,
+      "scope": "historical-baseline",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "history/ROLLING_UPDATE_CASES.json",
+      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json",
+      "sha256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
+      "bytes": 925673,
+      "scope": "historical-baseline",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    },
+    {
+      "path": "history/MODELSERVING_ROLLOUT_READABLE_GUIDE.md",
+      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/MODELSERVING_ROLLOUT_READABLE_GUIDE.md",
+      "sha256": "8ce91a90696626d3da41465ad2ed803de59aa0a367d3986dc4de592f09534d65",
+      "bytes": 32406,
+      "scope": "historical-baseline",
+      "sourceState": "workspace snapshot; not asserted to be committed"
+    }
+  ]
+}

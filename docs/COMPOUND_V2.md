@@ -1,12 +1,16 @@
 # ServingGroup 组合滚动 v2 用例
 
-设计基准是 workspace issue 033 的
-`SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md`。它描述期望行为，
+设计基准是本仓保存的
+[SG v2.0 预期过程表](specs/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md)
+（原始来源为 workspace issue 033）。它描述期望行为，
 不代表当前控制器已通过。`cases/servinggroup-compound-v2/` 的 35 个 case
 分别保留 `designID`：S01～S07 对应 RUN-618～624，C01～C16 对应
 RUN-625～640，P01～P11 对应 RUN-641～651，R01 对应 RUN-652。
 用例输入由 `scripts/generate-servinggroup-compound-v2.py` 生成，
 `TestCompoundCatalogueIsExecutable` 验证目录、ID 和设计映射。
+
+字段语义同时对照 [API reference](specs/modelserving-api-reference.en.v2.0.md)；
+口径差异和人工批准要求见[规范入口](specs/README.md)，不能为修复或通过用例直接改写预期。
 
 本套件独立于历史 708 项与 RUN-612～617。`baseline` 固定被测候选源码
 `6fea34e03a179b07686fd5415b83018e159b196b`；运行时仍需传入与真实

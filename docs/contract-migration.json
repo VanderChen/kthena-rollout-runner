@@ -1,0 +1,183 @@
+{
+  "boundary-numeric/RUN-543": [
+    "initial: SG: resolved U/S=0/0 (API 1.2)",
+    "literal-numeric-boundary-A-to-allowed-B: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-numeric/RUN-552": [
+    "initial: SG: P exceeds replicas (API 3/4)",
+    "literal-numeric-boundary-A-to-allowed-B: SG: P exceeds replicas (API 3/4)"
+  ],
+  "boundary-numeric/RUN-564": [
+    "initial: frontend: P exceeds replicas (API 3/4)",
+    "literal-numeric-boundary-A-to-allowed-B: frontend: P exceeds replicas (API 3/4)"
+  ],
+  "boundary-numeric/RUN-565": [
+    "initial: SG: U exceeds replicas (API 3/4)",
+    "literal-numeric-boundary-A-to-allowed-B: SG: U exceeds replicas (API 3/4)"
+  ],
+  "boundary-sparse/RUN-592": [
+    "initial: SG: resolved U/S=0/0 (API 1.2)",
+    "actual-sparse-ordinal-boundary: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-sparse/RUN-593": [
+    "initial: SG: P exceeds replicas (API 3/4)",
+    "actual-sparse-ordinal-boundary: SG: P exceeds replicas (API 3/4)"
+  ],
+  "boundary-sparse/RUN-598": [
+    "initial: frontend: resolved U/S=0/0 (API 1.2)",
+    "actual-sparse-ordinal-boundary: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-sparse/RUN-599": [
+    "initial: frontend: P exceeds replicas (API 3/4)",
+    "actual-sparse-ordinal-boundary: frontend: P exceeds replicas (API 3/4)"
+  ],
+  "boundary-zero/RUN-566": [
+    "initial: SG: resolved U/S=0/0 (API 1.2)",
+    "zero-dimension-preload-B-history: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-zero/RUN-567": [
+    "initial: SG: resolved U/S=0/0 (API 1.2)",
+    "zero-dimension-preload-B-history: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-zero/RUN-568": [
+    "initial: frontend: resolved U/S=0/0 (API 1.2)",
+    "zero-dimension-preload-B-history: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-zero/RUN-569": [
+    "initial: frontend: resolved U/S=0/0 (API 1.2)",
+    "zero-dimension-preload-B-history: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-zero/RUN-571": [
+    "initial: SG: resolved U/S=0/0 (API 1.2)",
+    "zero-dimension-preload-B-history: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "boundary-zero/RUN-572": [
+    "initial: frontend: resolved U/S=0/0 (API 1.2)",
+    "zero-dimension-preload-B-history: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "core/RUN-013": [
+    "input: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "core/RUN-014": [
+    "input: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "core/RUN-043": [
+    "input: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "core/RUN-044": [
+    "input: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-013": [
+    "input: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-014": [
+    "input: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-043": [
+    "input: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-044": [
+    "input: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-123": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-124": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-125": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-127": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-128": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-129": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-131": [
+    "change-member-layout: API 1.3: immutable Role-name set changes"
+  ],
+  "normal/RUN-150": [
+    "remove-coordination: API 5: immutable roleCoordination changes",
+    "restore-coordination: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-153": [
+    "change-only-budgets: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-157": [
+    "prepare-contiguous-B-fixture: API 5: immutable roleCoordination changes",
+    "install-catalogue-strategy-on-B: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-158": [
+    "prepare-contiguous-B-fixture: API 5: immutable roleCoordination changes",
+    "install-catalogue-strategy-on-B: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-159": [
+    "prepare-contiguous-B-fixture: API 5: immutable roleCoordination changes",
+    "install-catalogue-strategy-on-B: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-209": [
+    "scale-with-continuous-ledger: SG: P exceeds replicas (API 3/4)"
+  ],
+  "normal/RUN-210": [
+    "initial: SG: P exceeds replicas (API 3/4)",
+    "reach-canary-before-scale: SG: P exceeds replicas (API 3/4)"
+  ],
+  "normal/RUN-215": [
+    "scale-with-continuous-ledger: frontend: P exceeds replicas (API 3/4)"
+  ],
+  "normal/RUN-216": [
+    "initial: frontend: P exceeds replicas (API 3/4)",
+    "reach-canary-before-scale: frontend: P exceeds replicas (API 3/4)"
+  ],
+  "normal/RUN-285": [
+    "freeze-with-zero-budgets: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-296": [
+    "freeze-with-zero-budgets: frontend: resolved U/S=0/0 (API 1.2)"
+  ],
+  "normal/RUN-298": [
+    "change-coordination-without-resetting-progress: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-299": [
+    "change-coordination-without-resetting-progress: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-300": [
+    "change-coordination-without-resetting-progress: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-301": [
+    "change-coordination-without-resetting-progress: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-302": [
+    "change-coordination-without-resetting-progress: API 5: immutable roleCoordination changes"
+  ],
+  "normal/RUN-303": [
+    "change-coordination-without-resetting-progress: API 5: immutable roleCoordination changes"
+  ],
+  "rejection/DENY-020": [
+    "rejection: API 11: surge above 100% is allowed within int32; use api-contract"
+  ],
+  "rejection/DENY-035": [
+    "rejection: API 11: surge above 100% is allowed within int32; use api-contract"
+  ],
+  "rejection/DENY-044": [
+    "rejection: API 11: inactive budgets are allowed but ignored; use api-contract"
+  ],
+  "rejection/DENY-045": [
+    "rejection: API 11: inactive budgets are allowed but ignored; use api-contract"
+  ],
+  "rejection/DENY-046": [
+    "rejection: API 11: inactive budgets are allowed but ignored; use api-contract"
+  ],
+  "rejection/DENY-094": [
+    "initial: SG: resolved U/S=0/0 (API 1.2)",
+    "establish-all-protected-B-stop: SG: resolved U/S=0/0 (API 1.2)"
+  ],
+  "rejection/DENY-095": [
+    "initial: frontend: resolved U/S=0/0 (API 1.2)",
+    "establish-all-protected-B-stop: frontend: resolved U/S=0/0 (API 1.2)"
+  ]
+}

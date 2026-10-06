@@ -1,5 +1,7 @@
 # ModelServing API Reference
 
+Version 2.1 · 2026-10-06 · [简体中文](modelserving-api-reference.zh-CN.md)
+
 This reference lists field paths, semantics, defaults, accepted values, percentage rounding, validation constraints, and minimal reference YAML.
 
 **Contract status.** Mutability and validation statements describe the revised API contract, including the agreed immutable fields. **Mutable** means an in-place update is allowed if the resulting object passes all validation. **Immutable** means the value and, for an optional object, its presence cannot change after creation. Immutability still applies after rollout completion or scaling to zero. Some rules strengthen the inspected production baseline, `production/release-1.0@a011cd5a`; section 11 lists those differences so target requirements are not mistaken for implemented checks.
@@ -35,7 +37,7 @@ A ModelServing has three levels of replication:
 
 | Field | Percentage base | Rounding | Example: base `3`, value `"25%"` |
 | --- | --- | --- | --- |
-| ServingGroup `maxUnavailable` | `spec.replicas` | Round down; a positive percentage resolves to at least `1` when replicas are positive | `max(1, floor(3 × 25%)) = 1` |
+| ServingGroup `maxUnavailable` | `spec.replicas` | Round down; no minimum-of-one adjustment | `floor(3 × 25%) = 0` |
 | Role `maxUnavailable` | The corresponding Role's `replicas` | Round down; no minimum-of-one adjustment | `floor(3 × 25%) = 0` |
 | `maxSurge` | Desired replicas at the corresponding level | Round up | `ceil(3 × 25%) = 1` |
 | `partition` | Desired replicas at the corresponding level | Round up | `ceil(3 × 25%) = 1` |
@@ -43,7 +45,9 @@ A ModelServing has three levels of replication:
 
 `maxUnavailable`, `partition`, and eviction thresholds accept non-negative integers or whole-number percentages from `"0%"` through `"100%"`, subject to their replica-count limits. This revised reference retains the broader `maxSurge` range: non-negative integers or whole-number percentages with no API-contract upper bound of `100%`. The production baseline still rejects percentages above `100%`; see section 11. Use an integer such as `1`, not a numeric string such as `"1"` or a fractional percentage such as `"2.5%"`.
 
-For a rollout that has eligible instances (`replicas > resolved partition`), validate budgets after applying defaults and percentage rounding: resolved `maxUnavailable` and `maxSurge` must not both be `0`. The revised contract also prohibits explicitly configuring both budgets as `0` or `"0%"`, even when partition currently pauses all updates. Zero desired replicas do not themselves require rollout progress. The Role-level rounding rule matters: with three Role replicas, `maxUnavailable: "25%"` resolves to `0`, so a positive resolved `maxSurge` is required when updates are eligible.
+Apply defaults (`U=1`, `S=0`) and percentage rounding at the **active** rollout level. Reject resolved `U=0` and `S=0`, even at zero replicas or with every ordinal protected by partition. At zero replicas, default or explicitly configured integer `U=1` is allowed; `U=0` with omitted S is rejected. For either mode, `N=3/U=25%/S=0` is rejected, `N=3/U=25%/S=1` is allowed, and `N=4/U=25%/S=0` is allowed. Scaling revalidates the same rules against the new replica count.
+
+Inactive-level budgets may remain configured but are ignored. Their basic format, percentage range and non-negativity are still validated; replica upper bounds and the nonzero-pair check apply only to the active level. Active `replicas + resolved maxSurge` must fit in signed int32 (`<= 2147483647`), including when the surge percentage exceeds 100%.
 
 ### 1.3 Role names
 
@@ -71,7 +75,7 @@ For example, `{prefill, decode} -> {prefill, decode-v2}` is rejected. Reordering
 
 Path: `spec.rolloutStrategy.type`
 
-**Mutability.** Mutable, subject to the complete configuration remaining valid. Changing the strategy alone does not create a new template revision. Update incompatible budget fields in the same request. If `roleCoordination` was configured at creation, switching to `ServingGroupRollingUpdate` is not allowed: coordination is immutable and is valid only with `RoleRollingUpdate`.
+**Mutability.** Mutable, subject to the complete configuration remaining valid. Changing the strategy alone does not create a new template revision. Revalidate the newly active budgets in the same request; inactive budgets may remain. If `roleCoordination` was configured at creation, switching to `ServingGroupRollingUpdate` is not allowed: coordination is immutable and is valid only with `RoleRollingUpdate`.
 
 | Value | Meaning | Budget configuration | Typical use |
 | --- | --- | --- | --- |
@@ -84,15 +88,15 @@ The default is `ServingGroupRollingUpdate`, including when the entire `rolloutSt
 
 Configuration constraints:
 
-- `ServingGroupRollingUpdate` uses the top-level `rollingUpdateConfiguration`. Do not configure Role `maxUnavailable`, `maxSurge`, or `partition`; all three are forbidden by the revised contract, including explicit zero values. `roleCoordination` is also forbidden.
-- `RoleRollingUpdate` rejects the top-level `rollingUpdateConfiguration`. Place the three budget fields directly under each Role, without a nested `rollingUpdateConfiguration` object.
+- `ServingGroupRollingUpdate` uses the top-level `rollingUpdateConfiguration`. Role `maxUnavailable`, `maxSurge`, and `partition` are allowed but ignored. `roleCoordination` is forbidden.
+- `RoleRollingUpdate` ignores top-level `rollingUpdateConfiguration`, including an empty object. Place active budgets directly under each Role, without a nested Role budget object.
 - Combining `ServingGroupRecreate` with `RoleRollingUpdate` is rejected.
 
 ### 2.1 `ServingGroupRollingUpdate`
 
 **Mutability.** The strategy value may be selected or changed in place only when the resulting configuration satisfies section 2 and preserves all immutable fields.
 
-**Validation.** Use only the top-level rollout budget object; omit all three Role rollout fields and `roleCoordination`. Any of the three recovery policies is compatible with this mode. The top-level budgets must satisfy the range, rounding, and nonzero-budget rules in section 3.
+**Validation.** Only the top-level rollout budget is effective; Role budgets may be present but are ignored. Omit `roleCoordination`. Any of the three recovery policies is compatible with this mode. The top-level budgets must satisfy the range, rounding, and nonzero-budget rules in section 3.
 
 Reference configuration:
 
@@ -114,7 +118,7 @@ spec:
 
 **Mutability.** The strategy value may be selected or changed in place only when the resulting configuration satisfies section 2. Changing the mode cannot add an immutable `roleCoordination` object that was absent at creation.
 
-**Validation.** Omit top-level `rollingUpdateConfiguration`, including an empty `{}` object. Place budgets directly under each Role. `recoveryPolicy` must be `RoleRecreate` or `None`; `ServingGroupRecreate` is rejected. Coordination is optional, but must have been declared at creation if it is needed.
+**Validation.** Top-level `rollingUpdateConfiguration` is allowed but ignored, including `{}`. Place active budgets directly under each Role. `recoveryPolicy` must be `RoleRecreate` or `None`; `ServingGroupRecreate` is rejected. Coordination is optional, but must have been declared at creation if it is needed.
 
 Reference configuration:
 
@@ -146,13 +150,13 @@ Path: `spec.rolloutStrategy.rollingUpdateConfiguration.maxUnavailable`
 
 **Mutability.** Mutable; changes the availability budget of an existing rollout without creating a new revision.
 
-**Validation.** Valid only with `ServingGroupRollingUpdate`. An explicitly configured integer must be in `[0, spec.replicas]`; a percentage must be in `"0%"`–`"100%"`. If this budget resolves to `0` while updates are eligible, `maxSurge` must resolve above `0`. Explicitly setting both budgets to zero is rejected. The integer upper bound and unconditional explicit-zero restriction strengthen the baseline; see section 11.
+**Validation.** Effective only with `ServingGroupRollingUpdate`; under Role rollout this budget is allowed but ignored (section 1.2). An explicitly configured integer must be in `[0, spec.replicas]`; a percentage must be in `"0%"`–`"100%"`. If this active budget resolves to `0`, `maxSurge` must resolve above `0`. Resolved double-zero is rejected, including zero replicas, omitted fields, percentage rounding and full partition protection. At zero replicas, integer U=1 is allowed, whether defaulted or explicit. See section 11 for historical differences.
 
 | Property | Description |
 | --- | --- |
 | Type | Non-negative integer [0, replica] or percentage [0%, 100%] |
 | Default | `1` |
-| Percentage rounding | Round down; a positive percentage resolves to at least `1` when `spec.replicas > 0` |
+| Percentage rounding | Round down, with no minimum-of-one adjustment |
 | Meaning | The maximum allowed unavailability relative to the desired ServingGroup count during a rollout |
 
 The maximum scale-down instance count per iteration is calculated using the following formula:
@@ -190,11 +194,11 @@ Path: `spec.rolloutStrategy.rollingUpdateConfiguration.maxSurge`
 
 **Mutability.** Mutable; adjusts temporary rollout capacity without creating a new revision.
 
-**Validation.** Valid only with `ServingGroupRollingUpdate`. Accept a non-negative integer or whole-number percentage; the revised range is not capped by `spec.replicas` or `100%`. If this budget resolves to `0` while updates are eligible, `maxUnavailable` must resolve above `0`. Explicitly setting both budgets to zero is rejected. Percentages above `100%` require the baseline validation change identified in section 11.
+**Validation.** Effective only with `ServingGroupRollingUpdate`; under Role rollout this budget is allowed but ignored (section 1.2). Accept a non-negative integer or whole-number percentage; the revised range is not capped by `spec.replicas` or `100%`. If this active budget resolves to `0`, `maxUnavailable` must resolve above `0`. Resolved double-zero is rejected, including zero replicas, omitted fields, percentage rounding and full partition protection. Require `spec.replicas + resolved S <= 2147483647`; percentages above 100% are allowed within this bound.
 
 | Property | Description |
 | --- | --- |
-| Type | Non-negative integer or percentage [0%, $\infty$) |
+| Type | Non-negative integer or whole percentage; resolved sum bounded by int32 |
 | Default | `0` |
 | Percentage rounding | Round up |
 | Meaning | The temporary number of additional ServingGroups allowed above `spec.replicas` while old groups remain eligible for update |
@@ -225,7 +229,7 @@ spec:
 | 5 | Deleting / recreating | v2 Ready | v2 Ready | v2 Ready | 3–4 / 3 | Delete one old group |
 | Final | v2 Ready | v2 Ready | v2 Ready | removed | 3 / 3 | Retain three v2 groups |
 
-Repeat the create-and-replace cycle until all old groups have been replaced, then return to three groups. If the new group never becomes Ready, this example stops at stage 1. The final retained ordinals need not be `sg-0..sg-2`.
+Repeat the create-and-replace cycle until all old groups have been replaced, then return to three groups. If the new group never becomes Ready, this example stops at stage 1. A rollout starting with contiguous ordinals returns to `sg-0..sg-2` after temporary surge is removed. Previously retained healthy high ordinals can remain in a sparse layout (SG-S03); an outdated high ordinal can instead be replaced in a low hole, whose absolute ordinal determines its partition version (section 3.3).
 
 ### 3.3 `partition`
 
@@ -233,7 +237,7 @@ Path: `spec.rolloutStrategy.rollingUpdateConfiguration.partition`
 
 **Mutability.** Mutable; lowering it can release protected groups for update, while raising it protects eligible old groups. It does not roll back already updated groups or create a new revision.
 
-**Validation.** Valid only with `ServingGroupRollingUpdate`. An integer must be in `[0, spec.replicas]`; a percentage must be in `"0%"`–`"100%"`. Revalidate this limit when `spec.replicas` changes. Lowering partition to expose rollout candidates requires nonzero resolved rollout capacity. The integer upper bound strengthens the baseline; see section 11.
+**Validation.** Effective only with `ServingGroupRollingUpdate`; under Role rollout this budget is allowed but ignored (section 1.2). An integer must be in `[0, spec.replicas]`; a percentage must be in `"0%"`–`"100%"`. Revalidate this limit when `spec.replicas` changes. Lowering partition to expose rollout candidates requires nonzero resolved rollout capacity. The integer upper bound strengthens the baseline; see section 11.
 
 | Property | Description |
 | --- | --- |
@@ -265,6 +269,25 @@ Partition is an absolute ordinal boundary, not a count of arbitrary groups to re
 | 3 | v1 Ready (protected) | Deleting / recreating | v2 Ready | Update sg-1 |
 | Final | v1 Ready (protected) | v2 Ready | v2 Ready | Ordinals in `[0, 1)` retain the old version |
 
+**Sparse ordinals during a template rollout (clarified 2026-10-06).** A hole
+left by replica-only scale-down does not itself start a rollout. During an
+actual template rollout, replacing an outdated high-ordinal group can restore
+a missing low ordinal. Partition applies to the **replacement's absolute
+ordinal**, not the deleted group's ordinal or its position in a sorted list.
+An empty protected slot is recreated from the historical template.
+
+For example, start with `N=2`, `{sg-0:v1, sg-3:v1}`, `partition=2`,
+`maxUnavailable=1`, `maxSurge=0`, then submit v2. The controller can delete
+outdated sg-3 and create sg-1 using historical v1. The converged layout is
+`{sg-0:v1, sg-1:v1}`: **both groups remain v1** because both absolute ordinals
+are below partition. This is a partition pause with the desired layout, not
+full adoption of v2: `currentRevision` remains v1, `updateRevision` is v2, and
+`updatedReplicas` is zero. Lowering partition releases those slots for v2.
+All creation and deletion still obey the configured rollout budgets; there is
+no exception that makes a protected replacement adopt v2 merely because its
+predecessor had an unprotected high ordinal. See SG-P11 in the compound rollout
+expectations for this boundary.
+
 ## 4. Role rollout configuration
 
 Role fields are placed directly under `spec.template.roles[]` and are evaluated separately for each Role in each ServingGroup.
@@ -279,14 +302,14 @@ Path: `spec.template.roles[].maxUnavailable`
 
 **Mutability.** Mutable; affects only this Role's rollout budget in each ServingGroup.
 
-**Validation.** Valid only with `RoleRollingUpdate`. An explicitly configured integer must be in `[0, role.replicas]`; a percentage must be in `"0%"`–`"100%"`. Revalidate after replica changes. Percentage rounding can produce `0` even for a positive percentage: with `replicas: 3`, `maxUnavailable: "25%"`, and `partition: 0`, a positive resolved `maxSurge` is required. Explicitly configuring both budgets as zero is rejected. Rejecting this field under `ServingGroupRollingUpdate` is a target change; see section 11.
+**Validation.** Effective only with `RoleRollingUpdate`; under SG rollout this budget is allowed but ignored (section 1.2). An explicitly configured integer must be in `[0, role.replicas]`; a percentage must be in `"0%"`–`"100%"`. Revalidate after replica changes. Percentage rounding can produce `0` even for a positive percentage: with `replicas: 3`, `maxUnavailable: "25%"`, and `partition: 0`, a positive resolved `maxSurge` is required. Resolved double-zero is rejected, including zero replicas and full partition protection. At zero Role replicas, default or explicit integer U=1 is allowed. This field is ignored under SG rollout.
 
 | Property | Description |
 | --- | --- |
 | Type | Non-negative integer [0, replica] or percentage [0%, 100%] |
 | Default | `1` |
-| Percentage rounding | Round down, without the ServingGroup minimum-of-one adjustment |
-| Additional limit | The resolved value must not exceed that Role's `replicas` |
+| Percentage rounding | Round down, as at ServingGroup level |
+| Additional limit | The active value must not exceed Role replicas, except default/explicit integer U=1 at zero replicas |
 | Meaning | Maximum allowed unavailability for this Role's desired instances in each ServingGroup |
 
 **Reference configuration:**
@@ -321,11 +344,11 @@ Path: `spec.template.roles[].maxSurge`
 
 **Mutability.** Mutable; adjusts this Role's temporary rollout capacity in each ServingGroup.
 
-**Validation.** Valid only with `RoleRollingUpdate`. Accept a non-negative integer or whole-number percentage, without the revised contract imposing a `role.replicas` or `100%` upper bound. If it resolves to `0` while updates are eligible, Role `maxUnavailable` must resolve above `0`. Explicitly configuring both budgets as zero is rejected. Surge does not replace the stable replica capacity required by dependency validation. Percentages above `100%` differ from the baseline; see section 11.
+**Validation.** Effective only with `RoleRollingUpdate`; under SG rollout this budget is allowed but ignored (section 1.2). Accept a non-negative integer or whole-number percentage, without the revised contract imposing a `role.replicas` or `100%` upper bound. If this active budget resolves to `0`, Role `maxUnavailable` must resolve above `0`. Resolved double-zero is rejected, including zero replicas and full partition protection. Surge does not replace the stable replica capacity required by dependency validation. Require `role.replicas + resolved S <= 2147483647`; percentages above 100% are allowed within this bound.
 
 | Property | Description |
 | --- | --- |
-| Type | Non-negative integer or percentage [0%, $\infty$) |
+| Type | Non-negative integer or whole percentage; resolved sum bounded by int32 |
 | Default | `0` |
 | Percentage rounding | Round up |
 | Meaning | Temporary additional instances of this Role allowed above `role.replicas` in each ServingGroup |
@@ -365,7 +388,7 @@ Path: `spec.template.roles[].partition`
 
 **Mutability.** Mutable; changes the protected ordinal range for this Role without creating a new revision or rolling back already updated instances.
 
-**Validation.** Valid only with `RoleRollingUpdate`. An integer must be in `[0, role.replicas]`; a percentage must be in `"0%"`–`"100%"`. Revalidate after replica changes. When coordination needs a changed dependency's target-version capacity, partition must leave a usable target slot; increasing partition must not remove required capacity during an active coordinated rollout. Lowering partition must also leave nonzero resolved rollout capacity. The integer upper bound strengthens the baseline; see sections 5.2 and 11.
+**Validation.** Effective only with `RoleRollingUpdate`; under SG rollout this budget is allowed but ignored (section 1.2). An integer must be in `[0, role.replicas]`; a percentage must be in `"0%"`–`"100%"`. Revalidate after replica changes. When coordination needs a changed dependency's target-version capacity, partition must leave a usable target slot; increasing partition must not remove required capacity during an active coordinated rollout. Lowering partition must also leave nonzero resolved rollout capacity. The integer upper bound strengthens the baseline; see sections 5.2 and 11.
 
 | Property | Description |
 | --- | --- |
@@ -375,6 +398,11 @@ Path: `spec.template.roles[].partition`
 | Meaning | In each ServingGroup, protect instances of this Role whose ordinals are in `[0, partition)` |
 
 For resolved partition `P`, Role instances with ordinals in `[0, P)` are protected independently in each ServingGroup.
+
+The same absolute-ordinal and historical-template rule from section 3.3 applies
+to Role replica partition: restoring a protected low Role ordinal during an
+actual rollout can leave every desired Role replica on the historical version.
+
 
 ```yaml
 spec:
@@ -490,122 +518,47 @@ spec:
 
 ### 6.1 `recoveryPolicy`
 
-Path: `spec.recoveryPolicy`
+Path: `spec.recoveryPolicy`; mutable, default `RoleRecreate`. Legal values are `ServingGroupRecreate`, `RoleRecreate`, and `None`. SG rollout allows all three; Role rollout rejects `ServingGroupRecreate`. Recovery policy changes do not create a template revision.
 
-**Mutability.** Mutable; changes failure recovery policy without creating a template revision. It must remain compatible with the selected rollout mode.
-
-**Validation.** Only `ServingGroupRecreate`, `RoleRecreate`, and `None` are accepted. `ServingGroupRecreate` cannot be combined with `RoleRollingUpdate`; the other two values work with either rollout mode. Compatibility is checked after applying defaults and on updates as well as creation.
-
-Default: `RoleRecreate`.
-
-| Value | Recovery scope after Pod deletion, failure, or persistent unhealthiness | Usage notes |
+| Policy | Unhealthy restart / terminal Failed | Actual Pod deletion |
 | --- | --- | --- |
-| `ServingGroupRecreate` | Delete and recreate all Roles and Pods in the affected ServingGroup | Restart the whole group together; incompatible with `RoleRollingUpdate` |
-| `RoleRecreate` | Delete and recreate the affected Role instance, including its entry and worker Pods | Default; isolates recovery to one Role instance |
-| `None` | Let kubelet recover surviving Pods; replace missing Pods individually | The runtime must support independent recovery; terminal failed Pods may still be deleted and replaced |
+| `ServingGroupRecreate` | After applicable grace, recreate the affected ServingGroup, including other Roles and all entry/worker Pods | Recreate the affected ServingGroup; grace does not postpone deletion recovery |
+| `RoleRecreate` | After applicable grace, recreate the affected Role **instance**, including its entry and workers; other instances/Roles/groups retain UIDs | Recreate that Role instance, irrespective of grace |
+| `None` | Never proactively delete Pods for restart errors or Failed, regardless of legal grace; keep reporting unavailability | Recreate only the missing Pod slot; retain every other Pod UID |
 
-This policy controls failure recovery scope. Rollout batch size is controlled separately. `RoleRecreate` is valid with `ServingGroupRollingUpdate`, and `None` is valid with either rollout mode.
+An unhealthy restart means a currently non-Ready Pod with `RestartCount > 0` in a normal or init container; a terminal `Failed` Pod also qualifies. Historical restarts on a currently Ready Pod do not trigger rebuilding. Non-Ready alone, without a restart or Failed, does not establish this recovery trigger. Recovery and availability are separate: an unrepaired Pod remains unavailable even when deletion is disabled.
 
-#### `ServingGroupRecreate`
-
-**Mutability and validation.** Mutable, but valid only with `ServingGroupRollingUpdate`. A request that leaves `RoleRollingUpdate` configured is rejected.
-
-Reference configuration:
-
-```yaml
-spec:
-  recoveryPolicy: ServingGroupRecreate
-```
-
-**Simple behavior example.** A prefill Pod fails and triggers recovery. The whole ServingGroup is recreated, including the healthy decode Pods.
-
-| Stage | prefill | decode | Effect of `ServingGroupRecreate` |
-| --- | --- | --- | --- |
-| Initial | Ready (Pod UID P1) | Ready (Pod UID D1) | The group is healthy |
-| Failure | A prefill Pod becomes unhealthy | Ready (Pod UID D1) | The fault occurs in prefill |
-| Recovery | Deleting / recreating | Deleting / recreating | Recreate the entire ServingGroup |
-| Final | Ready (new Pod UID P2) | Ready (new Pod UID D2) | The healthy decode Pod is also replaced |
-
-#### `RoleRecreate`
-
-**Mutability and validation.** Mutable and valid with either rollout mode. This is the default; it does not require selecting `RoleRollingUpdate`.
-
-Reference configuration:
-
-```yaml
-spec:
-  recoveryPolicy: RoleRecreate
-```
-
-**Simple behavior example.** A Pod in one prefill instance fails and triggers recovery. Recreate that instance's entry and workers; preserve other Role instances.
-
-| Stage | prefill | decode | Effect of `RoleRecreate` |
-| --- | --- | --- | --- |
-| Initial | Ready (Pod UID P1) | Ready (Pod UID D1) | Both Roles are healthy |
-| Failure | A Pod in one Role instance fails | Ready (Pod UID D1) | The fault is localized to that prefill instance |
-| Recovery | That instance's entry and workers are recreated | Ready (same Pod UID D1) | Recovery covers one complete Role instance |
-| Final | Ready (new Pod UID P2) | Ready (same Pod UID D1) | Other Roles are preserved |
-
-#### `None`
-
-**Mutability and validation.** Mutable and valid with either rollout mode. The runtime's ability to recover independently is an operational prerequisite, not a separate admission check.
-
-Reference configuration:
+`None` permits kubelet/container recovery in place where restart policy permits. A terminal Failed Pod is not promised to recover by itself: a user or external actor may delete it, after which the missing Pod is recreated. This policy does not suppress desired-state reconciliation for a genuinely missing Pod.
 
 ```yaml
 spec:
   recoveryPolicy: None
+  template:
+    restartGracePeriodSeconds: 0
 ```
-
-**Simple behavior example.** Recovery stays at the individual Pod level. Missing Pods are still replaced.
-
-| Failure | Controller behavior | Other Pods |
-| --- | --- | --- |
-| A container restarts in a surviving Pod | Allow kubelet to recover it within the same Pod | Preserved |
-| One Pod is missing | Recreate only the missing Pod | Preserved |
-| A Pod reaches a terminal failed state | May delete it after the grace period, then replace it as a missing Pod | Recovery does not expand to the Role or group |
 
 ### 6.2 `restartGracePeriodSeconds`
 
-Path: `spec.template.restartGracePeriodSeconds`
+Path: `spec.template.restartGracePeriodSeconds`; mutable optional signed int64, default `0`, minimum `-1`. Values below `-1` are rejected on create and update, including under `None`. This field does not participate in template revision identity.
 
-**Mutability.** Mutable; changes recovery timing without creating a template revision.
+| Value | With `ServingGroupRecreate` / `RoleRecreate` | With `None` |
+| --- | --- | --- |
+| omitted / `0` | Handle the current unhealthy restart or Failed immediately at the policy scope | No proactive Pod deletion |
+| positive | Measure from the first observed fault; preserve UIDs if Ready recovers within grace, otherwise rebuild at the policy scope | No proactive Pod deletion |
+| `-1` | Tolerate restart errors and Failed indefinitely; do not schedule a grace deletion task | No proactive Pod deletion |
 
-**Validation.** Supply an `int64` number of seconds, not a duration string such as `"30s"`. Use non-negative values. A non-negative minimum is a recommendation in this reference, not a newly introduced admission requirement; the baseline accepts negative values and handles them like zero. No incompatibility with a particular rollout mode is imposed.
+`-1` is a sentinel, not a negative/immediate timeout or a very large sleeping timer. Actual Pod deletion still triggers the policy's deletion scope even at `-1`.
 
-| Property | Description |
-| --- | --- |
-| Type | `int64`, in seconds |
-| Default | `0` |
-| Recommended range | Non-negative integers |
-| Validation at the documented production baseline | Neither CRD nor webhook enforces `minimum: 0`; negative values are accepted and treated like zero for immediate handling |
-
-When the controller detects that a previously running Pod is unhealthy, it removes the Pod from the available set and waits for this grace period:
-
-- If the Pod becomes Ready during the grace period, preserve it.
-- If it remains unhealthy after the grace period, delete it; `recoveryPolicy` determines whether to replace that Pod, recreate its Role instance, or recreate the ServingGroup.
-- A value of `0` or less allows immediate handling of the unhealthy Pod.
-
-With `recoveryPolicy=None`, a surviving non-terminal Pod is left to kubelet for recovery. Expiration of this grace period does not cause the controller to delete that Pod. A terminal failed Pod may still be deleted and replaced after the grace period.
-
-This field is not a delay between rollout batches and does not pause planned template updates for the specified duration.
+Before acting on a delayed task, use the latest policy and grace and verify ModelServing and Pod identity. A switch to `None` or `-1` cancels the old deletion effect; increasing/decreasing finite grace uses the current configuration. An old ModelServing/Pod UID must never authorize deletion of its replacement. Controller restart must preserve these rules.
 
 ```yaml
 spec:
+  recoveryPolicy: RoleRecreate
   template:
-    restartGracePeriodSeconds: 30
+    restartGracePeriodSeconds: -1
 ```
 
-**Simple behavior example.** With a 30-second grace period, a previously running Pod can recover without replacement before the period expires.
-
-| Time / stage | Pod state | Controller behavior |
-| --- | --- | --- |
-| `t=0s` | A previously running Pod becomes NotReady | Exclude it from availability; do not delete it yet |
-| `t<30s` | Pod becomes Ready again | Preserve its UID and finish recovery |
-| At grace-period expiry | Pod is still unhealthy | Delete the failed Pod when reconciliation processes the expiry |
-| Afterwards | Pod is missing | Recover the Pod, Role instance, or entire group according to `recoveryPolicy` |
-
-With `recoveryPolicy=None`, a surviving non-terminal Pod remains under kubelet recovery even after the grace period expires.
+For example, when a worker in Role instance 0 restarts and remains non-Ready: `None/0` and `RoleRecreate/-1` retain all UIDs while availability drops. If that worker is actually deleted, `None` replaces only it, whereas `RoleRecreate/-1` replaces the entry and workers of instance 0. Other Role instances and groups retain their UIDs. A transient error that becomes Ready before a finite deadline also preserves the original UIDs.
 
 ## 7. `evictionStrategy`
 
@@ -927,14 +880,20 @@ If any affinity or anti-affinity object is present, the three objects together m
 
 ## 11. Differences from the inspected production baseline
 
-| Topic | Revised API contract | Inspected baseline |
+The historical comparison is pinned to `production/release-1.0@a011cd5a`; it is **not** a claim about the current production branch. The approved 043 rules and 041 recovery semantics below define runner contract 2.1. Runner PASS still requires execution against a separately recorded candidate image/commit.
+
+| Topic | Current API contract / runner verdict | Historical baseline |
 | --- | --- | --- |
-| Role-name set | Immutable; order and valid per-name content changes remain allowed | No general name-set immutability check |
-| `gangPolicy` | Entire object and its presence immutable | Existing parent cannot be removed; child-map equality checks do not cover every optional-field add/remove transition |
-| `roleCoordination` | Entire object and its presence immutable | Consistency and dependency-capacity checks exist, but no general whole-object immutability rule |
-| Role budgets under `ServingGroupRollingUpdate` | Reject Role `maxUnavailable`, `maxSurge`, and `partition`, even if explicitly zero | Rejects `maxSurge` and `partition`; Role `maxUnavailable` is not rejected and does not control group rollout |
-| Explicitly zero `maxUnavailable` and `maxSurge` | Reject the pair, including a fully partition-protected configuration | The resolved-zero rejection applies only when `replicas > resolved partition`; zero replicas or a fully protected range bypass it |
-| Budget percentages resolving to zero | When updates are eligible, reject if both resolved budgets are zero | Already checked after level-specific rounding |
-| Integer upper bounds | Configured `maxUnavailable` and `partition` stay within the corresponding replica count | Explicit Role `maxUnavailable` is bounded; ServingGroup integer `maxUnavailable` and integer partitions at both levels do not have that general upper bound |
-| `maxSurge` percentages | Non-negative whole-number percentages, including values above `100%` | The shared percentage validator rejects values above `100%` |
-| Boundary tier selectors | `highestTierAllowed` and `highestTierName` are mutually exclusive; hard mode requires one | Individual field ranges are enforced, but the inspected ModelServing schema/webhook do not fully enforce these cross-field boundary rules |
+| Role-name set | Immutable, including zero-replica Roles; reordering and valid per-name content changes allowed | No general name-set immutability check |
+| `gangPolicy` | Whole object and presence immutable, including map presence/keys/values | Partial parent/map checks miss optional transitions |
+| `roleCoordination` | Whole object and presence immutable; reordering semantic sets/maps allowed | Consistency/capacity checks without general whole-object immutability |
+| Inactive budgets | SG ignores Role U/S/P; Role ignores top-level U/S/P. Basic format/nonnegative checks remain; active-level bounds/pair rules do not apply to inactive budgets | SG rejects Role S/P but permits U; Role rejects top-level budgets |
+| Double-zero budgets | Reject resolved active U/S=0/0 after defaults and rounding, including zero replicas and full partition protection | Checked only when replicas exceed partition |
+| Small positive U percentage | Always floor without minimum 1; N=3/U=25%/S=0 is rejected | SG rounds small positive U up to at least 1 |
+| Integer bounds | Active U/P <= corresponding replicas; zero replicas allow default/explicit integer U=1 | No general SG U or integer partition upper bounds |
+| Surge percentages | Above 100% allowed; replicas+resolved S <= signed int32 maximum | Percentage validator capped at 100% |
+| Boundary selectors | hard exactly one; soft at most one, with individual field limits | Cross-field checks incomplete |
+| Recovery grace | -1 permanent tolerance; <-1 rejected; finite tasks recheck current policy and identities | Negative grace lacks the revised sentinel semantics |
+| `None` recovery | No proactive deletion for restart errors or Failed; only an actually missing Pod is recreated | Failed cleanup could still delete a Pod |
+
+Executable API cases: `cases/api-contract/cases.json`. Recovery execution: `scripts/run-recovery-contract.py` and `cases/recovery-contract/suite.json`. Historical catalogue conflicts and their current replacements are recorded separately; an old design trace is not proof of admission under this contract.

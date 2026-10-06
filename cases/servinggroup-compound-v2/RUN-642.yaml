@@ -1,13 +1,13 @@
 {
   "format": "rollout-runner/compound-v2",
   "id": "RUN-642",
-  "baseline": "6fea34e03a179b07686fd5415b83018e159b196b",
+  "baseline": "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b",
   "scenario": {
     "designID": "SG-P02",
     "source": {
       "id": "RUN-642",
       "designID": "SG-P02",
-      "design": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md"
+      "design": "servinggroup-compound-rollout.zh-CN.md"
     },
     "profile": "controlled",
     "initialSpec": {
@@ -83,7 +83,7 @@
       "rolloutStrategy": {
         "type": "ServingGroupRollingUpdate",
         "rollingUpdateConfiguration": {
-          "partition": 5,
+          "partition": 3,
           "maxSurge": 0,
           "maxUnavailable": 1
         }
@@ -123,7 +123,7 @@
     },
     "steps": [
       {
-        "name": "target-B-blocked-by-P5",
+        "name": "target-B-blocked-by-P3",
         "action": "update",
         "until": "compound",
         "release": "none",
@@ -226,7 +226,7 @@
           "rolloutStrategy": {
             "type": "ServingGroupRollingUpdate",
             "rollingUpdateConfiguration": {
-              "partition": 5,
+              "partition": 3,
               "maxSurge": 0,
               "maxUnavailable": 1
             }

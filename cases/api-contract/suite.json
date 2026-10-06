@@ -1,0 +1,9 @@
+{
+  "format": "rollout-runner/api-contract-v1",
+  "contractVersion": "2.1",
+  "source": "issues/bugs/043-modelserving-api-validation-DONE/revision-3/contract-cases.json",
+  "sourceSHA256": "e6c1be7f2b897b3508eafa542ab42a4dd50339635b6c7fee8fb1dfffe3da6bc6",
+  "approval": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md",
+  "casesSHA256": "57e75132bf99c10ac82a8380f59647b744d6944a5144234061398644cfffc890",
+  "count": 188
+}

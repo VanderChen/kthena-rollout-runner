@@ -6,6 +6,7 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -590,12 +591,12 @@ func intValue(m map[string]interface{}, k string, fallback int) int {
 func textValue(m map[string]interface{}, k string) string { v, _ := m[k].(string); return v }
 
 // Resolve percentages from desired capacity, never from the number of observed
-// Pods or surge objects. SG positive U has the documented minimum of one.
+// Pods or surge objects. Both rollout modes floor U without a minimum of one.
 func budget(m map[string]interface{}, k string, d int, sg bool) (int, error) {
 	return budgetForContract(m, k, d, sg, false)
 }
 
-func budgetForContract(m map[string]interface{}, k string, d int, sg, compound bool) (int, error) {
+func budgetForContract(m map[string]interface{}, k string, d int, _, _ bool) (int, error) {
 	fallback := 0
 	if k == "maxUnavailable" {
 		fallback = 1
@@ -607,17 +608,20 @@ func budgetForContract(m map[string]interface{}, k string, d int, sg, compound b
 		if !strings.HasSuffix(s, "%") {
 			return 0, fmt.Errorf("invalid %s=%q", k, s)
 		}
-		p, err := strconv.Atoi(strings.TrimSuffix(s, "%"))
-		if err != nil || p < 0 {
+		raw := strings.TrimSuffix(s, "%")
+		p, ok := new(big.Int).SetString(raw, 10)
+		if !ok || raw == "" || strings.Trim(raw, "0123456789") != "" || p.Sign() < 0 || d < 0 {
 			return 0, fmt.Errorf("invalid percentage")
 		}
-		v := d * p / 100
+		v := new(big.Int).Mul(big.NewInt(int64(d)), p)
 		if k != "maxUnavailable" {
-			v = (d*p + 99) / 100
-		} else if sg && !compound && d > 0 && p > 0 {
-			v = max(v, 1)
+			v.Add(v, big.NewInt(99))
 		}
-		return v, nil
+		v.Quo(v, big.NewInt(100))
+		if !v.IsInt64() || int64(int(v.Int64())) != v.Int64() {
+			return 0, fmt.Errorf("resolved %s overflows integer", k)
+		}
+		return int(v.Int64()), nil
 	}
 	v := number(m, k, -1)
 	if v < 0 {

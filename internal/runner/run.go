@@ -139,6 +139,9 @@ func Run(ctx context.Context, opt Options) (runErr error) {
 		return err
 	}
 	var cfg *rest.Config
+	if err = currentContractError(cases, selected); err != nil {
+		return err
+	}
 	if opt.Kubeconfig != "" {
 		cfg, err = clientcmd.BuildConfigFromFlags("", opt.Kubeconfig)
 	} else {

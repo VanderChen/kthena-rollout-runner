@@ -71,8 +71,8 @@ func TestCompoundPercentageUnavailableFloors(t *testing.T) {
 	if got, err := budgetForContract(m, "maxUnavailable", 3, true, true); err != nil || got != 0 {
 		t.Fatalf("compound 3*20%% must floor to zero: %d, %v", got, err)
 	}
-	if got, err := budgetForContract(m, "maxUnavailable", 3, true, false); err != nil || got != 1 {
-		t.Fatalf("legacy contract changed: %d, %v", got, err)
+	if got, err := budgetForContract(m, "maxUnavailable", 3, true, false); err != nil || got != 0 {
+		t.Fatalf("normal contract must also floor U: %d, %v", got, err)
 	}
 	m["maxUnavailable"] = "25%"
 	for _, point := range []struct{ n, want int }{{5, 1}, {9, 2}} {

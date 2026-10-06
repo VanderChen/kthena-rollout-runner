@@ -25,7 +25,6 @@ def budget(spec,role):
         if v is None:v=default
         if isinstance(v,str):
             pct=int(v[:-1]);v=(d*pct//100) if key=='maxUnavailable' else ((d*pct+99)//100)
-            if sg and key=='maxUnavailable' and pct>0 and d>0:v=max(1,v)
         return v
     return d,value('maxUnavailable',1),value('maxSurge',0),value('partition',0)
 

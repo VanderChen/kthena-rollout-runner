@@ -1,71 +1,247 @@
 {
-  "importedOn": "2026-10-05",
-  "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
-  "approval": "User request in this chat to retain previous rollout expectations and API reference. Future contract changes require separate explicit human approval.",
+  "purpose": "Final bilingual contract 2.1; explicit human-approved API/budget/recovery changes. Historical implementation and verification remain separate.",
+  "originalImport": {
+    "importedOn": "2026-10-05",
+    "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
+    "approval": "User request in this chat to retain previous rollout expectations and API reference. Future contract changes require separate explicit human approval."
+  },
+  "layoutRevision": {
+    "date": "2026-10-06",
+    "userInstruction": "无需保留局部，且重新整理docs/specs，仅需保留最终版本",
+    "scope": "Remove local AGENTS.md files and old copies; merge complete SG behavioral rules into v2.0; preserve scenario tables, acceptance clauses and API reference semantics.",
+    "previousRepositoryCommit": "64487e599ba5326a87dc99cecef8ad890ea7e5cd",
+    "provenance": "Original import records remain under originalSources; removed editions remain recoverable from Git history and original workspace sources."
+  },
   "files": [
     {
-      "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
-      "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
-      "sha256": "a22cb024bcd1e2f1d75d28b053e09878a1b8b26a55bed48d1079c72617e498b2",
-      "bytes": 17643,
-      "scope": "rollout-design",
-      "sourceState": "workspace snapshot; not asserted to be committed"
-    },
-    {
-      "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sha256": "9d700394fae571288ddb75dbfcb249c37e27f9ef4428a180c619b05cb74e002a",
-      "bytes": 55368,
-      "scope": "rollout-design",
-      "sourceState": "workspace snapshot; not asserted to be committed"
-    },
-    {
-      "path": "SERVINGGROUP_COMPOUND_ROLLOUT_PROCESS_TABLES.md",
-      "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_PROCESS_TABLES.md",
-      "sha256": "6e467991a7e4788e03b22985b30a40f20421d5f2f8ee7f77af2154acd9dafad6",
-      "bytes": 38775,
-      "scope": "rollout-design",
-      "sourceState": "workspace snapshot; not asserted to be committed"
-    },
-    {
-      "path": "modelserving-api-reference.en.v2.0.md",
-      "sourceWorkspacePath": "kthena/docs/kthena/docs/api/modelserving-api-reference.en.v2.0.md",
-      "sha256": "d6204f4251b6c050c1fd860741dd0f461feef518af0d1933d3d22e45a958e4df",
-      "bytes": 60372,
+      "path": "modelserving-api-reference.en.md",
+      "language": "en",
+      "version": "2.1",
+      "sha256": "94ed7e661b9dc603637a40b31e86c16977b5e073ec31dcc0620502252e795fdb",
+      "bytes": 60876,
       "scope": "api-reference",
-      "sourceState": "workspace snapshot; not asserted to be committed"
+      "pairedWith": "modelserving-api-reference.zh-CN.md",
+      "priorEdition": {
+        "path": "modelserving-api-reference.en.v2.0.md",
+        "sourceWorkspacePath": "kthena/docs/kthena/docs/api/modelserving-api-reference.en.v2.0.md",
+        "sha256": "e8b5895da2f4211a543ece5a9a0a1a59571e5484066efdad05d79a2164489ad3",
+        "bytes": 62117,
+        "scope": "api-reference",
+        "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
+      },
+      "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
+      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
     },
     {
-      "path": "history/ROLLING_UPDATE_SCENARIOS.md",
-      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_SCENARIOS.md",
-      "sha256": "c4319b80d5fe22698a2a303c0cb56fcd1d59838add0d4f5f57e07660d8950cf7",
-      "bytes": 53975,
-      "scope": "historical-baseline",
-      "sourceState": "workspace snapshot; not asserted to be committed"
+      "path": "modelserving-api-reference.zh-CN.md",
+      "language": "zh-CN",
+      "version": "2.1",
+      "sha256": "5c92835f1c42a8b4287d6ae0ac2f6b2099af2a1d66e07c3e443fca7a88e4fdff",
+      "bytes": 26043,
+      "scope": "api-reference",
+      "pairedWith": "modelserving-api-reference.en.md",
+      "priorEdition": {
+        "path": "modelserving-api-reference.en.v2.0.md",
+        "sourceWorkspacePath": "kthena/docs/kthena/docs/api/modelserving-api-reference.en.v2.0.md",
+        "sha256": "e8b5895da2f4211a543ece5a9a0a1a59571e5484066efdad05d79a2164489ad3",
+        "bytes": 62117,
+        "scope": "api-reference",
+        "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
+      },
+      "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
+      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
     },
     {
-      "path": "history/ROLLING_UPDATE_CASE_TABLE.md",
-      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASE_TABLE.md",
-      "sha256": "abc5d937f571f40244a581114d7cab7fe5cf94250632497e6da63f0fcf6034af",
-      "bytes": 399972,
-      "scope": "historical-baseline",
-      "sourceState": "workspace snapshot; not asserted to be committed"
+      "path": "servinggroup-compound-rollout.en.md",
+      "language": "en",
+      "version": "2.1",
+      "sha256": "f7946656ec30cae50c17623f32bfc7c3dae4b560d60d19e4db3bd3e3b92f67d3",
+      "bytes": 57014,
+      "scope": "rollout-design",
+      "pairedWith": "servinggroup-compound-rollout.zh-CN.md",
+      "priorEdition": {
+        "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+        "sha256": "719162476916191510a91cc7cef3b026dbdf076f15a61d68f8cef339c5cedd63",
+        "bytes": 73258,
+        "scope": "rollout-design",
+        "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved.",
+        "originalSources": [
+          {
+            "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+            "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+            "sha256": "9d700394fae571288ddb75dbfcb249c37e27f9ef4428a180c619b05cb74e002a",
+            "bytes": 55368,
+            "scope": "rollout-design",
+            "sourceState": "workspace snapshot; not asserted to be committed"
+          },
+          {
+            "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+            "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+            "sha256": "a22cb024bcd1e2f1d75d28b053e09878a1b8b26a55bed48d1079c72617e498b2",
+            "bytes": 17643,
+            "scope": "rollout-design",
+            "sourceState": "workspace snapshot; not asserted to be committed"
+          }
+        ]
+      },
+      "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
     },
     {
-      "path": "history/ROLLING_UPDATE_CASES.json",
-      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/ROLLING_UPDATE_CASES.json",
-      "sha256": "757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5",
-      "bytes": 925673,
-      "scope": "historical-baseline",
-      "sourceState": "workspace snapshot; not asserted to be committed"
+      "path": "servinggroup-compound-rollout.zh-CN.md",
+      "language": "zh-CN",
+      "version": "2.1",
+      "sha256": "43810c25868d783aa6e61d8793001d2ea24ae6ab33d23101bc7dbbb70420499c",
+      "bytes": 73662,
+      "scope": "rollout-design",
+      "pairedWith": "servinggroup-compound-rollout.en.md",
+      "priorEdition": {
+        "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+        "sha256": "719162476916191510a91cc7cef3b026dbdf076f15a61d68f8cef339c5cedd63",
+        "bytes": 73258,
+        "scope": "rollout-design",
+        "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved.",
+        "originalSources": [
+          {
+            "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+            "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+            "sha256": "9d700394fae571288ddb75dbfcb249c37e27f9ef4428a180c619b05cb74e002a",
+            "bytes": 55368,
+            "scope": "rollout-design",
+            "sourceState": "workspace snapshot; not asserted to be committed"
+          },
+          {
+            "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+            "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+            "sha256": "a22cb024bcd1e2f1d75d28b053e09878a1b8b26a55bed48d1079c72617e498b2",
+            "bytes": 17643,
+            "scope": "rollout-design",
+            "sourceState": "workspace snapshot; not asserted to be committed"
+          }
+        ]
+      },
+      "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
+    }
+  ],
+  "semanticRevisions": [
+    {
+      "date": "2026-10-06",
+      "task": "051 selected production fixes / 042",
+      "approvalRecord": "issues/bugs/042-maxsurge-final-ordinals-DONE/PROPOSAL_COMMIT.md, current human chat replies",
+      "approvalQuotes": [
+        "滚动会补齐低版本漏洞，之前描述的是，不为了补空洞而滚动，参考SG-S02，但是这里需要再api reference里面partition部分做一些特殊说明，毕竟这种情况下完成滚动后仍然是2个v1，综合下来绝对序号控制partition，和滚动恢复序号，是一个有明确预期的行为准则，否则会有很多暗含的特殊规则。",
+        "可能你对保留健康高位存在理解偏差，保留健康高位的含义是，如果sg-3已经是v2了，则不滚动为sg-1：v2，当前是sg-3：v1需要进行滚动则滚动完就变成sg-1：v1"
+      ],
+      "clauses": [
+        "SG-P11",
+        "Appendix A.3 items 3-4",
+        "API reference sections 3.2, 3.3, 4.3"
+      ],
+      "before": "SG-P11 required replacing old high sg-3 in place with v2; a protected low hole could not receive the replacement.",
+      "after": "An outdated high group may be replaced in the lowest hole; the replacement absolute ordinal selects the historical or target template. N=2/P=2 can converge to two v1 groups as a partition pause, not full v2 adoption. Healthy target high identities remain protected by unchanged SG-S03. A stable hole alone does not start rollout.",
+      "compatibility": "Old high UIDs may retire only when already due for replacement; healthy target high UIDs are retained. Normal contiguous rollouts retire temporary surge.",
+      "affectedCases": [
+        "servinggroup-compound-v2 SG-P11 (runner expectation not changed in this task)",
+        "local 042/verify_sparse_partition.py: SG/Role x SG-P11/SG-S03 x surge 0/1"
+      ],
+      "implementationCommit": "bd0d650f",
+      "validationEvidence": "issues/features/051-production-baseline-realignment-DONE/production-selected-20261006/042/",
+      "files": [
+        {
+          "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+          "beforeSha256": "c6f642736a772c861e8784382e11da86481e9d81fd1e8fe9b1a98778311369e7",
+          "afterSha256": "719162476916191510a91cc7cef3b026dbdf076f15a61d68f8cef339c5cedd63"
+        },
+        {
+          "path": "modelserving-api-reference.en.v2.0.md",
+          "beforeSha256": "d6204f4251b6c050c1fd860741dd0f461feef518af0d1933d3d22e45a958e4df",
+          "afterSha256": "e8b5895da2f4211a543ece5a9a0a1a59571e5484066efdad05d79a2164489ad3"
+        }
+      ]
     },
     {
-      "path": "history/MODELSERVING_ROLLOUT_READABLE_GUIDE.md",
-      "sourceWorkspacePath": "issues/features/020-modelserving-rollingupdate-behavior-matrix-DONE/MODELSERVING_ROLLOUT_READABLE_GUIDE.md",
-      "sha256": "8ce91a90696626d3da41465ad2ed803de59aa0a367d3986dc4de592f09534d65",
-      "bytes": 32406,
-      "scope": "historical-baseline",
-      "sourceState": "workspace snapshot; not asserted to be committed"
+      "date": "2026-10-06",
+      "task": "052 runner spec contract alignment",
+      "approvalRecord": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md",
+      "approvalQuotes": [
+        "整理spec下文件命名规则，同时维护中英文两个版本",
+        "maxUnavaiable不再补1，N=3、U=25%、S=0 解析成 0/0 时应该拒绝配置",
+        "restartGracePeriodSeconds=-1 和 None 的后续语义修正进spec和校验实现",
+        "仅 rollout runner 用例和判定",
+        "允许但忽略",
+        "这里的“校验实现”需要修改哪一侧？ 修改rollout-runner"
+      ],
+      "clauses": [
+        "API 1.2–5, 6, 8, 11",
+        "SG A.2",
+        "SG-P02/P03 bounded atomic N/P inputs",
+        "SG-P11 (reuse prior 042 approval, unchanged meaning)",
+        "SG-S03 preparation only"
+      ],
+      "before": "SG U minimum-one conflicted with floor; inactive budgets forbidden; historical API differences and recovery semantics had not been reconciled with 043/041; only one language per topic.",
+      "after": "SG/Role floor U, active double-zero rejection including fully protected/zero replicas, active U/P bounds and zero-replica U=1 exception, >100% surge with int32 capacity bound, immutable identity/policies, inactive budgets allowed but ignored; -1 indefinite tolerance and None no proactive deletion; complete Chinese/English contracts.",
+      "affectedCases": [
+        "cases/api-contract/cases.json",
+        "cases/recovery-contract/suite.json",
+        "scripts/run-budget-contract.py",
+        "servinggroup-compound-v2/RUN-620,642,643,651",
+        "docs/contract-migration.json"
+      ],
+      "compatibility": "No Kthena source changes. Historical catalogue conflicts stop before cluster access; old source matrices and pre-existing document edits retained.",
+      "verificationRecord": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md"
+    }
+  ],
+  "naming": {
+    "pattern": "<topic>.<language>.md",
+    "languages": [
+      "en",
+      "zh-CN"
+    ],
+    "versionLocation": "document body and this manifest",
+    "exceptions": [
+      "README.md (bilingual index)",
+      "SOURCES.json (provenance)"
+    ]
+  },
+  "priorEditions": [
+    {
+      "capturedIn": "issues/features/052-runner-spec-contract-alignment-IP/before",
+      "files": [
+        {
+          "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+          "sha256": "719162476916191510a91cc7cef3b026dbdf076f15a61d68f8cef339c5cedd63",
+          "bytes": 73258,
+          "scope": "rollout-design",
+          "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved.",
+          "originalSources": [
+            {
+              "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+              "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
+              "sha256": "9d700394fae571288ddb75dbfcb249c37e27f9ef4428a180c619b05cb74e002a",
+              "bytes": 55368,
+              "scope": "rollout-design",
+              "sourceState": "workspace snapshot; not asserted to be committed"
+            },
+            {
+              "path": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+              "sourceWorkspacePath": "issues/features/033-servinggroup-compound-rollout-scenarios-DONE/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS.md",
+              "sha256": "a22cb024bcd1e2f1d75d28b053e09878a1b8b26a55bed48d1079c72617e498b2",
+              "bytes": 17643,
+              "scope": "rollout-design",
+              "sourceState": "workspace snapshot; not asserted to be committed"
+            }
+          ]
+        },
+        {
+          "path": "modelserving-api-reference.en.v2.0.md",
+          "sourceWorkspacePath": "kthena/docs/kthena/docs/api/modelserving-api-reference.en.v2.0.md",
+          "sha256": "e8b5895da2f4211a543ece5a9a0a1a59571e5484066efdad05d79a2164489ad3",
+          "bytes": 62117,
+          "scope": "api-reference",
+          "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
+        }
+      ]
     }
   ]
 }

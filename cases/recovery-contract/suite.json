@@ -1,0 +1,18 @@
+{
+  "format": "rollout-runner/recovery-contract-v1",
+  "contractVersion": "2.1",
+  "source": "issues/features/041-recovery-policy-semantics-DONE/verify_kind.py",
+  "sourceSHA256": "e402821884a4d78fa1be546cfe19fa8815bda59a4ef5942bc0354771a74f8d42",
+  "fixture": "2 SG x 2 Role instances x (entry + worker), schedulerName=volcano",
+  "assertions": [
+    "real kubelet restart witnessed",
+    "None and -1 preserve every UID and unavailability",
+    "finite grace can expire or recover in place",
+    "Failed is retained for None and -1",
+    "pending grace canceled by policy update",
+    "policy survives controller restart",
+    "actual deletion rebuilds exactly SG/Role/missing Pod scope"
+  ],
+  "executor": "scripts/run-recovery-contract.py",
+  "budgetExecutor": "scripts/run-budget-contract.py"
+}

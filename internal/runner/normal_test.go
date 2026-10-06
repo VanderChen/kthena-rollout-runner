@@ -231,7 +231,7 @@ func TestNormalPercentageRounding(t *testing.T) {
 		k    string
 		sg   bool
 		want int
-	}{{"maxUnavailable", true, 1}, {"maxUnavailable", false, 0}, {"maxSurge", true, 1}, {"partition", false, 1}} {
+	}{{"maxUnavailable", true, 0}, {"maxUnavailable", false, 0}, {"maxSurge", true, 1}, {"partition", false, 1}} {
 		got, err := budget(map[string]interface{}{tc.k: "20%"}, tc.k, 3, tc.sg)
 		if err != nil || got != tc.want {
 			t.Fatalf("%+v got %d %v", tc, got, err)

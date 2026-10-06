@@ -4,7 +4,7 @@ runner 在已有 Kthena controller 的测试集群中逐例执行 ModelServing �
 
 **从这里开始：**[使用指南](docs/USER_GUIDE.md)只讲构建镜像、下发 Job、取回和定位结果；[开发指南](docs/DEVELOPER_GUIDE.md)讲如何增加或修改 case。
 
-**行为对照：**[滚动预期与 API reference](docs/specs/README.md)保存此前梳理的原文、适用范围和已知差异。Kthena 主仓的 ModelServing 修复必须核对这些规范；核心预期的修改需要人工明确批准具体差异，不能把过程讨论自动写入规范。
+**行为对照：**[滚动预期与 API reference](docs/specs/README.md)仅保留最终版本：SG v2.0（含完整行为规则与 35 个场景）和 API reference v2.0，并列明适用范围和已知差异。Kthena 源码、runner 用例和判定逻辑共同遵循 workspace 根目录的 [AGENTS.md](../AGENTS.md)。
 
 **分支：**`main` 承载完整实现及修复，包括阻塞与组合滚动用例、Job 生成和离线报告。不再维护 `legacy` 兼容分支；旧提交仅通过 `archive/legacy-20261005` tag 追溯。
 
@@ -26,3 +26,5 @@ runner 在已有 Kthena controller 的测试集群中逐例执行 ModelServing �
 之前的 ServingGroup 组合滚动 35 项在 `cases/servinggroup-compound-v2/`（RUN-618～652），其匹配的 controller commit、Job 示例和判定边界见 [组合用例说明](docs/COMPOUND_V2.md)。
 
 报告保留原始状态：**PASS** 为通过，**FAIL** 为用例违约，**INCONCLUSIVE** 为证据不足，**ERROR** 为执行错误，**NOT_RUN** 为未执行。缺失文件和互相矛盾的结果会显示为 `MISSING_RESULT` 或 `EVIDENCE_CONFLICT`，不会被算作 PASS。
+
+当前 API/恢复契约 2.1、可执行命令和历史输入迁移清单见 [CONTRACT_MIGRATION](docs/CONTRACT_MIGRATION.md)。规格同时维护 [中文/English](docs/specs/README.md)。

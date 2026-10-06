@@ -1,13 +1,13 @@
 {
   "format": "rollout-runner/compound-v2",
   "id": "RUN-639",
-  "baseline": "6fea34e03a179b07686fd5415b83018e159b196b",
+  "baseline": "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b",
   "scenario": {
     "designID": "SG-C15",
     "source": {
       "id": "RUN-639",
       "designID": "SG-C15",
-      "design": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md"
+      "design": "servinggroup-compound-rollout.zh-CN.md"
     },
     "profile": "controlled",
     "initialSpec": {

@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "cases" / "servinggroup-compound-v2"
-COMMIT = "6fea34e03a179b07686fd5415b83018e159b196b"
+COMMIT = "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b"
 TEMPLATE = json.loads((ROOT / "cases" / "rollout-blocking" / "RUN-612.yaml").read_text())["scenario"]["initialSpec"]
 
 
@@ -76,7 +76,7 @@ class Case:
             baseline["exclude"] = [condition(i) for i in bad]
         self.data = {"format": "rollout-runner/compound-v2", "id": self.id, "baseline": COMMIT,
                      "scenario": {"designID": "SG-" + design, "source": {"id": self.id, "designID": "SG-" + design,
-                     "design": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md"},
+                     "design": "servinggroup-compound-rollout.zh-CN.md"},
                      "profile": "controlled", "initialSpec": initial, "baseline": baseline, "steps": []}}
 
     def step(self, name, state, *, action="observe", next_spec=None, release="none", stable=0,
@@ -155,7 +155,7 @@ c.hold("complete-B", "0:B,1:B", release="all"); add(c)
 
 c = Case("S03", spec(4, u=1, p=3)); c.update("establish-high-B", "0:A,1:A,2:A,3:B", version="B", release="all")
 c.cost({0: 100, 1: -100, 2: -100, 3: 100})
-c.update("shrink-with-high-B-retained", "0:A,3:B", n=2, same={3: "establish-high-B"})
+c.update("shrink-with-high-B-retained", "0:A,3:B", n=2, p=2, same={3: "establish-high-B"})
 c.update("update-only-old-0", "0:B,3:B", p=0, release="all", stable=30, same={3: "establish-high-B"})
 c.update("S1-still-keeps-healthy-high-B", "0:B,3:B", s=1, stable=30, same={3: "establish-high-B"}); add(c)
 
@@ -289,12 +289,12 @@ c = Case("P01", spec(3, u=1, p=1)); c.update("P1-B-gray", "0:A,1:B,2:B", version
 c.update("expand-new-slots-B", "0:A,1:B,2:B,3:B!,4:B!", n=5, same={0: "baseline", 1: "P1-B-gray", 2: "P1-B-gray"})
 c.hold("P1-expanded-ready", "0:A,1:B,2:B,3:B,4:B", release="all", same={0: "baseline"}); add(c)
 
-c = Case("P02", spec(3, u=1, p=5)); c.update("target-B-blocked-by-P5", "0:A,1:A,2:A", version="B", stable=30)
-c.update("expand-across-P5", "0:A,1:A,2:A,3:A!,4:A!,5:B!", n=6)
+c = Case("P02", spec(3, u=1, p=3)); c.update("target-B-blocked-by-P3", "0:A,1:A,2:A", version="B", stable=30)
+c.update("expand-across-P5", "0:A,1:A,2:A,3:A!,4:A!,5:B!", n=6, p=5)
 c.hold("historical-protected-slots-ready", "0:A,1:A,2:A,3:A,4:A,5:B", release="all"); add(c)
 
 c = Case("P03", spec(5, u=1, p=3)); c.update("P3-gray", "0:A,1:A,2:A,3:B,4:B", version="B", release="all")
-c.update("shrink-through-partition", "0:A,1:A", n=2)
+c.update("shrink-through-partition", "0:A,1:A", n=2, p=2)
 c.hold("P-does-not-impose-minimum", "0:A,1:A", stable=30)
 c.update("restore-three-with-B2", "0:A,1:A,2:B", n=3, p=2, release="all")
 c.step("fault-protected-old-1", "0:A,1:A!,2:B", action="drop-ready", running=[1])
@@ -337,9 +337,9 @@ c.hold("P1-expanded-rollout", "0:A,1:B,2:B,3:B", release="all", same={3: "P1-B-s
 
 c = Case("P11", spec(4, u=1, p=2)); c.cost({0: 100, 1: -100, 2: -100, 3: 100})
 c.update("sparse-protected-source", "0:A,3:A", n=2)
-c.update("high-old-updates-in-place", "0:A,3:B", version="B", release="all")
-c.update("protected-hole-built-from-history", "0:A,1:A!,3:B", n=3, same={3: "high-old-updates-in-place"})
-c.hold("protected-hole-ready", "0:A,1:A,3:B", release="all", same={3: "high-old-updates-in-place"}); add(c)
+c.update("high-old-fills-protected-hole", "0:A,1:A", version="B", release="all", same={0: "baseline"}, stable=30)
+c.update("lower-P-releases-new-ordinal", "0:A,1:B", p=1, release="all", same={0: "baseline"})
+c.hold("protected-low-history-retained", "0:A,1:B", same={0: "baseline"}, stable=30); add(c)
 
 c = Case("R01", spec(3, u=1, p=1, workers=1, worker_version="W1"))
 c.update("historical-and-new-worker-templates", "0:A,1:B,2:B", version="B", worker_version="W2", release="all")
@@ -355,4 +355,4 @@ DEST.mkdir(parents=True, exist_ok=True)
 for case in cases:
     (DEST / f"{case['id']}.yaml").write_text(json.dumps(case, ensure_ascii=False, indent=2) + "\n")
 (DEST / "suite.json").write_text(json.dumps({"format": "rollout-runner/compound-v2", "controllerCommit": COMMIT,
-    "design": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md", "ids": [case["id"] for case in cases]}, indent=2) + "\n")
+    "design": "servinggroup-compound-rollout.zh-CN.md", "ids": [case["id"] for case in cases]}, indent=2) + "\n")

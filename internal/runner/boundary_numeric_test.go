@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-func TestNumericBoundaryCataloguePreservesDifferentRoundingAndAboveDesiredBudgets(t *testing.T) {
+func TestHistoricalNumericInputsResolveWithCurrentRounding(t *testing.T) {
 	cases, err := LoadCases(filepath.Join("..", "..", "cases", "boundary-numeric"))
 	if err != nil || len(cases) != 26 {
 		t.Fatal(len(cases), err)
 	}
-	want := map[string][3]int{"RUN-543": {1, 0, 0}, "RUN-556": {0, 1, 0}, "RUN-546": {1, 2, 2}, "RUN-558": {1, 2, 2}, "RUN-551": {0, 4, 0}, "RUN-552": {1, 0, 4}, "RUN-565": {4, 0, 0}}
+	want := map[string][3]int{"RUN-543": {0, 0, 0}, "RUN-556": {0, 1, 0}, "RUN-546": {1, 2, 2}, "RUN-558": {1, 2, 2}, "RUN-551": {0, 4, 0}, "RUN-552": {1, 0, 4}, "RUN-565": {4, 0, 0}}
 	for _, c := range cases {
 		model, err := readModel(c.Scenario.InitialSpec)
 		if err != nil {

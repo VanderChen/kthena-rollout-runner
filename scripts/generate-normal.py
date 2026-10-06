@@ -372,12 +372,11 @@ def set_budget(spec,key,value):
     if mode(spec)=='Role':role(spec)[key]=value
     else:spec.setdefault('rolloutStrategy',{}).setdefault('rollingUpdateConfiguration',{})[key]=value
 def effective_budget(spec,key):
-    import math
     b=role(spec) if mode(spec)=='Role' else spec.get('rolloutStrategy',{}).get('rollingUpdateConfiguration',{})
     value=b.get(key,1 if key=='maxUnavailable' else 0)
     if isinstance(value,str):
-        x=int(value[:-1])*desired(spec)/100
-        return max(int(x),1) if key=='maxUnavailable' and mode(spec)=='SG' and x>0 else int(x) if key=='maxUnavailable' else math.ceil(x)
+        product=int(value[:-1])*desired(spec)
+        return product//100 if key=='maxUnavailable' else (product+99)//100
     return value
 def blocked(spec,ordinal):
     c={'kind':'unit','ordinal':ordinal,'version':'B','ready':False,'count':1}

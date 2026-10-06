@@ -1,13 +1,13 @@
 {
   "format": "rollout-runner/compound-v2",
   "id": "RUN-651",
-  "baseline": "6fea34e03a179b07686fd5415b83018e159b196b",
+  "baseline": "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b",
   "scenario": {
     "designID": "SG-P11",
     "source": {
       "id": "RUN-651",
       "designID": "SG-P11",
-      "design": "SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md"
+      "design": "servinggroup-compound-rollout.zh-CN.md"
     },
     "profile": "controlled",
     "initialSpec": {
@@ -277,11 +277,11 @@
         }
       },
       {
-        "name": "high-old-updates-in-place",
+        "name": "high-old-fills-protected-hole",
         "action": "update",
         "until": "compound",
         "release": "all",
-        "stableSeconds": 0,
+        "stableSeconds": 30,
         "holdSeconds": 0,
         "expect": {
           "compound": {
@@ -291,11 +291,12 @@
               {
                 "ordinal": 0,
                 "version": "A",
-                "ready": true
+                "ready": true,
+                "uidSameAs": "baseline"
               },
               {
-                "ordinal": 3,
-                "version": "B",
+                "ordinal": 1,
+                "version": "A",
                 "ready": true
               }
             ],
@@ -383,32 +384,27 @@
         }
       },
       {
-        "name": "protected-hole-built-from-history",
+        "name": "lower-P-releases-new-ordinal",
         "action": "update",
         "until": "compound",
-        "release": "none",
+        "release": "all",
         "stableSeconds": 0,
         "holdSeconds": 0,
         "expect": {
           "compound": {
-            "active": 3,
+            "active": 2,
             "ready": 2,
             "groups": [
               {
                 "ordinal": 0,
                 "version": "A",
-                "ready": true
+                "ready": true,
+                "uidSameAs": "baseline"
               },
               {
                 "ordinal": 1,
-                "version": "A",
-                "ready": false
-              },
-              {
-                "ordinal": 3,
                 "version": "B",
-                "ready": true,
-                "uidSameAs": "high-old-updates-in-place"
+                "ready": true
               }
             ],
             "blocked": false
@@ -469,7 +465,7 @@
               }
             ]
           },
-          "replicas": 3,
+          "replicas": 2,
           "schedulerName": "volcano",
           "plugins": [
             {
@@ -487,7 +483,7 @@
           "rolloutStrategy": {
             "type": "ServingGroupRollingUpdate",
             "rollingUpdateConfiguration": {
-              "partition": 2,
+              "partition": 1,
               "maxSurge": 0,
               "maxUnavailable": 1
             }
@@ -495,32 +491,27 @@
         }
       },
       {
-        "name": "protected-hole-ready",
+        "name": "protected-low-history-retained",
         "action": "observe",
         "until": "compound",
-        "release": "all",
-        "stableSeconds": 0,
+        "release": "none",
+        "stableSeconds": 30,
         "holdSeconds": 0,
         "expect": {
           "compound": {
-            "active": 3,
-            "ready": 3,
+            "active": 2,
+            "ready": 2,
             "groups": [
               {
                 "ordinal": 0,
                 "version": "A",
-                "ready": true
+                "ready": true,
+                "uidSameAs": "baseline"
               },
               {
                 "ordinal": 1,
-                "version": "A",
-                "ready": true
-              },
-              {
-                "ordinal": 3,
                 "version": "B",
-                "ready": true,
-                "uidSameAs": "high-old-updates-in-place"
+                "ready": true
               }
             ],
             "blocked": false

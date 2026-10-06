@@ -561,7 +561,9 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !scale && ordinalCleanup {
 		reason = "ordinal-cleanup"
 	}
-	if !scale && !reservedEarlier && !ordinalCleanup && (active <= d || l.CompoundV2 && l.CompoundFormal[u.Ordinal]) && u.Ready && l.unitTarget(u) {
+	// A current-template unit does not become a rollout candidate when it is
+	// NotReady. Captured fault recovery is handled by recoveryBefore instead.
+	if !scale && !reservedEarlier && !ordinalCleanup && (active <= d || l.CompoundV2 && l.CompoundFormal[u.Ordinal]) && l.unitTarget(u) {
 		l.fail("UNEXPECTED_TARGET_REPLACED: " + key)
 	}
 	// Contract 2.2: unavailable old units first, descending within a health

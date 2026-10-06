@@ -609,6 +609,25 @@ func TestNormalAcceptedGroupScaleIntentSurvivesImmediateRestore(t *testing.T) {
 	requireNormalViolation(t, l, "UNEXPECTED_TARGET_REPLACED")
 }
 
+func TestCurrentNotReadyTargetIsNotAnOldRolloutCandidate(t *testing.T) {
+	for _, id := range []string{"RUN-166", "RUN-143"} {
+		t.Run(id, func(t *testing.T) {
+			l, objects := normalFixture(t, id)
+			l.Armed = true
+			l.Phase = "target-not-ready"
+			for _, pod := range objects["pods"] {
+				if pod.GetLabels()[LabelGroup] == "model-0" && pod.GetLabels()[LabelRole] == "frontend" && ordinal(pod.GetLabels()[LabelRoleID]) == 0 {
+					if err := unstructured.SetNestedSlice(pod.Object, []interface{}{map[string]interface{}{"type": "Ready", "status": "False"}}, "status", "conditions"); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			deleteNormal(l, objects, "frontend", 0, 0)
+			requireNormalViolation(t, l, "UNEXPECTED_TARGET_REPLACED")
+		})
+	}
+}
+
 func TestNormalAcceptedGroupScaleBatchSurvivesImmediateRestore(t *testing.T) {
 	for _, accepted := range []bool{false, true} {
 		t.Run(fmt.Sprint(accepted), func(t *testing.T) {

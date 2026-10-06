@@ -564,23 +564,40 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	if !scale && !reservedEarlier && !ordinalCleanup && (active <= d || l.CompoundV2 && l.CompoundFormal[u.Ordinal]) && u.Ready && l.unitTarget(u) {
 		l.fail("UNEXPECTED_TARGET_REPLACED: " + key)
 	}
-	// Already unavailable old units may be replaced before healthy old units.
-	// Descending healthy replacement order applies when consuming capacity.
-	if !scale && !reservedEarlier && (u.Ready || l.CompoundV2) && !l.unitTarget(u) {
+	// Contract 2.2: unavailable old units first, descending within a health
+	// class. Coordinated stable instances retain a descending prefix.
+	if !scale && !reservedEarlier && !l.unitTarget(u) {
 		_, _, _, partition := l.scopeBudget(u)
 		for _, other := range units {
-			if other.Scope != u.Scope || other.Ordinal <= u.Ordinal || other.Ordinal < partition || (!l.CompoundV2 && other.Ordinal >= d && !l.isSourceAboveDesired(other)) || !other.Active || l.unitTarget(other) {
+			if other.Scope != u.Scope || other.Key == u.Key || other.Ordinal < partition || !other.Active || l.unitTarget(other) || !l.oldCandidatePrecedes(other, u) {
 				continue
 			}
 			available := true
 			for _, p := range other.Pods {
-				if l.Committed[string(p.UID)] || l.ScaleUIDs[string(p.UID)] || p.DeletionTimestamp != nil {
+				if l.Committed[string(p.UID)] || l.PGPods[string(p.UID)] || l.ScaleUIDs[string(p.UID)] || p.DeletionTimestamp != nil {
 					available = false
 				}
 			}
 			if available {
 				l.fail(fmt.Sprintf("ORDER_MISMATCH: %s started %d before eligible %d", u.Scope, u.Ordinal, other.Ordinal))
 			}
+		}
+	}
+	if l.Model.Mode == "Role" && !scale && !reservedEarlier && !l.unitTarget(u) && (!u.Ready || readyAfter >= max(d-v, 0)) {
+		c, unavailable, inFlight := 0, 0, 0
+		for _, other := range units {
+			if other.Scope != u.Scope {
+				continue
+			}
+			c++
+			if l.unitTarget(other) && !other.Ready {
+				unavailable++
+			} else if l.unitDeletionPending(other) {
+				inFlight++
+			}
+		}
+		if max(0, c-max(0, d-v)-unavailable-inFlight) == 0 {
+			l.fail(fmt.Sprintf("Q_EXHAUSTED: %s C=%d V=%d I=%d", u.Scope, c, unavailable, inFlight))
 		}
 	}
 	start := NormalStart{At: time.Now().UTC(), Phase: l.Phase, Key: key, Scope: u.Scope, Group: u.Group, Role: u.Role, Ordinal: u.Ordinal, Version: u.Version, Reason: reason, ReadyBefore: ready, Minimum: max(d-v, 0)}
@@ -603,6 +620,39 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 		}
 	}
 	l.Starts = append(l.Starts, start)
+}
+
+func (l *NormalLedger) unitDeletionPending(u NormalUnit) bool {
+	for _, pod := range u.Pods {
+		if pod.DeletionTimestamp != nil || l.Committed[string(pod.UID)] || l.PGPods[string(pod.UID)] {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *NormalLedger) temporaryRoleSurge(u NormalUnit) bool {
+	if l.Model.Mode != "Role" || u.Ordinal < l.Model.Roles[u.Role].R {
+		return false
+	}
+	for _, pod := range u.Pods {
+		if pod.Annotations["modelserving.volcano.sh/surge"] == "role" {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *NormalLedger) oldCandidatePrecedes(candidate, selected NormalUnit) bool {
+	if l.Model.Mode == "Role" && mapValue(mapValue(l.Model.Spec, "rolloutStrategy"), "roleCoordination") != nil {
+		// Marked, unadopted surge is reclaimed separately. An unmarked high
+		// ordinal is still stable, and an adopted surge is now stable too.
+		return !l.temporaryRoleSurge(candidate) && !l.temporaryRoleSurge(selected) && candidate.Ordinal > selected.Ordinal
+	}
+	if candidate.Ready != selected.Ready {
+		return !candidate.Ready
+	}
+	return candidate.Ordinal > selected.Ordinal
 }
 
 // Natural readiness can change between the replicas request and deletion. Keep

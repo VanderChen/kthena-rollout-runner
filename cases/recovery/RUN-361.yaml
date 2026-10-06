@@ -1,6 +1,6 @@
 "format": "rollout-runner/v3"
 "id": "RUN-361"
-"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"baseline": "cad19d0fce097e2a5f481938727e9f4e4c42175c"
 "scenario":
   "source":
     "group": "2.1.1 Pod删除与recoveryPolicy组合"

@@ -84,9 +84,10 @@ func TestSparseSourceRequiresExactReadyAIdentities(t *testing.T) {
 	}
 }
 
-func TestSparseSourceHighOrdinalOrderingUsesFiniteUIDs(t *testing.T) {
+func TestCoordinatedSparseSourceHighOrdinalOrderingUsesFiniteUIDs(t *testing.T) {
 	for _, source := range []bool{false, true} {
 		l, objects := normalFixture(t, "RUN-143")
+		mapValue(l.Model.Spec, "rolloutStrategy")["roleCoordination"] = map[string]interface{}{"maxSkew": "100%"}
 		// This fixture has one group and W=0; preserve actual source A0/A3/A4.
 		for uid, o := range objects["pods"] {
 			if o.GetLabels()[LabelRole] == "frontend" && ordinal(o.GetLabels()[LabelRoleID]) != 0 {
@@ -95,6 +96,9 @@ func TestSparseSourceHighOrdinalOrderingUsesFiniteUIDs(t *testing.T) {
 		}
 		for _, n := range []int{3, 4} {
 			o := normalTestPod("Role", "frontend", n, "A", true, "entry")
+			if !source {
+				o.SetAnnotations(map[string]string{"modelserving.volcano.sh/surge": "role"})
+			}
 			objects["pods"][string(o.GetUID())] = o
 			l.Released[string(o.GetUID())] = true
 			if source {

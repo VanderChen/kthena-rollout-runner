@@ -13,6 +13,7 @@ loader = importlib.util.spec_from_file_location('normal_generator', ROOT/'script
 normal = importlib.util.module_from_spec(loader)
 loader.loader.exec_module(normal)
 SOURCE_SHA = '757de7f6de64ebfa2e8ce7a6e0be53809bd085d58191971ae552fc10141580c5'
+TEST_COMMIT = 'cad19d0fce097e2a5f481938727e9f4e4c42175c'
 
 
 def plan(row):
@@ -48,7 +49,7 @@ def plan(row):
                        action='recover-pod', stableSeconds=30, timeoutSeconds=420,
                        podFault={'group': 0, 'role': 'frontend', 'ordinal': 0, 'member': member},
                        expect={'targets': targets})
-    return {'format': 'rollout-runner/v3', 'id': row['id'], 'baseline': normal.COMMIT,
+    return {'format': 'rollout-runner/v3', 'id': row['id'], 'baseline': TEST_COMMIT,
             'scenario': {'source': row, 'profile': 'controlled', 'initialSpec': a, 'steps': [step]}}
 
 
@@ -61,7 +62,8 @@ def main():
     out.mkdir(exist_ok=True)
     for row in rows:
         (out/(row['id']+'.yaml')).write_text(normal.yaml(plan(row))+'\n')
-    manifest = {'format': 'rollout-runner/suite-v1', 'controllerCommit': normal.COMMIT,
+    manifest = {'format': 'rollout-runner/suite-v1', 'controllerCommit': TEST_COMMIT,
+                'priorControllerCommit': normal.COMMIT,
                 'sourceSHA256': SOURCE_SHA, 'developmentScope': 'RUN-305..388 only; category2 total236 remains incomplete',
                 'cases': rows, 'inputs': {r['id']: hashlib.sha256((out/(r['id']+'.yaml')).read_bytes()).hexdigest() for r in rows}}
     (out/'suite.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n')

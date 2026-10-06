@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "cases" / "servinggroup-compound-v2"
-COMMIT = "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b"
+COMMIT = "cad19d0fce097e2a5f481938727e9f4e4c42175c"
 TEMPLATE = json.loads((ROOT / "cases" / "rollout-blocking" / "RUN-612.yaml").read_text())["scenario"]["initialSpec"]
 
 
@@ -169,8 +169,9 @@ c.hold("all-formal-B-and-surge-retired", "0:B,1:B,2:B,3:B", release="all", same=
 c = Case("S05", spec(3, u=1)); c.cost({0: 100, 1: -100, 2: 100})
 c.update("sparse-source", "0:A,2:A", n=2)
 c.update("bad-low-new-capacity", "0:A,1:B!,2:A", n=3, version="B", running=[1])
-c.update("strict-high-old-blocks-low-repair", "0:A,1:B!,2:A", version="C", blocked=True, stable=30,
-         same={0: "bad-low-new-capacity", 1: "bad-low-new-capacity", 2: "bad-low-new-capacity"}, running=[1]); add(c)
+c.update("repair-low-old-before-healthy-high", "0:A,1:C!,2:A", version="C", blocked=True, stable=30,
+         same={0: "bad-low-new-capacity", 2: "bad-low-new-capacity"}, running=[1])
+c.hold("low-repair-releases-capacity-and-finishes", "0:C,1:C,2:C", release="all"); add(c)
 
 c = Case("S06", spec(5, u=2)); c.update("two-bad-B-high-groups", "0:A,1:A,2:A,3:B!,4:B!", version="B", running=[3,4])
 c.hold("same-target-does-not-rebuild-bad-B", stable=30, blocked=True, same={3: "two-bad-B-high-groups", 4: "two-bad-B-high-groups"}, running=[3,4])
@@ -179,7 +180,9 @@ c.hold("C-converges-after-batches", "0:C,1:C,2:C,3:C,4:C", release="all"); add(c
 
 c = Case("S07", spec(5, u=2), "0:A!,1:A!,2:A!,3:A!,4:A!", bad=range(5))
 c.update("first-Q-batch-only", "0:A!,1:A!,2:A!,3:B!,4:B!", version="B", blocked=True, stable=30, running=[0,1,2,3,4])
-c.hold("release-first-batch-and-finish", "0:B,1:B,2:B,3:B,4:B", release="all"); add(c)
+c.hold("release-only-new-version-and-finish", "0:B,1:B,2:B,3:B,4:B", release="except")
+c.data["scenario"]["steps"][-1]["exclude"] = [{"kind": "unit", "version": "A", "count": 1}]
+add(c)
 
 # Scale/update interleavings. Intermediate checkpoints carry exact identities;
 # the ledger audits all Watch events between them, including transient deletes.
@@ -225,8 +228,9 @@ c.update("C-inherits-committed-deletion", "0:A,1:A!,2:B", version="C", live=True
 c.unpin("0:A,1:C!,2:B"); c.hold("direct-C-convergence", "0:C,1:C,2:C", release="all")
 c.update("reset-for-created-B-branch", "0:A,1:A,2:A", version="A", release="all")
 c.update("B-1-create-already-issued", "0:A,1:B!,2:B", version="B", release="one")
-c.update("C-blocked-by-higher-ready-B2", "0:A,1:B!,2:B", version="C", blocked=True,
-         stable=30, same={1: "B-1-create-already-issued", 2: "B-1-create-already-issued"}); add(c)
+c.update("C-repairs-old-bad-B1-before-healthy-B2", "0:A,1:C!,2:B", version="C", blocked=True,
+         stable=30, same={0: "B-1-create-already-issued", 2: "B-1-create-already-issued"}, running=[1])
+c.hold("created-B-branch-converges-to-C", "0:C,1:C,2:C", release="all"); add(c)
 
 c = Case("C09", spec(3, u=1)); c.update("scale-A-first-group", "0:A,1:A,2:A,3:A", n=5, release="all", source=True, timeout=15)
 c.update("B-fills-last-scale-slot", "0:A,1:A,2:A,3:A,4:B", version="B", release="all")

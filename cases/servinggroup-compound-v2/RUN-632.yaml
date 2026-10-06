@@ -1,7 +1,7 @@
 {
   "format": "rollout-runner/compound-v2",
   "id": "RUN-632",
-  "baseline": "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b",
+  "baseline": "cad19d0fce097e2a5f481938727e9f4e4c42175c",
   "scenario": {
     "designID": "SG-C08",
     "source": {
@@ -685,7 +685,7 @@
         }
       },
       {
-        "name": "C-blocked-by-higher-ready-B2",
+        "name": "C-repairs-old-bad-B1-before-healthy-B2",
         "action": "update",
         "until": "compound",
         "release": "none",
@@ -699,13 +699,14 @@
               {
                 "ordinal": 0,
                 "version": "A",
-                "ready": true
+                "ready": true,
+                "uidSameAs": "B-1-create-already-issued"
               },
               {
                 "ordinal": 1,
-                "version": "B",
+                "version": "C",
                 "ready": false,
-                "uidSameAs": "B-1-create-already-issued"
+                "runningNotReady": true
               },
               {
                 "ordinal": 2,
@@ -794,6 +795,38 @@
               "maxSurge": 0,
               "maxUnavailable": 1
             }
+          }
+        }
+      },
+      {
+        "name": "created-B-branch-converges-to-C",
+        "action": "observe",
+        "until": "compound",
+        "release": "all",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 3,
+            "ready": 3,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "C",
+                "ready": true
+              },
+              {
+                "ordinal": 1,
+                "version": "C",
+                "ready": true
+              },
+              {
+                "ordinal": 2,
+                "version": "C",
+                "ready": true
+              }
+            ],
+            "blocked": false
           }
         }
       }

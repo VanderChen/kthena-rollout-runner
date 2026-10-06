@@ -1,6 +1,12 @@
-# Runner contract 2.1 migration
+# Runner contract 2.2 execution migration
 
 2026-10-06：本轮仅修改 rollout runner；具体批准、原始快照及 Kind 证据见 workspace issue 052。当前参考为 [API 中文](specs/modelserving-api-reference.zh-CN.md) / [English](specs/modelserving-api-reference.en.md) 及 [SG 中文](specs/servinggroup-compound-rollout.zh-CN.md) / [English](specs/servinggroup-compound-rollout.en.md)。
+
+## 2026-10-07 文档 2.2 与执行覆盖
+
+前次用户要求修正 API reference 和行为预期表；本次明确要求同步执行器并以合入后的 production 运行组合与故障恢复用例。2.2 在两层统一 Q/B/I，并确认默认旧 NotReady 优先、协调 Role 不跳过、无开关。查表入口见 [中文](specs/servinggroup-compound-rollout.zh-CN.md#budget-lookup) / [English](specs/servinggroup-compound-rollout.en.md#budget-lookup)。
+
+admission/recovery/budget 2.1 的执行语义未变。2.2 的 RUN-622/632、全旧坏 RUN-624 与通用候选顺序判定已迁移，SG 35 项和 Pod 删除 recovery 84 项绑定 production `cad19d0f`；原 recovery baseline 保存在 suite 的 priorControllerCommit 和 Git。下述 53 项历史 admission 冲突清单仍不等于顺序覆盖。Role 的 Q 及协调模式例外有正反例单元测试，35 个 SG case 不冒充 Role 运行覆盖。实际运行与失败分类见 [051 验证记录](../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md)。整批/逐 Ready 的独立差异未改判。
 
 ## 当前可执行合约
 
@@ -56,4 +62,4 @@ go run ./cmd/contract-audit > docs/contract-migration.json
 - SG-P03 缩到 N=2 时同请求 P=2，保留移除旧保护区成员和 NotReady 优先产生稀疏的覆盖。
 - SG-P11 按先前 042 明确批准修订：高位旧 3 替换到受保护低位 1，历史 A 暂停，再降低 P 更新 1；健康目标高位规则不变。
 
-组合目录 baseline 现固定 `bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b`（本次集群实际候选），它不表示 35 项均已通过。原 baseline 在 Git/052 before 快照及来源记录保留。
+组合目录 baseline 现固定 `cad19d0fce097e2a5f481938727e9f4e4c42175c`（本次集群实际候选），它不表示 35 项均已通过。原 baseline 在 Git/052 before 快照及来源记录保留。

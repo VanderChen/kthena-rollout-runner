@@ -1,8 +1,8 @@
 # ModelServing API 参考
 
-版本 2.1 · 2026-10-06 · [English](modelserving-api-reference.en.md)
+版本 2.2 · 2026-10-07 · [English](modelserving-api-reference.en.md)
 
-本文规定字段路径、默认值、可变性、合法范围、百分比取整和跨字段约束。Mutable 表示更新后的完整对象通过校验时可原地修改；Immutable 表示值和可选对象的存在性均不可变，即使滚动完成或副本数为零也不例外。第 11 节对比的是历史 `production/release-1.0@a011cd5a`，不代表当前 production 的实现状态。片段 YAML 需补齐其他必填字段；示例过程不承诺特定删除序号。
+本文规定字段路径、默认值、可变性、合法范围、百分比取整和跨字段约束。Mutable 表示更新后的完整对象通过校验时可原地修改；Immutable 表示值和可选对象的存在性均不可变，即使滚动完成或副本数为零也不例外。第 11 节对比的是历史 `production/release-1.0@a011cd5a`，不代表当前 production 的实现状态。片段 YAML 需补齐其他必填字段；示例过程服从 §2.3 的默认选择规则，异步事件不要求逐行全序。
 
 ## 1. 核心概念
 
@@ -94,6 +94,47 @@ spec:
     type: RoleRollingUpdate
 ```
 
+### 2.3 两层共用的预算与默认选择顺序
+
+本节同时适用于 SG 和 Role 滚动，**不新增顺序开关**。N/U/S/P 均取最新 spec 的生效层；SG 以完整 SG 为单位，Role 以每个 SG 内同一种 Role 的完整实例为单位。Role 的 entry 和所有必需 worker Ready 才计一个 Ready；各 Role、各 SG 不互借预算，未改模板的 Role 保留 UID。
+
+| 滚动模式 | 默认旧实例选择 | 是否允许跳过健康高位旧实例 |
+| --- | --- | --- |
+| SG | 合法旧 NotReady 优先，同类按 ordinal 高到低，再处理旧 Ready | 允许，直接生效 |
+| Role，未配置 roleCoordination | 与 SG 相同 | 允许，直接生效 |
+| Role，配置 roleCoordination | 稳定旧实例按 ordinal 高到低；最高候选受阻就等待 | 不允许，无开关；参与名单另决定 maxSkew/依赖作用范围 |
+
+**全量账本先计算，候选资格后判断。** protected、未参与协调和暂时不能删除的实例不能从其所属预算范围的可用性统计中消失。
+
+```text
+M = minAvailable         = max(0, N-U)
+Q = maxScaleDown         = max(0, C-M-V-I)
+B = maxHealthyScaleDown  = max(0, R-M)
+```
+
+| 符号 | 定义 |
+| --- | --- |
+| C | 实际活动实例数，包含实际已创建 surge；Deleting 完全消失前仍占物理容量，不预支未创建的 S |
+| R | 全部完整 Ready 容量，包含 protected、旧版和可用 surge；排除已承诺删除的容量 |
+| V | 最新目标版本的不可用实例数，包含目标 surge；不能把所有旧 NotReady 都计入 V |
+| I | 已占用、尚未由 C 减少或 V 增加反映的在途额度；与 C/V 的变化只记一次，稳定检查点为 0 |
+| B | 健康删除上限；不是 SG 附录中表示空洞集合的 H |
+
+例如旧对象删除已发但仍在 C 且不在 V 中，先占 I；对象消失后 C 减少，不再重复扣该 I；最新目标替代实例出现但未 Ready，由 V 占用。若替代槽受 P 保护、补建的是历史模板，也不能因其不属于最新目标而提前释放尚未恢复的在途额度。目标改变时重分类，不能把已过期坏版本永久锁在旧的在途计数中。所有动作共享同一轮拟执行账本；创建还须遵守包含在途创建预约的 N+S 上限。
+
+默认允许跳过时，令 Ebad/Ehealthy 为满足 partition、版本、身份和在途约束的旧 NotReady/旧 Ready 候选：
+
+```text
+dBad     = min(|Ebad|, Q)
+dHealthy = min(|Ehealthy|, Q-dBad, B)
+```
+
+Q 是总清理上界，**不是任意删除健康实例的许可**。每次健康删除仍重新核验 R；外部故障已使 R<M 时可在 Q 内修复合法旧坏版本，但不得再因滚动降低 R。已是当前目标的 NotReady 不反复模板滚动；明确 recoveryPolicy 的故障恢复另行适用。零更新量不形成永久滚动进度，N=0 的规模缩减按缩容处理。
+
+有 coordination 时，使用相同 Q/B，再叠加 §5 的剩余启动数、依赖和稳定实例有序前缀。废弃旧 NotReady **临时 surge** 的合法回收消耗同一 Q，但不属于稳定实例跳过，也不增加或返还稳定启动额度；须确认未转正式、不承担必要依赖、无冲突在途动作。健康旧 surge 还受 B 限制，不能提前删除仍承担底线的容量。不能只凭 ordinal≥N 判定临时身份。
+
+逐阶段例子及模式对照见 [SG/Role 共用速查表](servinggroup-compound-rollout.zh-CN.md#budget-lookup)。Q/B 给出预算上界，不单独决定批次调度时点；既有“整批等待/逐 Ready 推进”的执行口径差异见该表的覆盖边界，本次不据此新增批次语义。
+
 ## 3. ServingGroup 滚动配置
 
 路径：`spec.rolloutStrategy.rollingUpdateConfiguration`；以下字段可变，不单独创建模板 revision。在 Role 模式下允许配置但忽略，仍满足 §1.2 基础类型约束。
@@ -102,13 +143,9 @@ spec:
 
 默认 1，百分比按 SG 期望数向下取整、不补 1。生效整数范围 `[0, replicas]`，零副本默认/显式 U=1 例外；百分比 0%–100%。实际 U=0 要求实际 S>0，包括零副本和全 partition 情形。
 
-U 表示相对于期望 SG 数允许的最大不可用量。旧公式为：
+U 表示相对于期望 SG 数允许的最大不可用量。统一计算见 §2.3：`Q=max(0,C-max(0,N-U)-V-I)`，健康删除另受 `B=max(0,R-max(0,N-U))` 限制。partition 只约束候选，不能将保护区故障从全量 Ready 账本中排除。
 
-```text
-maxScaleDown = len(liveServingGroups) - (replicas - maxUnavailable) - newServingGroupUnavailableCount
-```
-
-三个 SG、U=2/S=0 时，可以先替换两组，等待它们 Ready，再替换余下一组；表述不指定哪两个序号先删除。
+三个健康 SG、U=2/S=0 时，可以先替换最高的两组，等待它们 Ready，再替换余下一组；存在合法旧 NotReady 时按 §2.3 优先处理它们。
 
 参考配置（局部片段）：
 
@@ -162,7 +199,7 @@ spec:
 
 ## 4. Role 滚动配置
 
-路径：`spec.template.roles[]` 下直接的 U/S/P；各 Role 在每个 SG 内独立计算。SG 模式下允许但忽略。改变预算本身不创建模板 revision。
+路径：`spec.template.roles[]` 下直接的 U/S/P；各 Role 在每个 SG 内独立计算。SG 模式下允许但忽略。改变预算本身不创建模板 revision。预算公式与 SG 相同，使用 §2.3 的 Q/B/I 和默认顺序；协调只进一步限制候选，不扩大预算。
 
 ### 4.1 Role `maxUnavailable`
 
@@ -230,10 +267,16 @@ spec:
 roles 省略或 `[]` 解析为全部已定义 Role，结果必须至少两个不同的既有名称。maxSkew 必填。先满足各 Role 预算，再按协调进一步约束启动；参与 Role 不要求副本数相同。
 
 ```text
-allowedStarted(role) = ceil((slowestReadyProgress + maxSkew) × role.totalToUpdate)
+allowedStarted(role) = min(role.totalToUpdate,
+                           ceil((slowestReadyProgress + maxSkew) × role.totalToUpdate))
+remainingStart(role) = max(0, allowedStarted(role) - role.alreadyStarted)
 ```
 
-进度按各 Role 可更新实例数归一化，以最慢 Role 的**目标版本 Ready**进度为基准；已启动不等于 Ready。
+进度按各 Role 可更新稳定实例数归一化，以参与本轮的最慢 Role 的**目标版本 Ready**进度为基准；已启动不等于 Ready，零更新量不作分母。只有一个 Role 实际更新时不额外施加跨 Role 进度差限制。
+
+存在 coordination 时，Role 模式的稳定旧实例不可跳过，无额外开关；从高到低取满足 Q、B、remainingStart 和依赖保留规则的连续候选前缀。最高待更新旧实例被挡住即等待，不因低位 NotReady 绕行。已经是目标版及 protected 实例不是待更新旧候选。协调名单限定百分比/依赖参与者，不能用未入名单绕过该模式的默认顺序。
+
+maxSkew 是**百分比进度差**，不是同 index 配对或原子版本切换承诺。合法废弃旧 surge 按 §2.3 单独回收，不占稳定序号前缀、不返还稳定启动额度。典型场景见共用速查表。
 
 ### 5.1 `maxSkew`
 

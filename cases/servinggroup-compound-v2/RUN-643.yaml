@@ -1,7 +1,7 @@
 {
   "format": "rollout-runner/compound-v2",
   "id": "RUN-643",
-  "baseline": "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b",
+  "baseline": "cad19d0fce097e2a5f481938727e9f4e4c42175c",
   "scenario": {
     "designID": "SG-P03",
     "source": {

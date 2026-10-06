@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,14 +157,82 @@ func TestCompoundOldPodsAndReplacementPodGroupCountTwice(t *testing.T) {
 	}
 }
 
-func TestCompoundNotReadyOldCannotSkipHigherOld(t *testing.T) {
+func TestCompoundNotReadyOldSkipsHealthyHigherOld(t *testing.T) {
 	l, objects := compoundFixture(t, "RUN-623", 1)
 	c := compoundCase(t, "RUN-623")
 	if err := l.Transition(c.Scenario.Steps[2].Spec, "B", ScenarioExpectation{}, objects); err != nil {
 		t.Fatal(err)
 	}
 	deleteNormal(l, objects, "frontend", 1, 0)
+	if err := l.error(); err != nil {
+		t.Fatalf("legal old NotReady repair rejected: %v", err)
+	}
+}
+
+func TestCompoundHealthyOldCannotSkipLowerNotReady(t *testing.T) {
+	l, objects := compoundFixture(t, "RUN-623", 1)
+	c := compoundCase(t, "RUN-623")
+	if err := l.Transition(c.Scenario.Steps[0].Spec, "B", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	deleteNormal(l, objects, "frontend", 4, 0)
 	requireNormalViolation(t, l, "COMPOUND_ORDER_MISMATCH")
+}
+
+func TestCompoundProtectedFailurePreservesHealthyFloor(t *testing.T) {
+	l, objects := compoundFixture(t, "RUN-649", 0)
+	c := compoundCase(t, "RUN-649")
+	if err := l.Transition(c.Scenario.Steps[0].Spec, "B", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	deleteNormal(l, objects, "frontend", 2, 0)
+	requireNormalViolation(t, l, "COMPOUND_READY_BUDGET")
+}
+
+func TestOldCandidateOrderByModeAndSurgeIdentity(t *testing.T) {
+	for _, mode := range []string{"SG", "Role", "coordinated", "excluded-role"} {
+		t.Run(mode, func(t *testing.T) {
+			l, _ := compoundFixture(t, "RUN-623")
+			if mode != "SG" {
+				l.Model.Mode = "Role"
+				l.Model.Roles["frontend"] = RoleLayout{R: 3}
+			}
+			coordinated := mode == "coordinated" || mode == "excluded-role"
+			if coordinated {
+				mapValue(l.Model.Spec, "rolloutStrategy")["roleCoordination"] = map[string]interface{}{"roles": []interface{}{"a", "b"}, "maxSkew": "50%"}
+			}
+			low := NormalUnit{Role: "frontend", Ordinal: 0, Ready: false}
+			high := NormalUnit{Role: "frontend", Ordinal: 2, Ready: true}
+			if l.oldCandidatePrecedes(high, low) != coordinated || l.oldCandidatePrecedes(low, high) == coordinated {
+				t.Fatal("wrong health/ordinal priority")
+			}
+			high.Ready = false
+			if !l.oldCandidatePrecedes(high, low) || l.oldCandidatePrecedes(low, high) {
+				t.Fatal("same health class must descend")
+			}
+			if coordinated {
+				pod := normalTestPod("Role", "frontend", 3, "A", false, "entry")
+				var typed corev1.Pod
+				if err := convertPod(pod, &typed); err != nil {
+					t.Fatal(err)
+				}
+				typed.Annotations = map[string]string{"modelserving.volcano.sh/surge": "role"}
+				surge := NormalUnit{Role: "frontend", Ordinal: 3, Pods: []*corev1.Pod{&typed}}
+				if l.oldCandidatePrecedes(surge, low) {
+					t.Fatal("temporary surge blocked stable prefix")
+				}
+				delete(typed.Annotations, "modelserving.volcano.sh/surge")
+				if !l.oldCandidatePrecedes(surge, low) {
+					t.Fatal("unmarked high ordinal treated as surge")
+				}
+				typed.Annotations["modelserving.volcano.sh/surge"] = "role"
+				l.Model.Roles["frontend"] = RoleLayout{R: 4}
+				if !l.oldCandidatePrecedes(surge, low) {
+					t.Fatal("adopted surge did not become stable")
+				}
+			}
+		})
+	}
 }
 
 func TestCompoundSurgeCountsBothCAndV(t *testing.T) {
@@ -287,6 +356,48 @@ func TestCompoundQCannotBeSpentThreeTimesBeforeReplacementReady(t *testing.T) {
 		t.Fatalf("two Q credits should be legal: %v", err)
 	}
 	deleteNormal(l, objects, "frontend", 2, 0)
+	requireNormalViolation(t, l, "COMPOUND_Q_EXHAUSTED")
+}
+
+func TestRoleOldNotReadyUsesQWithoutBorrowingOtherRoleCapacity(t *testing.T) {
+	l, objects := normalFixture(t, "RUN-143")
+	for _, pod := range objects["pods"] {
+		if pod.GetLabels()[LabelRole] == "frontend" {
+			mapValue(pod.Object, "status")["conditions"] = []interface{}{map[string]interface{}{"type": "Ready", "status": "False"}}
+		}
+	}
+	next := historyVersionSpec(l.Model.Spec, "B")
+	if err := l.Transition(next, "B", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	deleteNormal(l, objects, "frontend", 0, 2)
+	if err := l.error(); err != nil {
+		t.Fatalf("first old-bad repair rejected: %v", err)
+	}
+	deleteNormal(l, objects, "frontend", 0, 1)
+	requireNormalViolation(t, l, "Q_EXHAUSTED")
+}
+
+func TestCompoundPartialCohortDeletionDoesNotSpendQAgain(t *testing.T) {
+	l, objects := compoundFixture(t, "RUN-652")
+	c := compoundCase(t, "RUN-652")
+	if err := l.Transition(c.Scenario.Steps[0].Spec, "B", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	deleteNormal(l, objects, "frontend", 2, 0)
+	if err := l.error(); err != nil {
+		t.Fatal(err)
+	}
+	for uid, pod := range objects["pods"] {
+		if ordinal(pod.GetLabels()[LabelGroup]) == 2 && pod.GetLabels()[LabelEntry] == "true" {
+			delete(objects["pods"], uid)
+		}
+	}
+	deleteNormal(l, objects, "frontend", 2, 0)
+	if err := l.error(); err != nil {
+		t.Fatalf("same remaining worker deletion charged again: %v", err)
+	}
+	deleteNormal(l, objects, "frontend", 1, 0)
 	requireNormalViolation(t, l, "COMPOUND_Q_EXHAUSTED")
 }
 

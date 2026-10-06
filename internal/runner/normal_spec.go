@@ -15,6 +15,10 @@ import (
 
 const ProductionCommit = "538b2825c06bc1e8c5392d18f18f84faee9fca95"
 
+// The 2.2 SG and Pod-deletion recovery suites target the merged production fix.
+// Historical catalogues retain their original source baseline.
+const RolloutContractCommit = "cad19d0fce097e2a5f481938727e9f4e4c42175c"
+
 type Scenario struct {
 	Baseline    *ScenarioStep          `json:"baseline,omitempty"`
 	Fixture     string                 `json:"fixture,omitempty"`
@@ -129,7 +133,7 @@ func (c Case) validateScenario() error {
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !blocking && !compound && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || (!compound && c.Baseline != ProductionCommit) || (compound && len(c.Baseline) != 40) {
+	if err != nil || (!normal && !recovery && !restart && !midRollout && !blocking && !compound && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || (!compound && c.Baseline != ProductionCommit && !(recovery && c.Baseline == RolloutContractCommit)) || (compound && len(c.Baseline) != 40) {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	if compound {

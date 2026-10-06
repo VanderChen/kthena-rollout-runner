@@ -1,14 +1,14 @@
 # ServingGroupRollingUpdate compound rollout expectations
 
-Version 2.1 · 2026-10-06 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
+Version 2.2 · 2026-10-07 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
 
-This is a product design contract, not a claim that production implements it or that Kind verification has passed. Its scope is ServingGroupRollingUpdate; nested Role replica changes are included, but RoleRollingUpdate is not.
+This is a product design contract, not a claim that production implements it or that Kind verification has passed. The main tables retain all 35 SG designs. Shared budgets and default selection also apply to complete Role instances within each SG. [Appendix B](#budget-lookup) compares SG/Role modes, coordination, failed versions, protected faults, rollover and in-flight actions. Unchanged Roles retain UIDs; this does not imply 35 executable Role cases or completed runner migration.
 
 The 35 design IDs and the state tables below match the Chinese edition. Tables show one permitted trajectory, not a required total ordering of asynchronous events. v1/v2/v3 are successive requested templates. Ready means the complete group is Ready. Deleting groups occupy physical capacity until they disappear. N/U/S/P denote desired groups, maxUnavailable, maxSurge and partition. Counts list active and Ready groups. A dash means no group exists at that ordinal.
 
-New replacements select outdated eligible groups from highest to lowest ordinal. Scale-out fills the lowest missing ordinal. Scaling capacity is arranged before destructive rollout, but newly added groups need not all become Ready: each healthy deletion must independently preserve R >= max(0,N-U). Scale-out deficits do not grant deletion credit. U floors and S ceils percentages of the latest N.
+SG and independent Role rollout default to eligible old NotReady first, descending within each health class, then old Ready, with no new switch. Role rollout with coordination keeps descending stable old candidates and stops at a blocked highest one; maxSkew remains proportional progress, not index pairing. Scale-out fills the lowest missing ordinal. Scaling capacity is arranged before destructive rollout, but newly added groups need not all become Ready: each healthy deletion must independently preserve R >= max(0,N-U). Scale-out deficits do not grant deletion credit. U floors and S ceils percentages of the latest N.
 
-At a stable checkpoint, outdated unhealthy cleanup is limited by Q=max(0,C-(N-U)-V), where C includes actually created surge and V includes all non-Ready groups of the current target, including surge. Only when C=N may this be shortened to max(0,U-V). A new non-Ready surge increments both C and V; configured but uncreated surge grants no credit. Do not claim the same allowance again before replacements become Ready. A non-Ready group already on the current target is not repeatedly rebuilt.
+Use M=max(0,N-U), Q=max(0,C-M-V-I) and a separate healthy-deletion bound B=max(0,R-M). C includes actual surge; V includes latest-target NotReady surge; R includes protected/old/usable surge but excludes committed deletions. I is outstanding allowance not yet reflected in C/V, counted once and zero at stable checkpoints. See [API section 2.3](modelserving-api-reference.en.md#23-shared-budgets-and-default-candidate-selection). Q does not authorize arbitrary healthy deletion. A new non-Ready surge increments both C and V; configured but uncreated surge grants no credit. Do not claim the same allowance again before replacements become Ready. A non-Ready group already on the current target is not repeatedly rebuilt.
 
 Only explicit scale-down may leave new stable ordinal holes. Preserve healthy retained groups that need no template update; holes alone do not trigger rolling replacement. Partition uses absolute ordinals and determines the template of a replacement's new slot. A previously created surge becomes retained only if its ordinal enters the new formal range; matching a total count is insufficient. Appendix A states the complete rules.
 
@@ -63,18 +63,24 @@ Retained {0:v1,1:v1,3:v2} at N=3/U=0/S=1 has temporary 4:v2. Increasing N to 4 m
 | 4 | 4 | v1 Ready | v1 Deleting→v2 Ready | v2 Ready | v2 Ready | v2 Ready (temporary surge) | active 4–5; Ready 4→5 |
 | 5 | 4 | v2 Ready | v2 Ready | v2 Ready | v2 Ready | — | active 4; Ready 4 |
 
-### SG-S05: A low unhealthy group can block strict descending order
+### SG-S05: Repair a low unhealthy instance first by default
 
-This state comes from scaling, not descending rollout: scale v1 from 3 to 2 by deleting low-cost 1; expand to 3 with bad v2 in hole 1, retaining 0/2:v1. Submit v3 with U=1/S=0. Ready=2 and Q=1, but the highest old group 2 is healthy and deleting it would leave Ready=1. Do not skip 2 to repair unhealthy 1. Wait for self-recovery, legal Ready surge, changed budget or external intervention.
+Scale from 3 to 2, deleting low-cost 1 and retaining 0/2:v1. Expand to 3 with bad v2 in hole 1, then submit v3 at N=3/U=1/S=0/P=0. SG and independent Role rollout default to eligible old NotReady first: skip healthy old 2 to repair bad old 1, without an extra switch.
 
-| Step | N / target | sg-0 | sg-1 | sg-2 | Groups (active; Ready) |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 3/v1 | v1 Ready | v1 Ready | v1 Ready | active 3; Ready 3 |
-| 2 | 2/v1 | v1 Ready | v1 Deleting | v1 Ready | active 3→2; Ready 2–3 |
-| 3 | 2/v1 | v1 Ready | — | v1 Ready | active 2; Ready 2 |
-| 4 | 3/v2 | v1 Ready | v2 NotReady | v1 Ready | active 3; Ready 2 |
-| 5 | 3/v3 | v1 Ready | v2 NotReady | v1 Ready | active 3; Ready 2 |
-| 6 | 3/v3 | v1 Ready | v2 NotReady | v1 Ready | active 3; Ready 2 |
+| Step | N / target | sg-0 | sg-1 | sg-2 | Groups (active; Ready) | Reason |
+| --- | --- | --- | --- | --- | --- | --- |
+| Initial | 3/v1 | v1 Ready | v1 Ready | v1 Ready | active 3; Ready 3 | Healthy baseline |
+| Scale down | 2/v1 | v1 Ready | v1 Deleting | v1 Ready | active 3→2; Ready 2–3 | Cost selects 1 |
+| Hole | 2/v1 | v1 Ready | — | v1 Ready | active 2; Ready 2 | High 2 remains formal |
+| Expand and submit v2 | 3/v2 | v1 Ready | v2 NotReady | v1 Ready | active 3; Ready 2 | New formal slot fills hole |
+| Submit v3 | 3/v3 | v1 Ready | v2 NotReady | v1 Ready | active 3; Ready 2 | M=2, Q=1, B=0; cannot delete healthy 2 |
+| Repair 1 first | 3/v3 | v1 Ready | v2 Deleting→v3 NotReady | v1 Ready | active 2–3; Ready 2 | Delete only bad old 1, replace in place |
+| Repair ready | 3/v3 | v1 Ready | v3 Ready | v1 Ready | active 3; Ready 3 | Healthy credit returns |
+| Roll high 2 | 3/v3 | v1 Ready | v3 Ready | v1 Deleting→v3 Ready | active 2–3; Ready 2→3 | Descending healthy candidates |
+| Roll 0 | 3/v3 | v1 Deleting→v3 Ready | v3 Ready | v3 Ready | active 2–3; Ready 2→3 | Last old group |
+| Final | 3/v3 | v3 Ready | v3 Ready | v3 Ready | active 3; Ready 3 | No extra healthy loss |
+
+In the equivalent **Role + coordination comparison**, highest old 2 is healthy with B=0, so it must wait rather than skip to 1. Q=1 cannot override order, maxSkew or dependencies. If replacement v3-1 also stays NotReady, V=1/Q=0: wait instead of churning that target. This supersedes the old SG-S05 strict-order blocking expectation; Appendix B records executable migration coverage.
 
 ### SG-S06: Repair two bad v2 groups with v3
 
@@ -289,7 +295,7 @@ At desired N=5, scale-out has already created Ready 3:v1 but not 4. v2 arrives w
 
 ### SG-C08: v3 supersedes an incomplete v2 rollout at fixed N
 
-N=3/U=1/S=0/P=0. Group 2:v2 is Ready and deletion of 1:v1 is accepted, but its replacement create is not. Submit v3: finish that issued action by creating 1:v3, wait for Ready, then newly select highest old 2:v2 and finally 0:v1. If creation of 1:v2 was already accepted, do not edit it into v3. A non-Ready 1:v2 can block behind healthy 2:v2 under strict descending order despite Q=1; if it becomes Ready, roll 2 before 1.
+N=3/U=1/S=0/P=0. Group 2:v2 is Ready and deletion of 1:v1 is accepted, but its replacement create is not. Submit v3: finish that issued action by creating 1:v3, wait for Ready, then newly select highest old 2:v2 and finally 0:v1. If creation of 1:v2 was already accepted, do not edit it into v3. If 1:v2 is NotReady and now outdated, default SG/independent Role selection repairs it first: N=3/U=1/C=3/R=2/V=0/I=0/Q=1/B=0. Replace only bad 1 in place with v3, preserving Ready=2; once Ready, roll healthy 2, then 0. If 1:v2 is Ready, roll healthy 2 before healthy 1. The coordinated Role comparison still waits behind healthy high 2 at B=0; percentage maxSkew is unchanged.
 
 | Step | Target | sg-0 | sg-1 | sg-2 | Groups (active; Ready) |
 | --- | --- | --- | --- | --- | --- |
@@ -506,25 +512,25 @@ N=3/P=1: protected 0 uses historical worker W1; 1/2 use target W2. Raising Role 
 
 Record the current N/P/U/S and each group's ordinal, version, UID, Ready and deletion state. Distinguish retained identities from temporary surge, and keep accepted actions and historical templates. An interleaving test must prove that its preceding operation was still in flight when the next request arrived.
 
-Final count alone is insufficient. Check that non-scaling work creates no new stable holes, healthy target retained identities are not deleted for compaction, creates obey the surge ceiling, and healthy rollout deletion preserves the availability floor. When a pre-existing fault already violates the floor, outdated unhealthy cleanup may proceed only without reducing Ready, within Q, and without skipping a higher old candidate. Transient excess after scale-down can only decrease.
+Final count alone is insufficient. Check that non-scaling work creates no new stable holes, healthy target retained identities are not deleted for compaction, creates obey the surge ceiling, and healthy rollout deletion preserves the availability floor. When a pre-existing fault already violates the floor, outdated unhealthy cleanup may proceed only without reducing Ready, within Q, descending within the selected health class; only coordinated Role comparisons prohibit skipping a healthy higher old candidate. Transient excess after scale-down can only decrease.
 
-Three counterexamples are mandatory: S01's {0,3} to {0,1,3} leaves hole 2; S05's low unhealthy group remains blocked behind a healthy higher old group; C14 retains outdated surge while it is still needed for service. S06/S07 permit bounded recovery of outdated unhealthy highest groups even below the Ready floor. C16 requires accounting for both C and V when actual non-Ready surge exists. No state-table row is itself a Kind result.
+Three counterexamples are mandatory: S01's {0,3} to {0,1,3} leaves hole 2; S05 repairs the bad lower old instance first without spending Q on a healthy higher one, while its coordinated Role comparison waits; C14 retains outdated surge while it is still needed for service. S06/S07 permit bounded recovery of outdated unhealthy highest groups even below the Ready floor. C16 requires accounting for both C and V when actual non-Ready surge exists. No state-table row is itself a Kind result.
 
 <a id="behavior-rules"></a>
 
 ## Appendix A. SG behavioral rules
 
-Original design dated 2026-09-20, with separately recorded 2026-10-06 contract amendments. These product requirements do not derive their authority from the currently observed controller implementation. The 35 scenarios instantiate these rules.
+Original design dated 2026-09-20, with recorded amendments through 2026-10-07. Shared budget, identity/history and selection principles apply to complete Role instances; API section 5 and Appendix B add coordination limits. SG-R01 nested membership expansion is not mechanically a Role template rollout. These product requirements do not derive their authority from the currently observed controller implementation. The 35 scenarios instantiate these rules.
 
 ### A.1. Decisions and community references
 
-Replacing a whole inference group can reload models, occupy expensive GPUs and incur lengthy warm-up. Priority is: preserve existing availability and capacity ceilings, then avoid rebuilding healthy groups that need no update, then converge scale and opportunistically repay existing identity holes. Every newly selected template replacement still follows descending old-group ordinals; a lower priority never excuses skipping that order.
+Replacing a whole inference group can reload models, occupy expensive GPUs and incur lengthy warm-up. Priority is: preserve existing availability and capacity ceilings, then avoid rebuilding healthy groups that need no update, then converge scale and opportunistically repay existing identity holes. SG/independent Role selection prioritizes eligible old NotReady, then old Ready, descending within each class. Coordinated Role stable candidates cannot skip. Selection cannot override Q, healthy bound B, partition, dependencies or physical capacity.
 
 | Topic | Community reference | ModelServing decision |
 | --- | --- | --- |
 | Identity and partition | StatefulSet stable ordinals, historical template below P, descending replacement | Absolute threshold, but health/cost-aware scale-down may retain sparse identities |
 | Budgets | Deployment floors U and ceils S; LWS budgets complete groups | Recompute against latest N; only complete groups count Ready; scale-out deficits grant no deletion credit |
-| Latest intent | Deployment rollover; StatefulSet bad-template recovery may require intervention | A to B to C may skip full B completion; an outdated unhealthy highest candidate can be replaced by C |
+| Latest intent | Deployment rollover; StatefulSet bad-template recovery may require intervention | A to B to C may skip full B completion; eligible outdated NotReady B can take priority for replacement by C, descending within its class; coordinated Role stable order remains |
 | Inference cost | LWS group rollout; RBG Role/coordination distinction | Preserve healthy target retained identities and keep SG and Role replica axes separate |
 
 The Deployment calculation `maxScaledDown = allPodsCount - minAvailable - newReplicaSetPodsUnavailable` illustrates the accounting of actual capacity and unavailable new replicas. Cleanup does not borrow configured but uncreated surge. With N=10/U=2/S=3 and 13 actual replicas, five unavailable new replicas give 13-8-5=0 cleanup allowance; returning to an old good target with one unavailable target replica gives 4, while a brand-new empty target gives 5. Bad replicas that become old can then be cleaned without further availability loss. This does not grant extra maxUnavailable.
@@ -532,10 +538,12 @@ The Deployment calculation `maxScaledDown = allPodsCount - minAvailable - newRep
 For SG at a stable checkpoint with no in-flight creates/deletes:
 
 ```text
-Q = max(0, C - (N-U) - V) = max(0, U + (C-N) - V)
+M = max(0, N-U)
+Q = max(0, C-M-V-I)
+B = max(0, R-M)
 ```
 
-C counts actual groups including created surge; V counts non-Ready groups of the latest target including surge. C-N is actual excess, not configured S. Only at C=N is Q=max(0,U-V). Q is not an independent budget: candidate order, partition, physical capacity and outstanding reservations still constrain it. Deleting groups cannot repeatedly grant cleanup credit. For healthy deletion, separately require R-1 >= max(0,N-U). Creating a non-Ready surge increments C and V together and leaves Q unchanged.
+C includes actual surge; V includes latest-target NotReady surge. I is committed allowance not yet reflected in C/V, counted once; R includes protected/old Ready capacity and excludes committed deletions. At I=0, Q=max(0,C-M-V); only with U<=N and C=N does this become max(0,U-V). Use API section 2.3 definitions. Default selection takes dBad=min(|Ebad|,Q), then dHealthy=min(|Ehealthy|,Q-dBad,B), subject to partition, identity, dependencies, reservations and physical capacity. Recheck actual R before healthy deletion. A new NotReady surge increments C and V together, leaving Q unchanged.
 
 References: [Deployment rolling.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/deployment/rolling.go#L803-L918), [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/), [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [LWS rollout](https://lws.sigs.k8s.io/docs/concepts/leaderworkerset/rollout-strategy/), [LWS API](https://lws.sigs.k8s.io/docs/reference/leaderworkerset.v1/), [RBG API](https://github.com/sgl-project/rbg/blob/main/doc/reference/api.md).
 
@@ -567,15 +575,15 @@ Thus {0,3} at N=2 expanded to N=3 yields {0,1,3}, still missing 2. A healthy 3 n
 
 ### A.4. Operation ordering and version selection
 
-Recompute N/P/U/S/target from latest spec. Previously planned future actions are not commitments; accepted API creates/deletes remain facts. Recreating an already deleted slot completes an issued action and is not newly skipping a higher candidate. Subsequent new selection resumes from the highest old eligible ordinal.
+Recompute N/P/U/S/target from latest spec. Previously planned future actions are not commitments; accepted API creates/deletes remain facts. Recreating an already deleted slot completes an issued action and is not newly skipping a higher candidate. Subsequent SG/independent Role selection prioritizes old NotReady, descending within each health class; coordinated Role stable selection remains descending without skipping.
 
 1. Recognize deleting/creating groups and surge, reclassify using new N/P. A deleting group retains its name and physical reservation until fully gone.
 2. On shrink, select victims and wait for planned scale deletions. On expansion, arrange new formal slots in lowest holes; creates already accepted keep their template, unissued creates use the latest applicable version. Distinct formal slots may be created together. Arrange formal capacity before destructive rollout, but no blanket wait for all new groups Ready is imposed: each healthy deletion independently checks real R-1>=max(0,N-U). Increased U after expansion does not make its missing capacity free credit. Do not delete old groups to make room for formal slots that have not yet been arranged.
-3. Select the highest eligible outdated retained group. Never skip it for a lower unhealthy group. If it is already unhealthy, cleanup may proceed without reducing R, even below the floor, while Q remains. A batch consists of consecutive highest old candidates and cannot exceed remaining Q. Wait for deletion before reusing names/capacity, and do not spend the same credit repeatedly while replacements are non-Ready. If the new target is also bad, wait for a changed target or report blocking rather than churn it.
-4. For a healthy candidate, obtain legal surge if needed and preserve the floor after deletion. Otherwise wait without jumping lower. U>1 allows a consecutive highest-candidate batch; wait for that batch Ready before the next one. Protected missing/faulted slots use history and cannot bypass P.
-5. Remove temporary surge last, after its service credit is no longer needed. Preserve its UID when N absorbs it. Old-target surge may be reclaimed after a target change only when budget permits.
+3. SG/independent Role selection first takes eligible old NotReady instances, descending within that class, then healthy old instances. A low bad old instance may precede a healthy higher one, but cleanup stays within remaining Q and partition/identity constraints. Wait for deletion before reusing names or physical capacity. Accepted actions reserve credit; do not reclaim it repeatedly while replacements are unready. A bad current target waits for correction or explicit recovery rather than same-version churn. Coordinated Role comparisons instead take a descending stable old prefix, also constrained by remainingStart and dependencies; stop at a blocker.
+4. Healthy candidates remain descending. Obtain legal surge if needed, preserve R>=max(0,N-U) after each deletion and stay within B. Otherwise wait for healthy deletion credit. U>1 permits a healthy-candidate batch, with the existing SG rule waiting for that batch Ready before the next one; Appendix B records the discrepancy with ordinary per-Ready executors without changing that separate rule here. Protected missing/faulted slots use history and cannot bypass P.
+5. Retain healthy temporary surge while it supports the N-U floor; remove it after replacement capacity is Ready. Preserve its UID when N absorbs it. Superseded old NotReady surge may be legally reclaimed first within Q, without transferring its cleanup credit to healthy stable instances. Check actual temporary identity, dependencies and in-flight actions; coordinated Role cleanup neither skips a stable ordinal nor refunds stable starts.
 
-The N=5/U=2 examples show why both rejecting all recovery below the floor and replacing all bad groups at once are wrong. With bad target B at 4/3, Q=0; a new target C makes Q=2 and permits replacing those two first. All-unhealthy A at Ready=0 similarly permits batches 4/3,2/1,0 as each new batch becomes Ready. Conversely S05's healthy high A and unhealthy lower B can remain blocked at the floor under target C because selection order is strict. These are deliberate tradeoffs, not automatic recovery guarantees for every state.
+The N=5/U=2 examples show why both rejecting all recovery below the floor and replacing all bad groups at once are wrong. With bad target B at 4/3, Q=0; a new target C makes Q=2 and permits replacing those two first. All-unhealthy A at Ready=0 similarly permits batches 4/3,2/1,0 as each new batch becomes Ready. In S05, high 2:v1 is Ready, low 1:v2 is NotReady and the target is v3: with Q=1/B=0, default selection repairs 1 in place without Ready loss, then rolls healthy 2 after capacity returns. The equivalent coordinated Role state still waits behind its highest old candidate. Exhausted Q, bad targets, protected faults, dependencies and scheduling capacity can still block progress; automatic recovery is not guaranteed for every state.
 
 At creation/recreation time, ordinal<P uses the fixed, traceable historical template for this canary, and ordinal>=P uses latest target. Increasing P protects an existing B without rolling it back; if it later disappears, historical A may be recreated in its protected slot. The baseline is the most recently fully completed template before this canary; intermediate A→B→C submissions do not promote B. Only full adoption after releasing protection establishes the target as a future baseline. If history cannot be established, wait safely rather than guess the newest template.
 
@@ -586,6 +594,78 @@ Role replica changes affect internal membership, not SG template revision. Prote
 - Scale is complete when planned shrink deletions are gone, |K|=N, and newly retained groups are fully Ready on their applicable versions. Stable identity debt may remain if it cannot be repaid without needless disruption.
 - Rollout is complete when all existing eligible retained groups are Ready on the latest target, issued replacements are complete, temporary surge is removed and |L|=N. H need not be empty. Even at P=N, a sparse retained high ordinal can still be eligible. A canary pause exists only after no eligible retained group remains; never rebuild healthy groups merely to manufacture it.
 - Track holes and out-of-range retained identities separately. They are not inherently incomplete versions and do not authorize deletion on an ordinary reconcile. Fault-created missing capacity still requires recovery and must not be confused with stable scale-down debt.
-- Bad targets, missing history, exhausted Q, insufficient capacity/budget or strict-order blocking stop the relevant new actions and report the cause. Do not silently relax U/S, reverse accepted deletion or add rebuilds for superficial continuity.
+- Bad targets, missing history, exhausted Q, insufficient capacity/budget or coordination blockers stop the relevant new actions and report the cause. Do not silently relax U/S, reverse accepted deletion or add rebuilds for superficial continuity.
 
 A controller must preserve enough state across restart to distinguish retained groups, temporary surge and scale-down identity debt; count/ordinal alone is insufficient. Save/recover live historical templates and account for real Ready/Deleting/latest N/actual C/target V with in-flight reservations. This needs finite controller state and selection logic, not impossible Pod renaming. The contract does not claim current production compliance or substitute static reasoning for Kind verification.
+
+<a id="budget-lookup"></a>
+
+## Appendix B. Shared SG / Role budget and behavior lookup
+
+Use API section 2.3: `M=max(0,N-U)`, `Q=max(0,C-M-V-I)`, `B=max(0,R-M)`. One unit is a complete SG, or a complete instance of one Role within one SG. Default means SG or Role without coordination; coordinated means Role rollout with coordination. Unless stated otherwise, history is known, no conflicting action is in flight, and coordination has remaining starts and satisfied dependencies. Versions v1/v2/v3 are unrelated to budget B; H in Appendix A remains the hole set.
+
+### B.1 Numeric and candidate-selection comparison
+
+`N/U/S/P` is the latest effective configuration; `C/R/V/I` is the actual ledger before the action. RU-Bxx are lookup IDs, not new executable case IDs or passing-test counts.
+
+| Lookup ID / state | N/U/S/P | C/R/V/I | Q/B | Default: SG / independent Role | Role + coordination |
+| --- | --- | --- | --- | --- | --- |
+| RU-B01 All old healthy; submit v2 | 3/1/0/0 | 3/3/0/0 | 1/1 | Replace highest old 2 first; Ready stays at least 2 | Same, also bounded by remainingStart/dependencies |
+| RU-B02 Low old 1 bad, high old 2 healthy; target v3 | 3/1/0/0 | 3/2/0/0 | 1/0 | Repair 1 in place, preserving Ready=2; roll 2 after readiness returns | Highest old 2 is healthy with B=0; wait without skipping |
+| RU-B03 All old v1 bad; submit v2 | 3/1/0/0 | 3/0/0/0 | 1/0 | Repair only highest old 2 first | Repair highest old 2 if progress/dependencies permit; R<M alone does not reject all recovery |
+| RU-B04 RU-B03 has one unready v2 replacement | 3/1/0/0 | 3/0/1/0 | 0/0 | Wait; no more old cleanup or repeated same-target v2 replacement | Same |
+| RU-B05 Two old v2 bad; submit v3 | 5/2/0/0 | 5/3/0/0 | 2/0 | Repair at most two old bad instances, descending within class; retain healthy old ones | Only a legal descending prefix; do not bypass a healthy blocker |
+| RU-B06 025: only protected 0 is bad | 3/1/0/1 | 3/2/0/0 | 1/0 | No eligible old bad candidate and no healthy deletion; Ready stays 2 | Same; protected failure remains in the R deficit |
+| RU-B07 Old healthy; latest-target surge unready | 3/0/1/0 | 4/3/1/0 | 0/0 | Wait for surge Ready; C/V rise together without healthy credit | Same |
+| RU-B08 049: healthy v1 plus old bad v2 surge; target v3 | 1/0/1/0 | 2/1/0/0 | 1/0 | Reclaim only legal old bad surge; retain healthy v1 | Same independent surge cleanup; no stable ordinal is skipped |
+| RU-B09 RU-B08 replacement v3 surge is Ready | 1/0/1/0 | 2/2/0/0 | 1/1 | May start replacing stable old v1 | Start only when stable order, remainingStart and dependencies allow |
+| RU-B10 Healthy old surge supports floor; new stable v3 unready | 3/0/1/0 | 4/3/1/0 | 0/0 | Retain healthy old surge despite superseded version | Same, also retain necessary old dependencies |
+| RU-B11 Issued old deletion still occupies physical slot, not yet V | 3/1/0/0 | 3/2/0/1 | 0/0 | I reserves the action; do not reclaim U | Same; already-started work also consumes coordination allowance |
+| RU-B12 T=4, skew=25%, slowest Ready=0, already started 1 | 4/2/0/0 | 4/3/1/0 | 1/1 | Without coordination, local budget allows one more healthy old replacement | allowedStarted=1, remainingStart=0; wait for stable replacement |
+| RU-B13 Target dependency not ready, or last required old dependency retained | 2/1/0/0 | 2/2/0/0 | 1/1 | Without coordination, use default selection | Numeric credit cannot override the corresponding dependency constraint |
+| RU-B14 All old bad, U=0, surge Pending for lack of resources | 3/0/1/0 | 4/0/1/0 | 0/0 | Still blocked; default skipping does not guarantee recovery from every fault | Same; no budget/dependency bypass |
+| RU-B15 Old 2 bad and latest-target surge unready | 3/1/1/0 | 4/2/1/0 | 1/0 | Repair one old bad 2; its unready replacement raises V=2/Q=0 | Same if highest candidate and coordination constraints allow |
+| RU-B16 Zero desired and zero actual update work | 0/1/0/0 | 0/0/0/0 | 0/0 | No template replacement or permanent UpdateInProgress | Zero work is neither a progress denominator nor a permanent blocker |
+
+Explicit scale-down follows latest N before template replacement; these formulas do not grant arbitrary scale deletion. Recompute percentages against latest N: floor U, ceil S/P; classify old versions against the latest target. When pre-existing faults cause R<M, the rule prevents further rollout-induced Ready loss rather than promising immediate restoration to M.
+
+### B.2 All old versions unavailable: repair one at a time with U=1
+
+N=3/U=1/S=0/P=0, all v1 bad, target v2 healthy. The same trajectory applies to SG and independent Role; coordinated Role additionally needs legal descending starts, dependencies and proportional allowance.
+
+| Checkpoint | Instance 0 | Instance 1 | Instance 2 | R/V/I | Q/B | Next action |
+| --- | --- | --- | --- | --- | --- | --- |
+| Submit v2 | v1 NotReady | v1 NotReady | v1 NotReady | 0/0/0 | 1/0 | Repair 2 |
+| Deletion of 2 committed, object still present | v1 NotReady | v1 NotReady | v1 Deleting | 0/0/1 | 0/0 | Wait for deletion/replacement; no reused credit |
+| Replacement 2 exists | v1 NotReady | v1 NotReady | v2 NotReady | 0/1/0 | 0/0 | Wait for v2 Ready |
+| 2 Ready | v1 NotReady | v1 NotReady | v2 Ready | 1/0/0 | 1/0 | Repair 1 |
+| Replacement 1 exists | v1 NotReady | v2 NotReady | v2 Ready | 1/1/0 | 0/0 | Wait |
+| 1 Ready | v1 NotReady | v2 Ready | v2 Ready | 2/0/0 | 1/0 | Repair 0 |
+| Replacement 0 exists | v2 NotReady | v2 Ready | v2 Ready | 2/1/0 | 0/0 | Wait |
+| All Ready | v2 Ready | v2 Ready | v2 Ready | 3/0/0 | 1/1 | No old candidates; stop deleting |
+
+Rows have C=3. Between disappearance and replacement, C=2 and the corresponding I is no longer deducted; Q remains 0. Positive Q still requires an eligible old candidate; do not delete target instances merely to spend allowance.
+
+### B.3 Superseded surge during rollover: 049 comparison
+
+Each Role has N=1/U=0/S=1, stable 0:v1 Ready and temporary 1:v2 NotReady; target changes to v3. The two-Role coordinated example must preserve at least 2 Ready Pods throughout (workerReplicas=0); the analogous N=3 per-Role example must preserve at least 6.
+
+| Stage | Stable 0 | Temporary surge 1 | Per-Role C/R/V/I | Q/B | Expected action |
+| --- | --- | --- | --- | --- | --- |
+| Submit v3 | v1 Ready | v2 NotReady | 2/1/0/0 | 1/0 | Reclaim only old bad surge, retain healthy 0 |
+| Old surge deletion issued | v1 Ready | v2 Deleting | 2/1/0/1 | 0/0 | Reserve I; do not also delete 0 |
+| Create v3 surge | v1 Ready | v3 NotReady | 2/1/1/0 | 0/0 | Wait for new Ready capacity |
+| Surge Ready | v1 Ready | v3 Ready | 2/2/0/0 | 1/1 | Start stable replacement only when coordination/dependencies allow |
+| Stable replacement exists | v3 NotReady | v3 Ready | 2/1/1/0 | 0/0 | Retain still-serving surge |
+| Stable Ready | v3 Ready | v3 Ready | 2/2/0/0 | 1/1 | Reclaim healthy temporary capacity no longer needed |
+| Final | v3 Ready | — | 1/1/0/0 | 0/0 | One complete Ready instance per Role |
+
+After old surge disappears, the brief checkpoint is C=1/I=0/Q=0; subsequent creation still obeys N+S and dependencies. Ordinal>=N alone does not establish surge identity: retained high instances and absorbed former surge follow their real identity. If healthy old surge supports R=M, preserve it as in RU-B10 instead of mechanically applying bad-surge cleanup.
+
+### B.4 Coverage and remaining execution distinctions
+
+- The **35** existing SG design IDs remain SG-S01–S07, SG-C01–C16, SG-P01–P11 and SG-R01. This appendix adds **16 lookup scenarios**, not executable cases or Kind passes.
+- `servinggroup-compound-v2/RUN-622` (SG-S05) and `RUN-632` (the old lower NotReady branch of SG-C08) now implement 2.2 in cases, generator and order verdicts. RUN-624 releases only the new version, leaving the old version faulty. Actual results and failures are recorded in [issue 051](../../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md); historical results do not establish conformance of the new candidate.
+- Role needs equivalent fault/in-flight cases plus coordinated comparisons; the 35 SG cases are not Role coverage. Existing 025/049 reproductions are defect evidence, not passing results for the new contract.
+- SG A.4 retains a whole-batch Ready barrier; ordinary `CORE_EXPECTATIONS.md` item 6 progresses per Ready credit. This revision changes budget/selection, not that separate timing rule. Positive Q alone does not settle partial-batch timing assertions; those require separate alignment.
+- Admission, recovery policy, worker completeness, live Ready updates, reservation deduplication and restart identity recovery still require their own verification. Skipping does not relax them.

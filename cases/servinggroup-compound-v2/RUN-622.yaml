@@ -1,7 +1,7 @@
 {
   "format": "rollout-runner/compound-v2",
   "id": "RUN-622",
-  "baseline": "bd0d650f6ab3fd3d2b473d765d26a1a9d1be4a2b",
+  "baseline": "cad19d0fce097e2a5f481938727e9f4e4c42175c",
   "scenario": {
     "designID": "SG-S05",
     "source": {
@@ -378,7 +378,7 @@
         }
       },
       {
-        "name": "strict-high-old-blocks-low-repair",
+        "name": "repair-low-old-before-healthy-high",
         "action": "update",
         "until": "compound",
         "release": "none",
@@ -397,9 +397,8 @@
               },
               {
                 "ordinal": 1,
-                "version": "B",
+                "version": "C",
                 "ready": false,
-                "uidSameAs": "bad-low-new-capacity",
                 "runningNotReady": true
               },
               {
@@ -489,6 +488,38 @@
               "maxSurge": 0,
               "maxUnavailable": 1
             }
+          }
+        }
+      },
+      {
+        "name": "low-repair-releases-capacity-and-finishes",
+        "action": "observe",
+        "until": "compound",
+        "release": "all",
+        "stableSeconds": 0,
+        "holdSeconds": 0,
+        "expect": {
+          "compound": {
+            "active": 3,
+            "ready": 3,
+            "groups": [
+              {
+                "ordinal": 0,
+                "version": "C",
+                "ready": true
+              },
+              {
+                "ordinal": 1,
+                "version": "C",
+                "ready": true
+              },
+              {
+                "ordinal": 2,
+                "version": "C",
+                "ready": true
+              }
+            ],
+            "blocked": false
           }
         }
       }

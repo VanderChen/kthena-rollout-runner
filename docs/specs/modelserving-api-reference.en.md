@@ -1,12 +1,12 @@
 # ModelServing API Reference
 
-Version 2.1 · 2026-10-06 · [简体中文](modelserving-api-reference.zh-CN.md)
+Version 2.2 · 2026-10-07 · [简体中文](modelserving-api-reference.zh-CN.md)
 
 This reference lists field paths, semantics, defaults, accepted values, percentage rounding, validation constraints, and minimal reference YAML.
 
 **Contract status.** Mutability and validation statements describe the revised API contract, including the agreed immutable fields. **Mutable** means an in-place update is allowed if the resulting object passes all validation. **Immutable** means the value and, for an optional object, its presence cannot change after creation. Immutability still applies after rollout completion or scaling to zero. Some rules strengthen the inspected production baseline, `production/release-1.0@a011cd5a`; section 11 lists those differences so target requirements are not mistaken for implemented checks.
 
-The YAML snippets are partial configurations that illustrate individual fields. Supply the remaining required fields when creating a ModelServing. Behavior tables illustrate allowed sequences; they do not guarantee a particular ordinal order.
+The YAML snippets are partial configurations that illustrate individual fields. Supply the remaining required fields when creating a ModelServing. Behavior tables follow section 2.3 candidate selection; asynchronous events need not occur in a total row-by-row order.
 
 ## 1. Core concepts
 
@@ -136,13 +136,54 @@ spec:
 | 1 | Deleting / recreating | v1 Ready (same Pod UID D1) | Partially available | Only the changed Role is replaced |
 | Final | v2 Ready (new Pod UID P2) | v1 Ready (same Pod UID D1) | Ready | The unchanged decode Pods are preserved |
 
+### 2.3 Shared budgets and default candidate selection
+
+This section applies to both SG and Role rollout, with **no new ordering switch**. Resolve N/U/S/P from the latest spec at the active level. One unit is a complete SG, or a complete instance of one Role within one SG. A Role contributes one Ready unit only when its entry and every required worker are Ready. Budgets are not shared across Roles or SGs; unchanged Roles retain their UIDs.
+
+| Rollout mode | Default old-instance selection | May skip a healthy higher old instance? |
+| --- | --- | --- |
+| SG | Eligible old NotReady first, descending ordinal within each health class, then old Ready | Yes, automatically |
+| Role without roleCoordination | Same as SG | Yes, automatically |
+| Role with roleCoordination | Descending stable old ordinals; stop when the highest candidate is blocked | No; no switch. The participant list separately determines maxSkew/dependency scope |
+
+**Calculate the complete ledger before filtering candidates.** Protected, nonparticipating or temporarily undeletable instances remain in the availability accounting for their own budget scope.
+
+```text
+M = minAvailable         = max(0, N-U)
+Q = maxScaleDown         = max(0, C-M-V-I)
+B = maxHealthyScaleDown  = max(0, R-M)
+```
+
+| Symbol | Definition |
+| --- | --- |
+| C | Actual active instances, including created surge. Deleting instances occupy physical capacity until gone; uncreated S grants no credit |
+| R | All complete Ready capacity, including protected, old-version and usable surge instances; exclude capacity already committed to deletion |
+| V | Unavailable instances of the latest target, including target surge; do not count every old NotReady instance as V |
+| I | Committed allowance not yet reflected by a decrease in C or increase in V. Account for each reservation once; zero at a stable checkpoint |
+| B | Healthy-deletion limit; distinct from the hole set H in the SG appendix |
+
+For example, an old instance with an issued deletion that remains in C but not V consumes I. Once it disappears, C decreases and the same I is no longer deducted; an unready latest-target replacement consumes V instead. If P requires a historical-template replacement, its absence from V must not prematurely release the still-unrestored reservation. Reclassify when the target changes rather than permanently locking superseded bad versions in an old in-flight count. All actions share one projected ledger; creates must also respect N+S including outstanding creation reservations.
+
+For default skipping, let Ebad/Ehealthy be old NotReady/old Ready candidates allowed by partition, version, identity and in-flight constraints:
+
+```text
+dBad     = min(|Ebad|, Q)
+dHealthy = min(|Ehealthy|, Q-dBad, B)
+```
+
+Q bounds total cleanup; **it does not authorize arbitrary healthy deletion**. Recheck R for each healthy deletion. When external faults already leave R<M, eligible old bad versions may be repaired within Q without further rollout-induced Ready loss. Do not repeatedly template-roll an unready instance already on the current target; explicit recoveryPolicy behavior remains separate. Zero update work must not hold rollout progress indefinitely, and scale-to-zero follows the explicit scale-down intent.
+
+With coordination, keep Q/B and additionally apply section 5's remaining starts, dependencies and a descending stable-candidate prefix. Legal cleanup of a superseded old NotReady **temporary surge** consumes the same Q, but neither skips a stable instance nor increases or refunds stable-start allowance. Confirm it has not become formal capacity, is not needed by dependencies and has no conflicting in-flight action. Healthy old surge also consumes B and cannot retire while needed for the availability floor. Ordinal>=N alone does not identify temporary surge.
+
+See the [shared SG/Role lookup tables](servinggroup-compound-rollout.en.md#budget-lookup) for trajectories and mode comparisons. Q/B are budget bounds, not a complete batch scheduler. The existing whole-batch versus per-Ready execution discrepancy is recorded in the lookup coverage boundary; this revision does not choose a new batch-timing rule.
+
 ## 3. ServingGroup rollout configuration
 
 Configure these fields under `spec.rolloutStrategy.rollingUpdateConfiguration`.
 
 **Mutability.** The object and its budget fields are mutable. They control rollout progress and are not inputs to template revision identity.
 
-**Validation.** The object is allowed only with `ServingGroupRollingUpdate`, including that mode's default when `type` is omitted. In this section, `N = spec.replicas`. Apply defaults and percentage rounding before checking the budget pair. `maxUnavailable` and `maxSurge` cannot both be explicitly zero; when `N > resolved partition`, their resolved values must not both be zero either.
+**Validation.** This object is effective with `ServingGroupRollingUpdate`, including the default mode, and allowed but ignored under Role rollout. Here `N = spec.replicas`. Apply section 1.2 defaults, rounding and active-level limits; reject resolved U/S=0/0 even at zero replicas or full partition. This restates the existing validation contract.
 
 ### 3.1 `maxUnavailable`
 
@@ -159,11 +200,7 @@ Path: `spec.rolloutStrategy.rollingUpdateConfiguration.maxUnavailable`
 | Percentage rounding | Round down, with no minimum-of-one adjustment |
 | Meaning | The maximum allowed unavailability relative to the desired ServingGroup count during a rollout |
 
-The maximum scale-down instance count per iteration is calculated using the following formula:
-
-```text
-maxScaleDown = len(liveServingGroups) - (replicas - maxUnavailable) - newServingGroupUnavailableCount
-```
+Use section 2.3's shared formula: `Q=max(0,C-max(0,N-U)-V-I)` and the separate healthy-deletion bound `B=max(0,R-max(0,N-U))`. Partition filters candidates, not the complete Ready ledger; protected faults must still reduce availability.
 
 **Reference configuration:**
 
@@ -186,7 +223,7 @@ spec:
 | 3 | Deleting / recreating | v2 Ready | v2 Ready | 2 | Update the remaining old group |
 | Final | v2 Ready | v2 Ready | v2 Ready | 3 | Rollout complete |
 
-The illustrated ordinal order is one possible sequence; the budget does not guarantee deletion order.
+For all-healthy candidates the descending sequence shown follows section 2.3. Eligible old NotReady instances take priority when present; the numeric budget alone does not select candidates.
 
 ### 3.2 `maxSurge`
 
@@ -269,24 +306,9 @@ Partition is an absolute ordinal boundary, not a count of arbitrary groups to re
 | 3 | v1 Ready (protected) | Deleting / recreating | v2 Ready | Update sg-1 |
 | Final | v1 Ready (protected) | v2 Ready | v2 Ready | Ordinals in `[0, 1)` retain the old version |
 
-**Sparse ordinals during a template rollout (clarified 2026-10-06).** A hole
-left by replica-only scale-down does not itself start a rollout. During an
-actual template rollout, replacing an outdated high-ordinal group can restore
-a missing low ordinal. Partition applies to the **replacement's absolute
-ordinal**, not the deleted group's ordinal or its position in a sorted list.
-An empty protected slot is recreated from the historical template.
+**Sparse ordinals during a template rollout (clarified 2026-10-06).** A hole left by replica-only scale-down does not itself start a rollout. During an actual template rollout, replacing an outdated high-ordinal group can restore a missing low ordinal. Partition applies to the **replacement's absolute ordinal**, not the deleted group's ordinal or its position in a sorted list. An empty protected slot is recreated from the historical template.
 
-For example, start with `N=2`, `{sg-0:v1, sg-3:v1}`, `partition=2`,
-`maxUnavailable=1`, `maxSurge=0`, then submit v2. The controller can delete
-outdated sg-3 and create sg-1 using historical v1. The converged layout is
-`{sg-0:v1, sg-1:v1}`: **both groups remain v1** because both absolute ordinals
-are below partition. This is a partition pause with the desired layout, not
-full adoption of v2: `currentRevision` remains v1, `updateRevision` is v2, and
-`updatedReplicas` is zero. Lowering partition releases those slots for v2.
-All creation and deletion still obey the configured rollout budgets; there is
-no exception that makes a protected replacement adopt v2 merely because its
-predecessor had an unprotected high ordinal. See SG-P11 in the compound rollout
-expectations for this boundary.
+For example, start with `N=2`, `{sg-0:v1, sg-3:v1}`, `partition=2`, `maxUnavailable=1`, `maxSurge=0`, then submit v2. The controller can delete outdated sg-3 and create sg-1 using historical v1. The converged layout is `{sg-0:v1, sg-1:v1}`: **both groups remain v1** because both absolute ordinals are below partition. This is a partition pause with the desired layout, not full adoption of v2: `currentRevision` remains v1, `updateRevision` is v2, and `updatedReplicas` is zero. Lowering partition releases those slots for v2. All creation and deletion still obey the configured rollout budgets; there is no exception that makes a protected replacement adopt v2 merely because its predecessor had an unprotected high ordinal. See SG-P11 in the compound rollout expectations for this boundary.
 
 ## 4. Role rollout configuration
 
@@ -294,7 +316,7 @@ Role fields are placed directly under `spec.template.roles[]` and are evaluated 
 
 **Mutability.** Each existing Role's rollout fields are mutable and excluded from template revision identity.
 
-**Validation.** All three fields are valid only with `RoleRollingUpdate`; omit them under `ServingGroupRollingUpdate`, including explicit zero values. Do not wrap them in a per-Role `rollingUpdateConfiguration`. In this section, `N` is that Role's `replicas`; apply defaults and rounding separately for each Role. Explicitly zeroing both budgets is rejected. When `N > resolved partition`, the resolved budgets must not both be zero either.
+**Validation.** These fields are effective with `RoleRollingUpdate`, and allowed but ignored under SG rollout. Do not wrap them in a per-Role `rollingUpdateConfiguration`. Here N is that Role's replicas. Apply section 1.2 defaults, rounding and active-level limits; reject resolved U/S=0/0 even at zero replicas or full partition. Use the same Q/B/I and selection rules as SG in section 2.3; coordination further constrains candidates without expanding budgets.
 
 ### 4.1 Role `maxUnavailable`
 
@@ -399,9 +421,7 @@ Path: `spec.template.roles[].partition`
 
 For resolved partition `P`, Role instances with ordinals in `[0, P)` are protected independently in each ServingGroup.
 
-The same absolute-ordinal and historical-template rule from section 3.3 applies
-to Role replica partition: restoring a protected low Role ordinal during an
-actual rollout can leave every desired Role replica on the historical version.
+The same absolute-ordinal and historical-template rule from section 3.3 applies to Role replica partition: restoring a protected low Role ordinal during an actual rollout can leave every desired Role replica on the historical version.
 
 
 ```yaml
@@ -448,8 +468,14 @@ Progress is normalized by each Role's number of instances eligible for update; p
 
 $$
 allowedStarted(role)
-  = ceil((slowestReadyProgress + maxSkew) × role.totalToUpdate)
+  = min(role.totalToUpdate, ceil((slowestReadyProgress + maxSkew) × role.totalToUpdate))
 $$
+
+`remainingStart = max(0, allowedStarted - alreadyStarted)`. Use stable update-eligible counts and exclude zero work from denominators. When only one Role actually updates, no additional cross-Role progress-difference limit applies.
+
+The presence of coordination makes stable old-instance selection descending without skipping, with no additional switch. Select a consecutive prefix satisfying Q, B, remainingStart and dependency/old-capacity retention. Stop at a blocked highest outdated candidate; do not bypass it for a lower NotReady one. Protected and already-target instances are not outdated update candidates. The participant list scopes proportional/dependency constraints, not an exception to this mode's ordering.
+
+maxSkew means a **percentage progress difference**, not same-index pairing or atomic version switching. Legal superseded surge cleanup follows section 2.3 separately from the stable prefix and does not refund stable starts. See the shared lookup tables for examples.
 
 ### 5.1 `maxSkew`
 

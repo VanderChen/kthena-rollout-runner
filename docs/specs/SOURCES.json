@@ -1,5 +1,5 @@
 {
-  "purpose": "Final bilingual contract 2.1; explicit human-approved API/budget/recovery changes. Historical implementation and verification remain separate.",
+  "purpose": "Final bilingual contract 2.2; human-approved shared SG/Role budgets and default skipping with ordered coordinated Roles, no ordering switch. Documents, executor coverage and runtime verification remain separate.",
   "originalImport": {
     "importedOn": "2026-10-05",
     "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
@@ -16,9 +16,9 @@
     {
       "path": "modelserving-api-reference.en.md",
       "language": "en",
-      "version": "2.1",
-      "sha256": "94ed7e661b9dc603637a40b31e86c16977b5e073ec31dcc0620502252e795fdb",
-      "bytes": 60876,
+      "version": "2.2",
+      "sha256": "88aa335ee3899fa24fbcef8d525e36a08c19cfa772350b377972cade1a1338ff",
+      "bytes": 66183,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.zh-CN.md",
       "priorEdition": {
@@ -30,14 +30,14 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
+      "sourceState": "Final edition; explicit 2026-10-07 approval recorded in task 052 and 049; original import and prior editions retained. Documentation-only revision; no claim of executor migration or runtime conformance."
     },
     {
       "path": "modelserving-api-reference.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.1",
-      "sha256": "5c92835f1c42a8b4287d6ae0ac2f6b2099af2a1d66e07c3e443fca7a88e4fdff",
-      "bytes": 26043,
+      "version": "2.2",
+      "sha256": "c50fdcda97d0bf048e1bba4afb1c2c751d3328c0ba05767e6a98ded1babf9bc3",
+      "bytes": 30820,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.en.md",
       "priorEdition": {
@@ -49,14 +49,14 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
+      "sourceState": "Final edition; explicit 2026-10-07 approval recorded in task 052 and 049; original import and prior editions retained. Documentation-only revision; no claim of executor migration or runtime conformance."
     },
     {
       "path": "servinggroup-compound-rollout.en.md",
       "language": "en",
-      "version": "2.1",
-      "sha256": "f7946656ec30cae50c17623f32bfc7c3dae4b560d60d19e4db3bd3e3b92f67d3",
-      "bytes": 57014,
+      "version": "2.2",
+      "sha256": "2a0b24e56b6e090a7d9a1bab22591ca6441402da1f62cc67fbf8ef143e6192fa",
+      "bytes": 69159,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.zh-CN.md",
       "priorEdition": {
@@ -85,14 +85,14 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
+      "sourceState": "Final edition; explicit 2026-10-07 approval recorded in task 052 and 049; original import and prior editions retained. Documentation-only revision; no claim of executor migration or runtime conformance."
     },
     {
       "path": "servinggroup-compound-rollout.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.1",
-      "sha256": "43810c25868d783aa6e61d8793001d2ea24ae6ab33d23101bc7dbbb70420499c",
-      "bytes": 73662,
+      "version": "2.2",
+      "sha256": "9283a6508cee70806574bc9384318b9a40f48134d4ccfc82632741c949ead496",
+      "bytes": 82619,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.en.md",
       "priorEdition": {
@@ -121,7 +121,7 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition; user-approved task 052 semantics; translation preserves clause/scenario scope; no assertion of full runtime coverage."
+      "sourceState": "Final edition; explicit 2026-10-07 approval recorded in task 052 and 049; original import and prior editions retained. Documentation-only revision; no claim of executor migration or runtime conformance."
     }
   ],
   "semanticRevisions": [
@@ -190,6 +190,57 @@
       ],
       "compatibility": "No Kthena source changes. Historical catalogue conflicts stop before cluster access; old source matrices and pre-existing document edits retained.",
       "verificationRecord": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md"
+    },
+    {
+      "date": "2026-10-07",
+      "contractVersion": "2.2",
+      "task": "052 documentation / 025 and 049 shared rollout budget analysis",
+      "approvalRecord": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md; issues/bugs/049-role-coordination-rollover-DONE/PROPOSAL_COMMIT.md",
+      "approvalQuotes": [
+        "maxskew这里本意是百分比，所以不是一定index协同，而是跳过会破坏用户预期。",
+        "sg和role都按照默认开启可跳过，无开关；配置有rolecorrdination时不可跳过，无开关开启。",
+        "请修正runner中的api reference和行为预期表，覆盖这些典型场景，方便查表"
+      ],
+      "clauses": [
+        "API 2.3, 3.1, 4.1, 5",
+        "SG introduction, SG-S05, SG-C08, acceptance, A.1/A.2/A.4/A.5",
+        "Shared Appendix B RU-B01–RU-B16"
+      ],
+      "before": "SG candidates were strictly descending even when a lower old instance was NotReady; SG-S05 and an SG-C08 branch blocked. Total cleanup and healthy-deletion limits were not presented as a common SG/Role lookup.",
+      "after": "SG and independent Role rollout default to eligible old NotReady first, descending within each health class, without an API switch. Coordination preserves a descending stable prefix and proportional maxSkew, not index pairing. Shared M/Q/B/I accounting retains all availability and reservations; legal superseded surge cleanup is separate from stable starts.",
+      "compatibility": "Changes default low-old-fault trajectories in both modes. Does not alter partition/history/identity, admission, recovery or full-unit Ready requirements. Clarifies English validation duplicates using already-approved 2.1 inactive-budget and double-zero rules. Whole-batch versus per-Ready timing remains an explicitly unresolved separate contract discrepancy.",
+      "affectedCases": [
+        "servinggroup-compound-v2/RUN-622 (SG-S05), document expectation changed; executable migration pending",
+        "servinggroup-compound-v2/RUN-632 (SG-C08 old low NotReady branch), executable migration pending",
+        "SG/Role equivalent fault, protected 025, rollover 049, in-flight and coordination cases; RU-B01–RU-B16 are lookup IDs only"
+      ],
+      "executorChanges": false,
+      "implementationChanges": false,
+      "implementationCommit": null,
+      "validationRecord": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md; documentation checks and make test only, no new Kind run",
+      "baseRepositoryCommit": "8f04bb2915bae95caea145859ef8141e0501557d",
+      "files": [
+        {
+          "path": "modelserving-api-reference.en.md",
+          "beforeSha256": "94ed7e661b9dc603637a40b31e86c16977b5e073ec31dcc0620502252e795fdb",
+          "afterSha256": "7f406ee4b2f863935674139f1d7a77f2f38135c20888fa4de5add267a531962c"
+        },
+        {
+          "path": "modelserving-api-reference.zh-CN.md",
+          "beforeSha256": "5c92835f1c42a8b4287d6ae0ac2f6b2099af2a1d66e07c3e443fca7a88e4fdff",
+          "afterSha256": "c50fdcda97d0bf048e1bba4afb1c2c751d3328c0ba05767e6a98ded1babf9bc3"
+        },
+        {
+          "path": "servinggroup-compound-rollout.en.md",
+          "beforeSha256": "f7946656ec30cae50c17623f32bfc7c3dae4b560d60d19e4db3bd3e3b92f67d3",
+          "afterSha256": "104901775c6e0f743c1f6961a3db3583cc0e790f3c2169bcc7fcc21260e0bc23"
+        },
+        {
+          "path": "servinggroup-compound-rollout.zh-CN.md",
+          "beforeSha256": "43810c25868d783aa6e61d8793001d2ea24ae6ab33d23101bc7dbbb70420499c",
+          "afterSha256": "bcb6bafb6d5d817788665e0b0fac8c9dee455a51265f966c923c51bcbc1ebe3a"
+        }
+      ]
     }
   ],
   "naming": {
@@ -240,6 +291,116 @@
           "bytes": 62117,
           "scope": "api-reference",
           "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
+        }
+      ]
+    },
+    {
+      "version": "2.1",
+      "repositoryCommit": "8f04bb2915bae95caea145859ef8141e0501557d",
+      "capturedIn": "Git at the repository commit, docs/specs/",
+      "files": [
+        {
+          "path": "modelserving-api-reference.en.md",
+          "version": "2.1",
+          "sha256": "94ed7e661b9dc603637a40b31e86c16977b5e073ec31dcc0620502252e795fdb",
+          "bytes": 60876
+        },
+        {
+          "path": "modelserving-api-reference.zh-CN.md",
+          "version": "2.1",
+          "sha256": "5c92835f1c42a8b4287d6ae0ac2f6b2099af2a1d66e07c3e443fca7a88e4fdff",
+          "bytes": 26043
+        },
+        {
+          "path": "servinggroup-compound-rollout.en.md",
+          "version": "2.1",
+          "sha256": "f7946656ec30cae50c17623f32bfc7c3dae4b560d60d19e4db3bd3e3b92f67d3",
+          "bytes": 57014
+        },
+        {
+          "path": "servinggroup-compound-rollout.zh-CN.md",
+          "version": "2.1",
+          "sha256": "43810c25868d783aa6e61d8793001d2ea24ae6ab33d23101bc7dbbb70420499c",
+          "bytes": 73662
+        }
+      ]
+    }
+  ],
+  "formattingRevisions": [
+    {
+      "date": "2026-10-07",
+      "version": "2.2",
+      "semanticChanges": false,
+      "request": "User requested removal of unnatural hard-wrapped paragraphs in runner documentation.",
+      "scope": "Join prose and list-item continuation lines; preserve paragraph boundaries, code, tables, headings, list structure and intentional hard breaks. No wording or contract changes.",
+      "verificationRecord": "issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md",
+      "files": [
+        {
+          "path": "docs/COMPOUND_V2.md",
+          "joinedLines": 30,
+          "beforeSha256": "70173e0e213286f9aa38353d46f2677d9a34e049e0fa820ed1de14346e7016f5",
+          "afterSha256": "39de491da4a09ddc76bf6f65faee3b924dd6498a1dc3794dbefad06c71a3d34a"
+        },
+        {
+          "path": "docs/CONTRACT.md",
+          "joinedLines": 36,
+          "beforeSha256": "a74169c086a43eb06db13514e58be58339dd093d914c4c68f45cf48f680557ba",
+          "afterSha256": "1bc70c689ff4cc83ce1a3ec64d8fb332f46445a843ab6ffa664ea9a7a1ba32dc"
+        },
+        {
+          "path": "docs/CORE_EXPECTATIONS.md",
+          "joinedLines": 11,
+          "beforeSha256": "b467e4e00b65413e7df76740a360bbb7ef909ea45768760f7ad5c685768b5afd",
+          "afterSha256": "b0590e02cecb05045baf939e258a7cbfb2acb70882ff0a973d34162b636dd401"
+        },
+        {
+          "path": "docs/specs/modelserving-api-reference.en.md",
+          "joinedLines": 17,
+          "beforeSha256": "7f406ee4b2f863935674139f1d7a77f2f38135c20888fa4de5add267a531962c",
+          "afterSha256": "88aa335ee3899fa24fbcef8d525e36a08c19cfa772350b377972cade1a1338ff"
+        },
+        {
+          "path": "docs/specs/servinggroup-compound-rollout.en.md",
+          "joinedLines": 13,
+          "beforeSha256": "104901775c6e0f743c1f6961a3db3583cc0e790f3c2169bcc7fcc21260e0bc23",
+          "afterSha256": "14449da98f93741030d266ade9874a7b244b89ac91b9f9ed993f225f653c82dc"
+        },
+        {
+          "path": "docs/specs/servinggroup-compound-rollout.zh-CN.md",
+          "joinedLines": 305,
+          "beforeSha256": "bcb6bafb6d5d817788665e0b0fac8c9dee455a51265f966c923c51bcbc1ebe3a",
+          "afterSha256": "1b42e81cf77a669ee01d9d3cd18262db91a52a9e466867947b7cdd889a80e70f"
+        }
+      ]
+    }
+  ],
+  "linkRevisions": [
+    {
+      "date": "2026-10-07",
+      "reason": "049 task completed and renamed IP to DONE after implementation/Kind verification; preserve approval links.",
+      "semanticChange": false,
+      "path": "README.md",
+      "beforeSha256": "53733643a2274c23757bb20b0e55523638013570110938bf52e7f60e6e93f0c8",
+      "afterSha256": "0c3e44f559b0e68fd090ca0d3ab616dc5c8b082825162a4d8b0f6b250a70d2c0"
+    }
+  ],
+  "executionCoverageRevisions": [
+    {
+      "date": "2026-10-07",
+      "semanticChange": false,
+      "scope": "Coverage status only; approved contract 2.2 unchanged",
+      "approval": "同步修改runner中的校验规则，基于production分支作为测试版本，在kind中运行runner的组合滚动用例和故障恢复用例",
+      "controllerCommit": "cad19d0fce097e2a5f481938727e9f4e4c42175c",
+      "files": [
+        {
+          "path": "servinggroup-compound-rollout.zh-CN.md",
+          "beforeSHA256": "1b42e81cf77a669ee01d9d3cd18262db91a52a9e466867947b7cdd889a80e70f",
+          "afterSHA256": "9283a6508cee70806574bc9384318b9a40f48134d4ccfc82632741c949ead496"
+        },
+        {
+          "path": "servinggroup-compound-rollout.en.md",
+          "beforeSHA256": "14449da98f93741030d266ade9874a7b244b89ac91b9f9ed993f225f653c82dc",
+          "afterSHA256": "2a0b24e56b6e090a7d9a1bab22591ca6441402da1f62cc67fbf8ef143e6192fa"
         }
       ]
     }

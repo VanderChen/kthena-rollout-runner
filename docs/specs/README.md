@@ -1,15 +1,15 @@
 # ModelServing 规范 / Specifications
 
-本目录是 Kthena 源码、rollout runner 和人工评审共享的最终契约。当前版本 **2.1（2026-10-06）**；文档预期、历史实现、runner 覆盖和实际测试结果分别记录，不互相替代。工作与审批规则见 workspace [AGENTS.md](../../../AGENTS.md)。
+本目录是 Kthena 源码、rollout runner 和人工评审共享的最终契约。当前版本 **2.2（2026-10-07）**；文档预期、历史实现、runner 覆盖和实际测试结果分别记录，不互相替代。工作与审批规则见 workspace [AGENTS.md](../../../AGENTS.md)。
 
-This directory holds the shared final contract for source changes, runner expectations and human review. Version **2.1 (2026-10-06)** defines expectations; it does not imply implementation compliance or a passing cluster run.
+This directory holds the shared final contract for source changes, runner expectations and human review. Version **2.2 (2026-10-07)** defines expectations; it does not imply implementation compliance or a passing cluster run.
 
 ## 文档入口 / Documents
 
 | 主题 / Topic | 中文 | English |
 | --- | --- | --- |
 | API、默认值、可变性和校验 / API, defaults, mutability, validation | [API 参考](modelserving-api-reference.zh-CN.md) | [API reference](modelserving-api-reference.en.md) |
-| SG 组合滚动、35 个设计场景、完整行为规则 / SG compound rollout, 35 scenarios and behavioral rules | [SG 规范](servinggroup-compound-rollout.zh-CN.md) | [SG expectations](servinggroup-compound-rollout.en.md) |
+| SG 35 个组合场景及 SG/Role 共用速查 / 35 SG scenarios and shared SG/Role lookup | [SG 规范](servinggroup-compound-rollout.zh-CN.md) | [SG expectations](servinggroup-compound-rollout.en.md) |
 
 ## 命名与同步 / Naming and synchronization
 
@@ -21,6 +21,21 @@ This directory holds the shared final contract for source changes, runner expect
 Use `<topic>.<language>.md`, with lower-case kebab-case topics and `en` / `zh-CN` locales. Keep versions inside documents and SOURCES.json, preserving stable links. Maintain both editions in the same change, with matching clause numbers, scenario IDs, numeric tables and semantics. Record explicit semantic approval and provenance; never regenerate expectations from observed implementation. Earlier editions remain recoverable from Git or the recorded original sources.
 
 ## 本次批准的修订 / Approved changes
+
+**2.2（2026-10-07）**：SG/独立 Role 默认合法旧 NotReady 优先、同类高到低；配置 roleCoordination 的 Role 稳定实例不跳过，无新增开关。maxSkew 仍为百分比进度，不增加 index 配对语义。统一 Q 总额度、B 健康删除上限及不重复扣减的 I 在途账本。
+
+**2.2 (2026-10-07)**: SG/independent Role rollout defaults to eligible old NotReady first, descending within each health class. Coordinated Role stable instances cannot skip; no new switch or index-pairing guarantee. Shared accounting distinguishes total Q, healthy bound B and nonduplicated in-flight I.
+
+| 快速入口 / Quick lookup | 内容 / Content |
+| --- | --- |
+| [API §2.3 中文](modelserving-api-reference.zh-CN.md#23-两层共用的预算与默认选择顺序) / [English](modelserving-api-reference.en.md#23-shared-budgets-and-default-candidate-selection) | 两层公式、计数单位、模式规则 / Shared formulas, units and mode selection |
+| [行为速查中文](servinggroup-compound-rollout.zh-CN.md#budget-lookup) / [English](servinggroup-compound-rollout.en.md#budget-lookup) | 16 个数值场景；全旧版坏、025/049、协调阻塞、surge、在途动作 / 16 numeric cases, all-old failure, 025/049, coordination, surge and reservations |
+
+本轮文档批准及验证见 [052 proposal](../../../issues/features/052-runner-spec-contract-alignment-IP/PROPOSAL_COMMIT.md)；公式分析见 [049 proposal](../../../issues/bugs/049-role-coordination-rollover-DONE/PROPOSAL_COMMIT.md)。前次同步文档和来源记录；本次执行器迁移与真实测试见 [051 验证记录](../../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md)，不宣称产品全套符合。
+
+Approval and verification are recorded in those proposals. The initial revision updated documents and provenance. Executor migration and actual results are recorded separately in issue 051; they do not imply full product conformance.
+
+以下保留此前 2.1 的批准摘要 / Earlier approved 2.1 changes:
 
 | 范围 / Scope | 契约 2.1 / Contract 2.1 |
 | --- | --- |
@@ -38,10 +53,12 @@ Approval and evidence are recorded in the linked proposals. Pre-existing uncommi
 
 - 当前 API 与恢复入口、执行命令、历史用例冲突见 [CONTRACT_MIGRATION.md](../CONTRACT_MIGRATION.md)。历史矩阵原始来源不改写；被替代的旧预期不计作当前通过，也不计作产品失败。
 - `cases/servinggroup-compound-v2/` 的 35 个 ID 映射 SG-S01～S07、SG-C01～C16、SG-P01～P11、SG-R01 至 RUN-618～652；引用必须同时含 suite/路径和 ID，不能把重复编号直接相加。全套未运行不能宣称全套通过。
+- 2.2 明确改变 SG-S05/RUN-622 与 SG-C08/RUN-632 的低位故障分支；case/generator/顺序 verdict 已迁移，真实结果单独记录。16 个共用查表场景也不是 16 个新 executable case。旧结果不能直接作为 2.2 PASS/FAIL，详见速查表 B.4 和 [COMPOUND_V2](../COMPOUND_V2.md)。
+- SG 整批等待与普通执行器逐 Ready 推进仍有独立口径差异，此次顺序修订不自行裁定；应单独统一部分批次 Ready 的时点断言。
 - 历史普通用例的连续终态与 SG 稀疏身份保留分属不同场景；不得全局放松连续检查，或把连续终态强加于 SG-S01/S03。
 - 046 插件不可变、047 手动 revision、048 Pod 隔离等能力尚未在本 API 参考完整描述；缺文档不授权删除这些能力。
 - runner 执行契约另见 [DEVELOPER_GUIDE](../DEVELOPER_GUIDE.md)、[CONTRACT](../CONTRACT.md)、[CORE_EXPECTATIONS](../CORE_EXPECTATIONS.md)、[COMPOUND_V2](../COMPOUND_V2.md)。
 
-Current executors and historical conflicts are documented in the migration guide. Suite-qualified IDs are required. Contiguous historical workflows and approved sparse layouts retain their own assertions. Documentation gaps for later plugin, manual-revision and Pod-isolation work do not authorize removal of those capabilities. A passing subset does not establish complete suite coverage.
+Current executors and historical conflicts are documented in the migration guide. Suite-qualified IDs are required. Contiguous historical workflows and approved sparse layouts retain their own assertions. Documentation gaps for later plugin, manual-revision and Pod-isolation work do not authorize removal of those capabilities. A passing subset does not establish complete suite coverage. Cases/generators/order verdicts now implement the 2.2 ordering, including RUN-622/632; the 16 lookup rows are not executable coverage. The existing whole-batch versus per-Ready timing discrepancy remains separate from this ordering change.
 
 [SOURCES.json](SOURCES.json) preserves original imports, prior final-edition hashes, approvals and current bilingual checksums.

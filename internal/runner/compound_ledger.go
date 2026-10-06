@@ -52,7 +52,7 @@ func (l *NormalLedger) compoundBudget(objects Objects) compoundBudget {
 			b.V++
 		}
 	}
-	b.Q = max(0, b.C-(b.N-b.U)-b.V)
+	b.Q = max(0, b.C-max(0, b.N-b.U)-b.V)
 	return b
 }
 
@@ -65,10 +65,31 @@ func compoundUnitKey(u NormalUnit) string {
 	return fmt.Sprintf("%d/%s", u.Group, strings.Join(ids, ","))
 }
 
+func compoundHasOriginalPod(u NormalUnit, key string) bool {
+	parts := strings.SplitN(key, "/", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	for _, uid := range strings.Split(parts[1], ",") {
+		for _, pod := range u.Pods {
+			if string(pod.UID) == uid {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // compoundBefore evaluates the first accepted deletion signal for a ServingGroup.
 // A PodGroup and its Pods can report that signal in either Watch order.
 func (l *NormalLedger) compoundBefore(kind, event string, o *unstructured.Unstructured, objects Objects) {
 	if !l.CompoundV2 || !l.Armed || l.Model.Mode != "SG" || (kind != "pods" && kind != "podgroups") || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) {
+		return
+	}
+	// The first destructive signal reserves every original Pod UID. As
+	// members disappear the cohort key changes, but those later notifications
+	// are still the same action, not another use of Q.
+	if kind == "pods" && (l.Committed[string(o.GetUID())] || l.PGPods[string(o.GetUID())]) {
 		return
 	}
 	groupName := o.GetName()
@@ -126,7 +147,7 @@ func (l *NormalLedger) compoundBefore(kind, event string, o *unstructured.Unstru
 		return
 	}
 	for _, higher := range l.units(objects["pods"]) {
-		if higher.Group <= ordinal || higher.Group < l.Model.P || l.compoundTarget(higher) || !higher.Active || l.ScaleGroups[higher.Group] || l.CompoundStarted[compoundUnitKey(higher)] {
+		if higher.Group == ordinal || higher.Group < l.Model.P || l.compoundTarget(higher) || !higher.Active || l.ScaleGroups[higher.Group] || l.CompoundStarted[compoundUnitKey(higher)] || !l.oldCandidatePrecedes(higher, u) {
 			continue
 		}
 		l.fail(fmt.Sprintf("COMPOUND_ORDER_MISMATCH: group=%d before higher old group=%d", ordinal, higher.Group))
@@ -136,12 +157,11 @@ func (l *NormalLedger) compoundBefore(kind, event string, o *unstructured.Unstru
 		if budget.R-1 < budget.N-budget.U {
 			l.fail(fmt.Sprintf("COMPOUND_READY_BUDGET: group=%d Ready=%d minimum=%d", ordinal, budget.R, budget.N-budget.U))
 		}
-		return
 	}
 	pending := 0
 	for oldOrdinal, inFlightKey := range l.CompoundPending {
 		for _, current := range l.units(objects["pods"]) {
-			if current.Group == oldOrdinal && compoundUnitKey(current) == inFlightKey {
+			if current.Group == oldOrdinal && compoundHasOriginalPod(current, inFlightKey) && !l.compoundTarget(current) {
 				pending++
 				break
 			}

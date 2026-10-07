@@ -20,6 +20,8 @@ import (
 )
 
 type normalExecution struct {
+	partialScaleRule          string
+	partialScalePhase         int
 	compoundSnapshots         map[string]map[int]map[string]bool
 	preparingCompletionSource bool
 	completionStatusProbe     bool
@@ -135,6 +137,12 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 	}
 	e := &normalExecution{compoundSnapshots: map[string]map[int]map[string]bool{}, pinned: map[string]types.UID{}, tableVersion: "1.0", r: r, c: c, o: o, namespace: res.Namespace, dir: dir, res: &res}
 	defer e.finalizeRecoveryEvidence()
+	defer func() {
+		if err := e.releasePartialScaleBoundary(); err != nil {
+			res.Status = "ERROR"
+			res.Error += "; barrier cleanup: " + err.Error()
+		}
+	}()
 	defer func() {
 		// Cancel and drain all already-delivered events before freezing the verdict.
 		o.cancel()
@@ -456,6 +464,9 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 			return err
 		}
 	case "update", "merge-patch":
+		if err := e.installPartialScaleBoundary(ctx, p); err != nil {
+			return err
+		}
 		current, err := api.Get(ctx, "model", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -551,6 +562,11 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 			return err
 		}
 		e.current = next
+		if e.partialScaleRule != "" && e.phase > e.partialScalePhase {
+			if err := e.releasePartialScaleBoundary(); err != nil {
+				return err
+			}
+		}
 		if err = saveYAML(filepath.Join(e.dir, prefix+"-server.yaml"), next.Object); err != nil {
 			return err
 		}

@@ -166,7 +166,7 @@ func Run(ctx context.Context, opt Options) (runErr error) {
 		return err
 	}
 	for _, c := range cases {
-		if c.Format == "rollout-runner/v3" || c.Format == "rollout-runner/v4" {
+		if c.Format == "rollout-runner/v3" || c.Format == "rollout-runner/v4" || needsPartialScaleBoundary(c) {
 			if err = r.preflightRecovery(ctx); err != nil {
 				return err
 			}

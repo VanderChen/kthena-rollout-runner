@@ -70,6 +70,7 @@ type NormalLedger struct {
 	Recoveries             []*RecoveryRecord      `json:"recoveries,omitempty"`
 	PGScale                map[string]bool        `json:"podGroupScaleIntentUIDs"`
 	PGPhase                map[string]string      `json:"podGroupIntentPhase"`
+	OrderCheckedUIDs       map[string]bool        `json:"rolloutOrderCheckedPodUIDs,omitempty"`
 	BornRanktable          map[string]bool        `json:"ranktableAtPodCreation"`
 	Served                 map[string]bool        `json:"previouslyReadyUIDs"`
 	GroupShrinkRemaining   int                    `json:"groupShrinkRemaining"`
@@ -556,22 +557,8 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	}
 	// Contract 2.2: unavailable old units first, descending within a health
 	// class. Coordinated stable instances retain a descending prefix.
-	if !scale && !reservedEarlier && !l.unitTarget(u) {
-		_, _, _, partition := l.scopeBudget(u)
-		for _, other := range units {
-			if other.Scope != u.Scope || other.Key == u.Key || other.Ordinal < partition || !other.Active || l.unitTarget(other) || !l.oldCandidatePrecedes(other, u) {
-				continue
-			}
-			available := true
-			for _, p := range other.Pods {
-				if l.Committed[string(p.UID)] || l.PGPods[string(p.UID)] || l.ScaleUIDs[string(p.UID)] || p.DeletionTimestamp != nil {
-					available = false
-				}
-			}
-			if available {
-				l.fail(fmt.Sprintf("ORDER_MISMATCH: %s started %d before eligible %d", u.Scope, u.Ordinal, other.Ordinal))
-			}
-		}
+	if !scale && !reservedEarlier && !l.OrderCheckedUIDs[uid] && !l.unitTarget(u) {
+		l.checkOldCandidateOrder(u, units)
 	}
 	if l.Model.Mode == "Role" && !scale && !reservedEarlier && !l.unitTarget(u) && (!u.Ready || readyAfter >= max(d-v, 0)) {
 		c, unavailable, inFlight := 0, 0, 0
@@ -610,6 +597,41 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 		}
 	}
 	l.Starts = append(l.Starts, start)
+}
+
+func (l *NormalLedger) checkOldCandidateOrder(selected NormalUnit, units map[string]NormalUnit) {
+	if !l.CompoundV2 {
+		checked := len(selected.Pods) > 0
+		for _, pod := range selected.Pods {
+			checked = checked && l.OrderCheckedUIDs[string(pod.UID)]
+		}
+		if checked {
+			return
+		}
+	}
+	_, _, _, partition := l.scopeBudget(selected)
+	for _, other := range units {
+		if other.Scope != selected.Scope || other.Key == selected.Key || other.Ordinal < partition || !other.Active || l.unitTarget(other) || !l.oldCandidatePrecedes(other, selected) {
+			continue
+		}
+		available := true
+		for _, pod := range other.Pods {
+			if l.Committed[string(pod.UID)] || l.PGPods[string(pod.UID)] || l.ScaleUIDs[string(pod.UID)] || pod.DeletionTimestamp != nil {
+				available = false
+			}
+		}
+		if available {
+			l.fail(fmt.Sprintf("ORDER_MISMATCH: %s started %d before eligible %d", selected.Scope, selected.Ordinal, other.Ordinal))
+		}
+	}
+	if !l.CompoundV2 {
+		if l.OrderCheckedUIDs == nil {
+			l.OrderCheckedUIDs = map[string]bool{}
+		}
+		for _, pod := range selected.Pods {
+			l.OrderCheckedUIDs[string(pod.UID)] = true
+		}
+	}
 }
 
 func (l *NormalLedger) unitDeletionPending(u NormalUnit) bool {
@@ -979,6 +1001,12 @@ func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstru
 	if !ok {
 		return
 	} // A PG may be collected after its last observed Pod.
+	if !l.CompoundV2 && !l.unitTarget(u) {
+		// This is the first destructive evidence for this finite cohort. A
+		// recovery member may disappear before the following Pod stream event,
+		// changing which old units are eligible without changing this start.
+		l.checkOldCandidateOrder(u, units)
+	}
 	optimistic := func(u NormalUnit) bool {
 		if !u.Complete {
 			return false

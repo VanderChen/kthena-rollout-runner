@@ -4,9 +4,11 @@
 package runner
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -516,6 +518,13 @@ func (e *normalExecution) pluginFacts(groups map[int]map[string][]NormalUnit) (b
 			}
 			continue
 		}
+		stateName := fmt.Sprintf("modelserving-members-%x", sha256.Sum256([]byte(cm.GetNamespace()+"/model/"+e.l.Owner)))
+		if cm.GetName() == stateName {
+			if !validGroupMembersState(cm, e.l.Owner) {
+				return false, "invalid applied group member state"
+			}
+			continue
+		}
 		count, ok := wantedTables[cm.GetName()]
 		if !ok {
 			return false, "unexpected ConfigMap " + cm.GetName()
@@ -543,4 +552,37 @@ func (e *normalExecution) pluginFacts(groups map[int]map[string][]NormalUnit) (b
 		return false, "Ranktable count"
 	}
 	return true, ""
+}
+
+// Controller-owned operation state is distinct from user-requested Ranktables.
+// Recognize one exact UID-derived object and validate its complete schema.
+func validGroupMembersState(cm *unstructured.Unstructured, owner string) bool {
+	name := fmt.Sprintf("modelserving-members-%x", sha256.Sum256([]byte(cm.GetNamespace()+"/model/"+owner)))
+	if cm.GetName() != name || !objectOwned(cm, owner) || cm.GetDeletionTimestamp() != nil || cm.GetLabels()["modelserving.volcano.sh/name"] != "model" {
+		return false
+	}
+	if cm.GetLabels()["modelserving.volcano.sh/group-name"] != "" || cm.GetLabels()["modelserving.volcano.sh/role"] != "" {
+		return false
+	}
+	data, _, err := unstructured.NestedStringMap(cm.Object, "data")
+	if err != nil || len(data) != 2 {
+		return false
+	}
+	var targets map[string]map[string]int32
+	var revisions map[string]string
+	if json.Unmarshal([]byte(data["targets.json"]), &targets) != nil || targets == nil || json.Unmarshal([]byte(data["revisions.json"]), &revisions) != nil || revisions == nil {
+		return false
+	}
+	for group, roles := range targets {
+		ordinal, err := strconv.Atoi(strings.TrimPrefix(group, "model-"))
+		if err != nil || ordinal < 0 || group != fmt.Sprintf("model-%d", ordinal) || len(roles) == 0 || revisions[group] == "" {
+			return false
+		}
+		for role, count := range roles {
+			if role == "" || count < 0 {
+				return false
+			}
+		}
+	}
+	return len(targets) == len(revisions)
 }

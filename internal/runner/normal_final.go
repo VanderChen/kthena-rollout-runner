@@ -26,6 +26,20 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 		if !u.Ready || !u.Complete {
 			return false, "members not complete/Ready: " + u.Key
 		}
+		if len(l.Recoveries) > 0 && !expect.NoFullPromotion && !expect.BlockedByBudget {
+			// Physical count can already equal N while a temporary surge is
+			// still providing the capacity needed to fill a formal hole.
+			if l.temporaryRoleSurge(u) {
+				return false, "temporary recovery surge remains: " + u.Key
+			}
+			if l.Model.Mode == "SG" && u.Group >= l.Model.N {
+				for _, pod := range u.Pods {
+					if pod.Annotations["modelserving.volcano.sh/surge"] == "serving-group" {
+						return false, "temporary recovery surge remains: " + pod.Labels[LabelGroup]
+					}
+				}
+			}
+		}
 		if groups[u.Group] == nil {
 			groups[u.Group] = map[string][]NormalUnit{}
 		}

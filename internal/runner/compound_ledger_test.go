@@ -258,7 +258,7 @@ func TestCompoundSurgeCountsBothCAndV(t *testing.T) {
 	}
 }
 
-func TestCompoundTargetPodGroupWithoutPodAlreadyCountsV(t *testing.T) {
+func TestCompoundPodGroupWithoutPodReservesUnknownCapacity(t *testing.T) {
 	l, objects := compoundFixture(t, "RUN-640", 2)
 	c := compoundCase(t, "RUN-640")
 	if err := l.Transition(c.Scenario.Steps[1].Spec, "B", ScenarioExpectation{}, objects); err != nil {
@@ -271,8 +271,8 @@ func TestCompoundTargetPodGroupWithoutPodAlreadyCountsV(t *testing.T) {
 	objects["podgroups"][string(group.GetUID())] = group
 	l.compoundAfter("podgroups", "ADDED", group, objects)
 	budget := l.compoundBudget(objects)
-	if budget.C != 4 || budget.V != 1 || budget.Q != 1 {
-		t.Fatalf("target PodGroup before its Pod must count in C and V: %+v", budget)
+	if budget.C != 4 || budget.V != 0 || budget.I != 1 || budget.Q != 1 {
+		t.Fatalf("PodGroup before any member must count in C and I, without guessing a version: %+v", budget)
 	}
 }
 
@@ -511,4 +511,54 @@ func TestCompoundRoleMemberIncreaseCannotDropSecondGroupBelowFloor(t *testing.T)
 		l.compoundAfter("pods", "ADDED", added, objects)
 	}
 	requireNormalViolation(t, l, "COMPOUND_ROLE_READY_BUDGET")
+}
+
+func TestCompoundShrinkDoesNotCommitServingSurge(t *testing.T) {
+	l, objects := compoundFixture(t, "RUN-636")
+	// Healthy target surge is temporary; the three original groups are formal.
+	p := normalTestPod("SG", "frontend", 0, "A", true, "entry")
+	labels := p.GetLabels()
+	labels[LabelGroup] = "model-3"
+	p.SetLabels(labels)
+	p.SetName("sg-3-B")
+	p.SetUID("serving-surge")
+	objects["pods"][string(p.GetUID())] = p
+	l.Released[string(p.GetUID())] = true
+	next := cloneMap(l.Model.Spec)
+	next["replicas"] = float64(2)
+	if err := l.Transition(next, "shrink", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	if l.ScaleGroups[3] || !l.ScaleGroups[2] {
+		t.Fatalf("shrink must select formal group only: %+v", l.ScaleGroups)
+	}
+	pg := &unstructured.Unstructured{}
+	pg.SetName("model-2")
+	pg.SetUID("pg-2")
+	pg.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+	l.podGroupBefore("podgroups", "DELETED", pg, objects)
+	if l.PGPods["serving-surge"] || l.PGScale["serving-surge"] {
+		t.Fatal("serving surge was committed without destructive evidence")
+	}
+	if !l.units(objects["pods"])["model-3"].Ready {
+		t.Fatal("serving surge lost Ready credit")
+	}
+}
+
+func TestCompoundNewPodGroupUsesActualOldMemberVersion(t *testing.T) {
+	l, objects := compoundFixture(t, "RUN-623", 1)
+	c := compoundCase(t, "RUN-623")
+	if err := l.Transition(c.Scenario.Steps[2].Spec, "B", ScenarioExpectation{}, objects); err != nil {
+		t.Fatal(err)
+	}
+	pg := &unstructured.Unstructured{}
+	pg.SetName("model-1")
+	pg.SetUID("new-pg-old-member")
+	pg.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+	objects["podgroups"][string(pg.GetUID())] = pg
+	l.compoundAfter("podgroups", "ADDED", pg, objects)
+	b := l.compoundBudget(objects)
+	if b.V != 0 || b.I != 0 {
+		t.Fatalf("observed old member is neither new-unavailable nor unknown: %+v", b)
+	}
 }

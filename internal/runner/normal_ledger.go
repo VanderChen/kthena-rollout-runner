@@ -341,25 +341,12 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 	}
 	var gs []NormalUnit
 	for _, g := range groups {
-		if g.Active {
+		if g.Active && (!l.CompoundV2 || l.CompoundFormal[g.Group] || g.Group < next.N) {
 			gs = append(gs, g)
 		}
 	}
 	sort.Slice(gs, func(i, j int) bool {
-		pi, pj := gs[i].Ordinal < next.P, gs[j].Ordinal < next.P
-		if old.Mode == "SG" && !l.CompoundV2 && pi != pj {
-			return !pi
-		}
-		if gs[i].Ready != gs[j].Ready {
-			return !gs[i].Ready
-		}
-		if old.Mode == "SG" && l.CompoundV2 && pi != pj {
-			return !pi
-		}
-		if l.CompoundV2 && compoundDeletionCost(gs[i]) != compoundDeletionCost(gs[j]) {
-			return compoundDeletionCost(gs[i]) < compoundDeletionCost(gs[j])
-		}
-		return gs[i].Ordinal > gs[j].Ordinal
+		return l.scaleLess(gs[i], gs[j], next.P, old.Mode == "SG")
 	})
 	groupDeletes := 0
 	if next.N < old.N {
@@ -389,16 +376,17 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 			continue
 		}
 		oldR := old.Roles[us[0].Role].R
-		sort.Slice(us, func(i, j int) bool {
-			pi, pj := us[i].Ordinal < r.P, us[j].Ordinal < r.P
-			if old.Mode == "Role" && pi != pj {
-				return !pi
+		formal := us[:0]
+		for _, unit := range us {
+			if !l.temporaryRoleSurge(unit) || unit.Ordinal < r.R {
+				formal = append(formal, unit)
 			}
-			if us[i].Ready != us[j].Ready {
-				return !us[i].Ready
-			}
-			return us[i].Ordinal > us[j].Ordinal
-		})
+		}
+		us = formal
+		if len(us) == 0 {
+			continue
+		}
+		sort.Slice(us, func(i, j int) bool { return l.scaleLess(us[i], us[j], r.P, old.Mode == "Role") })
 		roleDeletes := 0
 		if r.R < oldR {
 			roleDeletes = max(len(us)-r.R, 0)
@@ -741,21 +729,12 @@ func (l *NormalLedger) dynamicScaleBefore(kind, event string, o *unstructured.Un
 		}
 	}
 }
-func (l *NormalLedger) scaleLess(a, b NormalUnit, partition int, protect bool) bool {
-	if protect && !l.CompoundV2 && (a.Ordinal < partition) != (b.Ordinal < partition) {
-		return a.Ordinal >= partition
-	}
+func (l *NormalLedger) scaleLess(a, b NormalUnit, _ int, _ bool) bool {
 	if a.Ready != b.Ready {
 		return !a.Ready
 	}
-	if protect && l.CompoundV2 && (a.Ordinal < partition) != (b.Ordinal < partition) {
-		return a.Ordinal >= partition
-	}
-	if l.CompoundV2 && compoundDeletionCost(a) != compoundDeletionCost(b) {
+	if compoundDeletionCost(a) != compoundDeletionCost(b) {
 		return compoundDeletionCost(a) < compoundDeletionCost(b)
-	}
-	if len(a.Pods) != len(b.Pods) {
-		return len(a.Pods) < len(b.Pods)
 	}
 	return a.Ordinal > b.Ordinal
 }
@@ -969,16 +948,14 @@ func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstru
 	l.PGCommitted[string(o.GetUID())] = true
 	group := ordinal(o.GetName())
 	if l.ScaleGroups[group] {
-		// The first selected PG deletion starts the finite SG shrink batch.
-		// A rapid replicas restore can arrive while later PGs in that same
-		// batch are still being deleted. Retain only its selected Pod UIDs.
+		// Selection is not execution. Only this observed PG's finite Pod
+		// cohort has destructive evidence; a still-serving surge keeps credit.
 		for uid, p := range objects["pods"] {
-			if l.ScaleUIDs[uid] && l.ScaleGroups[ordinal(p.GetLabels()[LabelGroup])] && objectOwned(p, l.Owner) {
+			if l.ScaleUIDs[uid] && p.GetLabels()[LabelGroup] == o.GetName() && objectOwned(p, l.Owner) {
 				if !l.PGPods[uid] {
 					l.PGPhase[uid] = l.Phase
 				}
-				l.PGPods[uid] = true
-				l.PGScale[uid] = true
+				l.PGPods[uid], l.PGScale[uid] = true, true
 			}
 		}
 		return

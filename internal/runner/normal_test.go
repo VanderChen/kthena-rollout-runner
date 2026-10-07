@@ -628,7 +628,7 @@ func TestCurrentNotReadyTargetIsNotAnOldRolloutCandidate(t *testing.T) {
 	}
 }
 
-func TestNormalAcceptedGroupScaleBatchSurvivesImmediateRestore(t *testing.T) {
+func TestNormalIndividuallyAcceptedGroupScaleIntentsSurviveImmediateRestore(t *testing.T) {
 	for _, accepted := range []bool{false, true} {
 		t.Run(fmt.Sprint(accepted), func(t *testing.T) {
 			l, objects := normalFixture(t, "RUN-176")
@@ -651,6 +651,7 @@ func TestNormalAcceptedGroupScaleBatchSurvivesImmediateRestore(t *testing.T) {
 			}
 			if accepted {
 				l.Before("podgroups", "DELETED", pg(2), objects)
+				l.Before("podgroups", "DELETED", pg(1), objects)
 			}
 			if err := l.Transition(steps[2].Spec, "restore", ScenarioExpectation{}, objects); err != nil {
 				t.Fatal(err)

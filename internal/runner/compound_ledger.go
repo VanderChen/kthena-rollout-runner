@@ -8,13 +8,12 @@ import (
 	"sort"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type compoundBudget struct {
-	N, U, S, P int
-	C, R, V, Q int
+	N, U, S, P    int
+	C, R, V, I, Q int
 }
 
 func (l *NormalLedger) compoundBudget(objects Objects) compoundBudget {
@@ -29,30 +28,28 @@ func (l *NormalLedger) compoundBudget(objects Objects) compoundBudget {
 		}
 	}
 	for _, group := range objects["podgroups"] {
-		if !objectOwned(group, l.Owner) || l.CompoundPGVersion[string(group.GetUID())] != target {
+		if !objectOwned(group, l.Owner) {
 			continue
 		}
-		readyGenerationPod := false
+		hasMember := false
 		created := group.GetCreationTimestamp()
 		for _, pod := range objects["pods"] {
 			if !objectOwned(pod, l.Owner) || pod.GetLabels()[LabelGroup] != group.GetName() {
 				continue
 			}
-			var typed corev1.Pod
-			if convertPod(pod, &typed) != nil || podVersion(&typed) != target {
-				continue
-			}
 			podCreated := pod.GetCreationTimestamp()
 			if created.IsZero() || podCreated.IsZero() || !podCreated.Before(&created) {
-				readyGenerationPod = true
+				hasMember = true
 				break
 			}
 		}
-		if !readyGenerationPod {
-			b.V++
+		// A PG alone proves occupancy, never the member template or Ready.
+		// Once members arrive, their actual version supplies V/Ebad instead.
+		if !hasMember {
+			b.I++
 		}
 	}
-	b.Q = max(0, b.C-max(0, b.N-b.U)-b.V)
+	b.Q = max(0, b.C-max(0, b.N-b.U)-b.V-b.I)
 	return b
 }
 
@@ -168,7 +165,7 @@ func (l *NormalLedger) compoundBefore(kind, event string, o *unstructured.Unstru
 		}
 	}
 	if budget.Q-pending <= 0 {
-		l.fail(fmt.Sprintf("COMPOUND_Q_EXHAUSTED: group=%d C=%d N=%d U=%d V=%d Q=%d pending=%d", ordinal, budget.C, budget.N, budget.U, budget.V, budget.Q, pending))
+		l.fail(fmt.Sprintf("COMPOUND_Q_EXHAUSTED: group=%d C=%d N=%d U=%d V=%d I=%d Q=%d pending=%d", ordinal, budget.C, budget.N, budget.U, budget.V, budget.I, budget.Q, pending))
 		return
 	}
 	l.CompoundPending[ordinal] = key

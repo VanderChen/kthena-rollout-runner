@@ -77,7 +77,7 @@ func (s *Server) captureDeletion(request requestContext, frame watchFrame) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, rule := range s.rules {
-		if !s.activeLocked(rule) || rule.Mode != "replay-deletion" || !rule.matchesObject(frame.object) {
+		if !s.activeLocked(rule) || rule.Mode != "replay-deletion" || rule.LabelSelector != "" && rule.LabelSelector != request.meta.LabelSelector || !rule.matchesObject(frame.object) {
 			continue
 		}
 		if rule.Captured[frame.object.UID] != "" {
@@ -119,7 +119,7 @@ func (s *Server) noteReplayOriginalForward(request requestContext, frame watchFr
 	}
 	hash := frameHash(frame)
 	for _, rule := range s.rules {
-		if rule.Mode == "replay-deletion" && s.activeLocked(rule) && rule.Captured[frame.object.UID] == hash {
+		if rule.Mode == "replay-deletion" && s.activeLocked(rule) && (rule.LabelSelector == "" || rule.LabelSelector == request.meta.LabelSelector) && rule.Captured[frame.object.UID] == hash {
 			if stream.forwarded[rule.ID] == nil {
 				stream.forwarded[rule.ID] = map[string]string{}
 			}
@@ -188,7 +188,7 @@ func (s *Server) queueReplay(ctx context.Context, request ReplayRequest) (replay
 	}
 	var selected *replayStream
 	for _, stream := range s.replayStreams {
-		if stream.request.meta.Resource != "pods" || stream.forwarded[rule.ID][want[0]] != rule.Captured[want[0]] || stream.forwarded[rule.ID][want[1]] != rule.Captured[want[1]] {
+		if stream.request.meta.Resource != "pods" || rule.LabelSelector != "" && rule.LabelSelector != stream.request.meta.LabelSelector || stream.forwarded[rule.ID][want[0]] != rule.Captured[want[0]] || stream.forwarded[rule.ID][want[1]] != rule.Captured[want[1]] {
 			continue
 		}
 		if selected != nil {

@@ -121,8 +121,8 @@ func (r Rule) validate() error {
 	if r.Generation < 0 || r.Generation > 0 && (r.Mode != "error" || r.InitialSync || r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodPut || r.Name == "" || r.OwnerUID == "") {
 		return fmt.Errorf("generation filter requires an exact owned object PUT")
 	}
-	if (r.LabelSelector != "" || r.ListLimit != nil) && (!r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodGet || r.ListLimit != nil && *r.ListLimit < 0) {
-		return fmt.Errorf("selector and limit filters require a collection-only GET error and nonnegative limit")
+	if (r.LabelSelector != "" || r.ListLimit != nil) && !(r.Mode == "replay-deletion" && r.ListLimit == nil && !r.CollectionOnly) && (!r.CollectionOnly || len(r.Methods) != 1 || r.Methods[0] != http.MethodGet || r.ListLimit != nil && *r.ListLimit < 0) {
+		return fmt.Errorf("selector filters require an exact replay Watch or collection GET; limits require nonnegative collection GET")
 	}
 	switch r.Mode {
 	case "omit-list-object":

@@ -5,6 +5,8 @@ package faultproxy
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -202,6 +204,46 @@ func TestReplayRejectsAmbiguousOriginalStreams(t *testing.T) {
 		if nextUID(t, framesOne) != uid {
 			t.Fatal("wrong surviving stream replay")
 		}
+	}
+	control(t, s, "DELETE", "/v1/rules/replay", nil, 204)
+}
+
+func TestReplaySelectsExactControllerWatch(t *testing.T) {
+	s, origin, streams := watchFixture(t)
+	unrelated, other := connect(t, origin, streams)
+	defer unrelated.Body.Close()
+	const selector = "modelserving.volcano.sh/group-name"
+	selected, err := http.Get(origin + "/api/v1/pods?watch=true&labelSelector=" + url.QueryEscape(selector))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer selected.Body.Close()
+	current := <-streams
+	ordinaryFrames, selectedFrames := readFrames(unrelated), readFrames(selected)
+	rule := replayRule()
+	rule.LabelSelector = selector
+	control(t, s, "POST", "/v1/rules", rule, 201)
+	for _, uid := range []string{"old-entry", "old-worker"} {
+		other.events <- event("DELETED", "test", uid, true)
+		nextUID(t, ordinaryFrames)
+	}
+	if state(t, s).Rules[0].Hits != 0 {
+		t.Fatal("unrelated controller stream was captured")
+	}
+	for _, uid := range []string{"old-entry", "old-worker"} {
+		current.events <- event("DELETED", "test", uid, true)
+		nextUID(t, selectedFrames)
+	}
+	awaitOriginalReplayFrames(t, s)
+	control(t, s, "POST", "/v1/replay", replayOrder(), 200)
+	for _, uid := range replayOrder().Order {
+		if nextUID(t, selectedFrames) != uid {
+			t.Fatal("wrong replay identity")
+		}
+	}
+	other.events <- event("ADDED", "test", "ordinary", false)
+	if nextUID(t, ordinaryFrames) != "ordinary" {
+		t.Fatal("replay leaked into unrelated controller")
 	}
 	control(t, s, "DELETE", "/v1/rules/replay", nil, 204)
 }

@@ -153,7 +153,7 @@ func (e *normalExecution) replayOldDeletions(ctx context.Context, p ScenarioStep
 	if err = writeJSON(filepath.Join(e.dir, prefix+"-fault-scope.json"), scope); err != nil {
 		return err
 	}
-	rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: "pods", OwnerUID: e.l.Owner, UIDs: []string{string(cohort[0].UID), string(cohort[1].UID)}, Mode: "replay-deletion", Count: -1, DurationSeconds: 900}
+	rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: "pods", OwnerUID: e.l.Owner, UIDs: []string{string(cohort[0].UID), string(cohort[1].UID)}, Mode: "replay-deletion", Count: -1, DurationSeconds: 900, LabelSelector: LabelGroup}
 	var installed faultproxy.RuleStatus
 	if err = e.r.faultControl(ctx, "POST", "/v1/rules", rule, &installed); err != nil {
 		return err

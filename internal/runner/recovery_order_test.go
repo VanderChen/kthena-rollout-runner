@@ -153,3 +153,89 @@ func TestRecoveryOrderAcceptsPodBeforePodGroupDelivery(t *testing.T) {
 		t.Fatal("late PodGroup frame changed the already observed Pod start", err)
 	}
 }
+
+func TestRecoveryOrderRetainsInFlightUnitAfterLastOldMemberDisappears(t *testing.T) {
+	l, objects, worker := recoveryOrderFixture(t)
+	deleteRecoveryPod(l, objects, worker)
+	startRecoveryOrderGroup(l, objects)
+	deleteNormal(l, objects, "backend", 2, 0)
+	if err := l.error(); err != nil {
+		t.Fatal("already recovering unit became a new old-bad candidate", err)
+	}
+}
+
+func TestRecoveryOrderArmingAloneDoesNotExcludeOldBadCandidate(t *testing.T) {
+	l, objects, scope := recoveryFixture(t, "RUN-313", "RoleRecreate")
+	if err := l.armRecovery(scope, objects); err != nil {
+		t.Fatal(err)
+	}
+	addRecoveryOrderSurge(l, objects)
+	makeRecoveryOrderGroupUnavailable(objects, "model-0")
+	startRecoveryOrderGroup(l, objects)
+	requireNormalViolation(t, l, "ORDER_MISMATCH")
+}
+
+func recoveryOrderReplacements(t *testing.T) (*NormalLedger, Objects, []*unstructured.Unstructured) {
+	t.Helper()
+	l, objects, scope := recoveryFixture(t, "RUN-313", "RoleRecreate")
+	if err := l.armRecovery(scope, objects); err != nil {
+		t.Fatal(err)
+	}
+	addRecoveryOrderSurge(l, objects)
+	var replacements []*unstructured.Unstructured
+	for uid := range scope.RecoveryUIDs {
+		p := objects["pods"][uid].DeepCopy()
+		p.SetUID(types.UID("replacement-" + uid))
+		labels := p.GetLabels()
+		labels["modelserving.volcano.sh/revision"] = "fixture-B"
+		p.SetLabels(labels)
+		containers, _, _ := unstructured.NestedSlice(p.Object, "spec", "containers")
+		env := containers[0].(map[string]interface{})["env"].([]interface{})
+		env[0].(map[string]interface{})["value"] = "B"
+		_ = unstructured.SetNestedSlice(p.Object, containers, "spec", "containers")
+		_ = unstructured.SetNestedSlice(p.Object, []interface{}{map[string]interface{}{"type": "Ready", "status": "False"}}, "status", "conditions")
+		replacements = append(replacements, p)
+		deleteRecoveryPod(l, objects, uid)
+	}
+	for _, p := range replacements {
+		objects["pods"][string(p.GetUID())] = p
+		l.Released[string(p.GetUID())] = true
+		l.recoveryAfter("pods", "ADDED", p)
+	}
+	l.updateRecoveryOrderState(objects)
+	return l, objects, replacements
+}
+
+func TestRecoveryOrderCompletionRequiresAllFirstReplacementsReadyAndIsPermanent(t *testing.T) {
+	l, objects, replacements := recoveryOrderReplacements(t)
+	r := l.Recoveries[0]
+	for i, p := range replacements {
+		if r.OrderComplete {
+			t.Fatal("recovery ended before every first replacement was Ready")
+		}
+		_ = unstructured.SetNestedSlice(p.Object, []interface{}{map[string]interface{}{"type": "Ready", "status": "True"}}, "status", "conditions")
+		l.After("pods", "MODIFIED", p, objects)
+		if r.OrderComplete != (i == len(replacements)-1) {
+			t.Fatal("completion did not match physical first-replacement readiness")
+		}
+	}
+	makeRecoveryOrderGroupUnavailable(objects, "model-0")
+	l.updateRecoveryOrderState(objects)
+	if !r.OrderComplete {
+		t.Fatal("a later unrelated failure revived the old recovery record")
+	}
+	role := l.Model.Roles["frontend"]
+	role.Entry, role.Worker = "C", "C"
+	l.Model.Roles["frontend"] = role
+	startRecoveryOrderGroup(l, objects)
+	requireNormalViolation(t, l, "ORDER_MISMATCH")
+}
+
+func TestRecoveryOrderSupersededReplacementBecomesCandidateAgain(t *testing.T) {
+	l, objects, _ := recoveryOrderReplacements(t)
+	role := l.Model.Roles["frontend"]
+	role.Entry, role.Worker = "C", "C"
+	l.Model.Roles["frontend"] = role
+	startRecoveryOrderGroup(l, objects)
+	requireNormalViolation(t, l, "ORDER_MISMATCH")
+}

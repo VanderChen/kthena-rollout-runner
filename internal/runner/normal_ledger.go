@@ -611,7 +611,7 @@ func (l *NormalLedger) checkOldCandidateOrder(selected NormalUnit, units map[str
 	}
 	_, _, _, partition := l.scopeBudget(selected)
 	for _, other := range units {
-		if other.Scope != selected.Scope || other.Key == selected.Key || other.Ordinal < partition || !other.Active || l.unitTarget(other) || !l.oldCandidatePrecedes(other, selected) {
+		if other.Scope != selected.Scope || other.Key == selected.Key || other.Ordinal < partition || !other.Active || l.unitTarget(other) || l.recoveryOrderPending(other) || !l.oldCandidatePrecedes(other, selected) {
 			continue
 		}
 		available := true
@@ -816,6 +816,9 @@ func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, o
 		}
 	}
 	l.recoveryAfter(kind, event, o)
+	if kind == "pods" {
+		l.updateRecoveryOrderState(objects)
+	}
 	if kind == "controllerrevisions" && event != "DELETED" && objectOwned(o, l.Owner) {
 		data, _ := json.Marshal(o.Object["data"])
 		uid := string(o.GetUID())

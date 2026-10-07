@@ -21,6 +21,8 @@ type RecoveryRecord struct {
 	ProtectedNames map[string]bool   `json:"protectedRecoveryNames"`
 	Replacements   map[string]string `json:"replacementUIDsByName"`
 	PodGroups      map[string]string `json:"recoverablePodGroupUIDs"`
+	OrderUnits     map[string]bool   `json:"recoveringOrderUnits"`
+	OrderComplete  bool              `json:"orderRecoveryComplete"`
 }
 
 func (l *NormalLedger) armRecovery(scope PodFaultScope, objects Objects) error {
@@ -28,6 +30,7 @@ func (l *NormalLedger) armRecovery(scope PodFaultScope, objects Objects) error {
 		return fmt.Errorf("invalid recovery scope owner/UIDs")
 	}
 	r := &RecoveryRecord{Scope: scope, Armed: time.Now().UTC(), Deleted: map[string]bool{}, WantVersions: map[string]string{}, ProtectedNames: map[string]bool{}, Replacements: map[string]string{}, PodGroups: map[string]string{}}
+	r.OrderUnits = map[string]bool{}
 	for uid, name := range scope.RecoveryUIDs {
 		object := objects["pods"][uid]
 		var pod corev1.Pod
@@ -47,6 +50,8 @@ func (l *NormalLedger) armRecovery(scope PodFaultScope, objects Objects) error {
 			want = podVersion(&pod)
 		}
 		r.WantVersions[name] = want
+		r.OrderUnits["SG/"+pod.Labels[LabelGroup]] = true
+		r.OrderUnits["Role/"+roleUnitKey(&pod)] = true
 		if scope.Recovery == "ServingGroupRecreate" {
 			for pgUID, pg := range objects["podgroups"] {
 				if objectOwned(pg, l.Owner) && pg.GetNamespace() == scope.Namespace && pg.GetName() == pod.Labels[LabelGroup] && pg.GetDeletionTimestamp() == nil {
@@ -65,6 +70,65 @@ func (l *NormalLedger) armRecovery(scope PodFaultScope, objects Objects) error {
 	}
 	l.Recoveries = append(l.Recoveries, r)
 	return nil
+}
+
+// A recovery does not become a fresh old-bad candidate just because its last
+// captured Pod disappeared. This affects precedence only, never Ready credit
+// or permission to delete a replacement UID.
+func (l *NormalLedger) recoveryOrderPending(u NormalUnit) bool {
+	for _, r := range l.Recoveries {
+		if r.Scope.OwnerUID != l.Owner || !r.Deleted[r.Scope.TargetUID] || r.OrderComplete || !r.OrderUnits[l.Model.Mode+"/"+u.Key] {
+			continue
+		}
+		for _, pod := range u.Pods {
+			if pod.Namespace != r.Scope.Namespace {
+				continue
+			}
+			if r.Scope.RecoveryUIDs[string(pod.UID)] != "" {
+				return true
+			}
+		}
+		// A newly superseded replacement is an old candidate again; an old
+		// recovery record must not lock obsolete bad versions indefinitely.
+		superseded := false
+		for _, pod := range u.Pods {
+			if r.Replacements[pod.Name] != string(pod.UID) || pod.Namespace != r.Scope.Namespace {
+				continue
+			}
+			layout := l.Model.Roles[pod.Labels[LabelRole]]
+			want := layout.Entry
+			if !podIsEntry(pod) {
+				want = layout.Worker
+			}
+			if want != r.WantVersions[pod.Name] && !r.ProtectedNames[pod.Name] {
+				superseded = true
+			}
+		}
+		if !superseded {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *NormalLedger) updateRecoveryOrderState(objects Objects) {
+	for _, r := range l.Recoveries {
+		if r.OrderComplete || !r.Deleted[r.Scope.TargetUID] {
+			continue
+		}
+		complete := true
+		for uid := range r.Scope.RecoveryUIDs {
+			complete = complete && objects["pods"][uid] == nil
+		}
+		for name, version := range r.WantVersions {
+			object := objects["pods"][r.Replacements[name]]
+			var pod corev1.Pod
+			if object == nil || convertPod(object, &pod) != nil || !owned(&pod, r.Scope.OwnerUID) || pod.Namespace != r.Scope.Namespace || pod.Name != name || podVersion(&pod) != version || !podReady(&pod) || pod.DeletionTimestamp != nil {
+				complete = false
+			}
+		}
+		r.OrderComplete = complete
+	}
 }
 
 func (l *NormalLedger) recoveryBefore(kind, event string, object *unstructured.Unstructured, objects Objects) bool {

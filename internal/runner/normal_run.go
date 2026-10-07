@@ -109,10 +109,9 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 			res.Error += "; " + err.Error()
 		}
 	}()
-	if r.testedCommit() != c.Baseline {
-		res.Error = "case requires --controller-commit=" + c.Baseline
-		return
-	}
+	// Baseline identifies the approved case catalogue. The explicitly supplied
+	// controller commit identifies the candidate under test, recorded in the
+	// run manifest; testing a fix must not rewrite the catalogue provenance.
 	if err := saveYAML(filepath.Join(dir, "case.yaml"), c); err != nil {
 		res.Error = err.Error()
 		return

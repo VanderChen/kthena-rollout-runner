@@ -22,7 +22,7 @@
           "w": 0
     "initial": "A全Ready"
     "action": "更新f为B，在旧实例删除中终止并由Deployment重启同镜像controller"
-    "expect": "从API持久化事实及历史重建状态，不重复消费预算、不误滚已完成B、不永久等待；最终无需再次人工重启完成"
+    "expect": "重启后不重放原删除批次；按实际Pod、最新配置、历史模板、partition与当前预算重新收敛，不重复取得删除额度、不误删同名新UID；不要求原批次所有旧UID都被替换"
     "refs":
       - "L15"
     "note": ""
@@ -265,7 +265,7 @@
           "count": 1
       "timeoutSeconds": 420
     -
-      "name": "release-old-deletion-and-complete"
+      "name": "release-terminating-object-and-converge"
       "action": "unpin"
       "until": "settled"
       "release": "one"

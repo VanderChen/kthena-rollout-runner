@@ -63,7 +63,7 @@
       },
       "initial": "A全Ready",
       "action": "更新f为B，在旧实例删除中终止并由Deployment重启同镜像controller",
-      "expect": "从API持久化事实及历史重建状态，不重复消费预算、不误滚已完成B、不永久等待；最终无需再次人工重启完成",
+      "expect": "重启后不重放原删除批次；按实际Pod、最新配置、历史模板、partition与当前预算重新收敛，不重复取得删除额度、不误删同名新UID；不要求原批次所有旧UID都被替换",
       "refs": [
         "L15"
       ],
@@ -178,7 +178,7 @@
       },
       "initial": "A全Ready",
       "action": "更新f为B，在旧实例删除中终止并由Deployment重启同镜像controller",
-      "expect": "从API持久化事实及历史重建状态，不重复消费预算、不误滚已完成B、不永久等待；最终无需再次人工重启完成",
+      "expect": "重启后不重放原删除批次；按实际Pod、最新配置、历史模板、partition与当前预算重新收敛，不重复取得删除额度、不误删同名新UID；不要求原批次所有旧UID都被替换",
       "refs": [
         "L15"
       ],
@@ -235,10 +235,10 @@
   ],
   "inputs": {
     "RUN-435": "4b08f832db14b01792e0fa424eaecf7592653f337e8c7ebfca5c8f6ae0688c83",
-    "RUN-436": "481988e5c5e2bfca081e8403509b78d32b7e6936c376951a30cd0d9d57b71716",
+    "RUN-436": "e8c23e75689ea0ce841070e074e8a5b175418df74b7e628b2472547b5ecae3f3",
     "RUN-437": "a39169c2803787f1fcab8a3f77f6e93b3c0c22c77059496635ca76fbe4da96b9",
     "RUN-438": "c2fd877fc7ab9ca6ed0cad5b6e9235c9c1d7677eaa87f92a0121a00a2010ccc4",
-    "RUN-439": "ccb3bb41e7f52fc99744954dd6d59679bd5c20054112b7a04e23563d9b20b41d",
+    "RUN-439": "87c42fc4bd9f1388ddc0e1715b32521918fcb2bc6231c8337187c123a60c77ef",
     "RUN-440": "490a5126e189798ddc826e5d12fa983e7e794191c156db04d7368ab107d1b747"
   }
 }

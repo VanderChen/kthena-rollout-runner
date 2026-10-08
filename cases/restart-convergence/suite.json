@@ -1,0 +1,27 @@
+{
+  "format": "rollout-runner/restart-convergence-v1",
+  "contractVersion": "2.6",
+  "reference": "docs/specs/servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases",
+  "executor": "scripts/run-restart-convergence.py",
+  "fixture": "Real Failed Pod, controller-only DELETE/POST errors, cleared completion facts, same-image controller replacement with initialSync, schedulerName=volcano",
+  "cases": [
+    {"id": "RC-01", "mode": "SG", "policy": "ServingGroupRecreate", "coordination": false, "workers": 0, "description": "整组恢复仅删除 decode 后重启，补历史 decode 并保留 prefill"},
+    {"id": "RC-02", "mode": "SG", "policy": "RoleRecreate", "coordination": false, "workers": 1, "description": "SG 内 Role 恢复仅删除 worker 后重启，保留 entry 和另一 Role"},
+    {"id": "RC-03", "mode": "Role", "policy": "RoleRecreate", "coordination": false, "workers": 1, "description": "独立 Role 部分恢复后重启，按历史布局补 worker 并保持当前预算"},
+    {"id": "RC-04", "mode": "Role", "policy": "RoleRecreate", "coordination": true, "workers": 1, "description": "配置百分比协调约束的 Role 部分恢复后重启，仍按当前预算及保护规则收敛"}
+  ],
+  "assertions": [
+    "A full Ready baseline and durable completion facts precede desired B with partition=2",
+    "Actual failed Pod disappears, survivor DELETE is rejected, and recovery completion facts are cleared before restart",
+    "Restart changes controller UID without changing image or template, and completes initialSync",
+    "partition 2->1 while stopped; missing low unit consumes maxUnavailable=1; healthy survivor and other unit UIDs stay unchanged while POST is blocked",
+    "First replacement uses historical A, a new UID and the applied entry/worker layout; surviving healthy UIDs remain until partition release",
+    "High eligible unit reaches B only after refill; partition 1->0 then converges all eligible units to B",
+    "A fresh fault in the continuously running controller still replaces exactly the configured Role/SG scope"
+  ],
+  "limitations": [
+    "This suite does not migrate the 84 historical recovery cases or prove every roleCoordination/maxSkew/order combination",
+    "Pure NotReady, None, grace=-1 and finite grace retain their independent recovery-contract/grace-restart coverage",
+    "RUN-436/439 remain the separate rolling-Terminating restart cases"
+  ]
+}

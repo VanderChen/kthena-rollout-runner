@@ -18,7 +18,7 @@
 
 没有把 U=0/S=0/P<3 的不推进或拒绝类场景塞入这60项正向基础集合。其余目录的错误/故障/扩缩等场景仍须独立标注未实现或人工执行，不能由本表推导为通过。
 
-本文件的普通滚动从健康旧实例开始；其高到低顺序不是故障组合的全局禁止跳过规则。契约 2.2 的 SG/独立 Role 默认旧 NotReady 优先、协调 Role 不跳过，见 [共用查表](specs/servinggroup-compound-rollout.zh-CN.md#budget-lookup)。本文件第 6 条的逐 Ready 信用与 SG A.4 整批等待仍需独立统一，不能以此次候选顺序修订隐式覆盖。
+本文件的普通滚动从健康旧实例开始；其高到低顺序不是故障组合的全局禁止跳过规则。契约 2.2 的 SG/独立 Role 默认旧 NotReady 优先、协调 Role 不跳过，见 [共用查表](specs/servinggroup-compound-rollout.zh-CN.md#budget-lookup)。契约 2.3 已按单独批准将 SG A.4 统一为第 6 条的逐 Ready 推进；每次按当前状态核算所有预算与约束，不设置额外整批等待。
 
 ## 每例共同预期
 

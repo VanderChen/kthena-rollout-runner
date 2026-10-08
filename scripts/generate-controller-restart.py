@@ -13,9 +13,17 @@ loader=importlib.util.spec_from_file_location('recovery_generator',ROOT/'scripts
 recovery=importlib.util.module_from_spec(loader);loader.loader.exec_module(recovery);normal=recovery.normal
 
 
+def contract_row(source):
+    """Keep the immutable catalogue; apply the approved 2.6 restart expectation."""
+    row = copy.deepcopy(source)
+    if row['id'] in ('RUN-436', 'RUN-439'):
+        row['expect'] = '重启后不重放原删除批次；按实际Pod、最新配置、历史模板、partition与当前预算重新收敛，不重复取得删除额度、不误删同名新UID；不要求原批次所有旧UID都被替换'
+    return row
+
+
 def main():
     raw=normal.SOURCE.read_bytes();assert hashlib.sha256(raw).hexdigest()==recovery.SOURCE_SHA
-    rows=[r for r in json.loads(raw)['cases'] if r['id'].startswith('RUN-') and 435<=int(r['id'][4:])<=440];assert len(rows)==6
+    rows=[contract_row(r) for r in json.loads(raw)['cases'] if r['id'].startswith('RUN-') and 435<=int(r['id'][4:])<=440];assert len(rows)==6
     out=ROOT/'cases/controller-restart';out.mkdir(exist_ok=True)
     for row in rows:
         config=row['config'];assert set(config)<={'mode','n','recovery','roles','top','coordination'}
@@ -32,7 +40,7 @@ def main():
             steps=[normal.step('hold-first-old-deletion',action='pin',conditions=[old],release='none',stableSeconds=0,expect={'noReplacement':True,'noNewRevision':True}),
                    normal.step('old-instance-actually-terminating',b,until='conditions',conditions=[term],stableSeconds=0),
                    normal.step('terminate-controller-during-old-deletion',action='terminate-controller',until='conditions',conditions=[term],release='none',stableSeconds=0),
-                   normal.step('release-old-deletion-and-complete',action='unpin',stableSeconds=30,expect={'targets':targets})]
+                   normal.step('release-terminating-object-and-converge',action='unpin',stableSeconds=30,expect={'targets':targets})]
         else:
             steps=[normal.step('complete-B-including-resource-cleanup',b,stableSeconds=30,expect={'targets':targets}),
                    normal.step('terminate-controller-after-cleanup',action='terminate-controller',release='none',stableSeconds=30,expect={'targets':targets,'noReplacement':True,'noNewRevision':True})]

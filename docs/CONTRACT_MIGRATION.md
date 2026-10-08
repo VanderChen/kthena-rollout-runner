@@ -6,7 +6,7 @@
 
 前次用户要求修正 API reference 和行为预期表；本次明确要求同步执行器并以合入后的 production 运行组合与故障恢复用例。2.2 在两层统一 Q/B/I，并确认默认旧 NotReady 优先、协调 Role 不跳过、无开关。查表入口见 [中文](specs/servinggroup-compound-rollout.zh-CN.md#budget-lookup) / [English](specs/servinggroup-compound-rollout.en.md#budget-lookup)。
 
-admission/recovery/budget 2.1 的执行语义未变。2.2 的 RUN-622/632、全旧坏 RUN-624 与通用候选顺序判定已迁移，SG 35 项和 Pod 删除 recovery 84 项绑定 production `cad19d0f`；原 recovery baseline 保存在 suite 的 priorControllerCommit 和 Git。下述 53 项历史 admission 冲突清单仍不等于顺序覆盖。Role 的 Q 及协调模式例外有正反例单元测试，35 个 SG case 不冒充 Role 运行覆盖。实际运行与失败分类见 [051 验证记录](../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md)。整批/逐 Ready 的独立差异未改判。
+admission/recovery/budget 2.1 的执行语义未变。2.2 的 RUN-622/632、全旧坏 RUN-624 与通用候选顺序判定已迁移，SG 35 项和 Pod 删除 recovery 84 项绑定 production `cad19d0f`；原 recovery baseline 保存在 suite 的 priorControllerCommit 和 Git。下述 53 项历史 admission 冲突清单仍不等于顺序覆盖。Role 的 Q 及协调模式例外有正反例单元测试，35 个 SG case 不冒充 Role 运行覆盖。实际运行与失败分类见 [051 验证记录](../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md)。后续 2.3 文档已获单独批准统一逐 Ready 推进；本段的既有执行器迁移/运行结果不等于新的部分 Ready 专项验证。
 
 ## 当前可执行合约
 
@@ -63,3 +63,28 @@ go run ./cmd/contract-audit > docs/contract-migration.json
 - SG-P11 按先前 042 明确批准修订：高位旧 3 替换到受保护低位 1，历史 A 暂停，再降低 P 更新 1；健康目标高位规则不变。
 
 组合目录 baseline 现固定 `cad19d0fce097e2a5f481938727e9f4e4c42175c`（本次集群实际候选），它不表示 35 项均已通过。原 baseline 在 Git/052 before 快照及来源记录保留。
+
+
+## 2.4 文档决议与待迁移执行范围
+
+用户已确认局部恢复保持所属滚动单元已应用模板、完整单元重建按 partition 选版本；有限 grace 保留跨 controller 重启故障起点；pod-discovery 发布 Running/NotReady 成员 IP；正在使用的 ranktable 模板内容应由 webhook 拒绝修改。具体批准及实现证据差异见 052；D6 仍未选择，D7 后续已按 2.5 决议。
+
+本轮没有修改 case/generator/verdict。`cases/recovery/RUN-305、RUN-309、RUN-310` 等非保护局部恢复的首次版本规则，以及通用 WantVersions/重复创建检查，需区分“先按旧模板恢复、随后合法滚动”和“旧事件误删新 UID”；不能一律放行重复创建或覆盖旧 FAIL。30 项 recovery-contract 的既有结果不证明跨重启有限 grace 截止时刻保持；插件要求也没有新增 Kind 结果。
+
+前述 53 项机器可读冲突清单针对原有 2.1 admission 差异，并未自动包含本次 2.4 恢复版本语义；不能据该清单未报冲突宣称用例已迁移。核查本地 production@4e5c9016 只找到 ranktable 模板存在性校验，用户随后确认 ConfigMap 更新保护 webhook 在生产分支，并要求暂时忽略此问题；因此暂停定位，不再列为当前待办，也不宣称已验证部署。
+
+## 2.5 旧删除记录局部暂停
+
+按 2026-10-07 的 D7 批准，SG A.4 区分确认零 DELETE 的准备、确认已接受删除且可重建有限旧 UID 集合、无法安全重建事实三条路径。前两者按最新意图和既有收尾规则处理；第三条暂停受影响 SG 的相关删除、明确告警并等待人工，其他 SG 在已有约束允许时继续。不能凭 scope 标记或成员缺失猜测提交，也不能把暂停当作完成、释放实际/未决占用或放宽顺序和预算。
+
+专项回归仍需实现：部分准备失败后提高 partition；确认 DELETE 后崩溃；DELETE 超时且读取失败；旧记录缺阶段/UID 集合；同名新 UID 隔离；重启后暂停；另一个 SG 可继续且不重复领额度。现有 35 个 SG case 和历史 PASS/FAIL 不自动覆盖这些切点，53 项旧 admission 冲突清单也不包含本次语义。此轮仅更新文档，未修改 case/generator/verdict、产品实现或增加 Kind 验证。该方案未上线，并已被下述 2.6 明确取代，仅保留为历史决议记录。
+
+## 2.6 重启后按当前事实重新收敛
+
+2026-10-08 的 058 明确批准删除 `workload.kthena.io/deletion-scope` 及仅用于跨重启恢复旧删除事务的 operation、阶段和有限 UID 持久化；未上线版本不存在兼容、迁移或人工解除负担。controller 持续运行期间仍以进程内有限 UID 计划完成配置要求的 RoleRecreate/ServingGroupRecreate 范围，并保留 UID/owner fence、同名新实例隔离和开始删除前的最新意图复核。
+
+controller 在批次中途重启后，不恢复或补完重启前的旧事务。新进程依据实际 Pod、最新配置、已应用模板、partition、Terminating/不可用容量、预算及 roleCoordination 重新判断。若 SG 恢复仅删掉 prefill，可按该 SG 正确历史模板补齐 prefill；补齐后完整 Ready 则保留原 decode。补齐后仍有真实故障时，按当前 recoveryPolicy、grace 和健康事实开始新的恢复判断；允许重新经历一轮检测/宽限，不绕过 None 或 grace=-1。
+
+RUN-436/RUN-439 的说明和输入哈希同步迁移为上述收敛语义：检查重启不重复取得删除额度、不误删同名新 UID，并在释放实际 Terminating 对象后合法完成；不再断言重启前的所有旧 UID 必须由同一批次替换。058 的产品单测及 Kind 另外覆盖局部 SG 中断后的历史模板补齐和健康幸存实例保留。现有终态断言不能替代中途预算、版本和 UID 检查。
+
+2026-10-08 执行覆盖补充：新增独立 `cases/restart-convergence/suite.json` 的 RC-01～04，执行与结果说明见 [RESTART_CONVERGENCE.md](RESTART_CONVERGENCE.md)。通过 controller API 代理构造真实部分故障恢复，在新进程 initialSync 后验证首次历史补建、健康幸存 UID、缺员占预算及后续合法滚动；每例带持续运行时完整恢复范围对照。RUN-436/439 仍是普通滚动重启，其生成器现使用显式 2.6 覆盖层保留原矩阵并可重生成已批准内容。本次不全局放松 84 个旧 recovery 用例的重复创建断言，也不改写旧 FAIL 原始证据。

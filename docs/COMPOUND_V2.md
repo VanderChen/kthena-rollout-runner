@@ -1,8 +1,10 @@
 # ServingGroup 组合滚动 v2 用例
 
-设计基准是本仓保存的 [SG v2.2 预期过程表](specs/servinggroup-compound-rollout.zh-CN.md) （原始来源为 workspace issue 033）。它描述期望行为，不代表当前控制器已通过。`cases/servinggroup-compound-v2/` 的 35 个 case 分别保留 `designID`：S01～S07 对应 RUN-618～624，C01～C16 对应 RUN-625～640，P01～P11 对应 RUN-641～651，R01 对应 RUN-652。用例输入由 `scripts/generate-servinggroup-compound-v2.py` 生成，`TestCompoundCatalogueIsExecutable` 验证目录、ID 和设计映射。
+设计基准是本仓保存的 [SG v2.6 预期过程表](specs/servinggroup-compound-rollout.zh-CN.md) （原始来源为 workspace issue 033）。它描述期望行为，不代表当前控制器已通过。`cases/servinggroup-compound-v2/` 的 35 个 case 分别保留 `designID`：S01～S07 对应 RUN-618～624，C01～C16 对应 RUN-625～640，P01～P11 对应 RUN-641～651，R01 对应 RUN-652。用例输入由 `scripts/generate-servinggroup-compound-v2.py` 生成，`TestCompoundCatalogueIsExecutable` 验证目录、ID 和设计映射。
 
 **2026-10-07 执行器迁移：** 规范 2.2 已落实到 RUN-622/632 的生成器、YAML 和通用顺序判定：SG/独立 Role 默认旧 NotReady 优先、同类降序；有 coordination 的稳定 Role 不跳过，标记明确且未转正的临时 surge 单独回收。Q/B/I 与 protected 全量 Ready 断言保留。RUN-624 最终只放行新版本，旧错误版本持续 NotReady。16 个查表行仍不是新增 executable case；实际运行结果见 workspace [051 验证记录](../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md)，不因执行器迁移而宣称产品全套通过。
+
+**2026-10-07 时点契约 2.3：** 已批准逐完整单元 Ready 重新结算并继续推进，无额外整批屏障，其他约束保持。SG 附录 B.5 给出仅放行同批一个单位的可区分例子；本轮文档同步没有新增 case/generator/verdict 修改或 Kind 结果，既有 release-all 的组合轨迹不能冒充该专项覆盖。
 
 字段语义同时对照 [API reference](specs/modelserving-api-reference.en.md)；口径差异和人工批准要求见[规范入口](specs/README.md)，不能为修复或通过用例直接改写预期。
 
@@ -35,3 +37,7 @@ kubectl create -f "/tmp/rollout-$RUN_ID.json"
 编辑生成脚本后重新运行它，并执行 `go test ./...`；修改 runner 代码后还要运行 `go test -race ./...`、`go vet ./...` 和真实 Kind 验证。
 
 本轮使用宿主 runner 和已有 kubeconfig 在现有 Kind 执行，未创建 Job，也未新增 cluster-admin 绑定。宿主结果按 summary/result/observations 判定；不得伪造 Job 终态或把只适用于 Job 的 report_attempt 缺失 Job 提示解释为产品失败。
+
+**2.4 恢复交叉边界：** SG 内仅恢复一个 Role/Pod 时保留所属 SG 已应用模板，完整 SG 重建才按当前 partition 选择版本；先恢复旧版后正常滚动可以发生。该规则及 Role 对应关系见 API §6.1；当前 recovery 首次版本/重复创建判定尚待专项迁移，本页既有执行结果不是 2.4 完整覆盖证明。
+
+**2.6 重启收敛边界：** controller 持续运行时，RoleRecreate/ServingGroupRecreate 仍以启动操作时捕获的有限旧 UID 集合完成所选范围；同名新 UID 不属于该操作。controller 重启会丢弃该进程内计划，不重放重启前的整批删除事务。随后按现存 Pod、最新配置、已应用模板、partition、预算和协调规则收敛：可补齐中断留下的缺失成员并保留健康幸存成员，后续真实故障再按当前 recoveryPolicy/grace 判断。Terminating 和其他实际不可用容量继续占用预算，重启不提供额外删除额度。此规则取代 2.5 的旧记录暂停边界；RUN-436/RUN-439 与 058 专项证据分别覆盖 runner 重启流程和局部 SG 恢复中断。

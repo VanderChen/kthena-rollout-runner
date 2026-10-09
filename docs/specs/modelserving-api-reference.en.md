@@ -1,6 +1,6 @@
 # ModelServing API Reference
 
-Version 2.8 · 2026-10-09 · [简体中文](modelserving-api-reference.zh-CN.md)
+Version 2.9 · 2026-10-09 · [简体中文](modelserving-api-reference.zh-CN.md)
 
 This reference lists field paths, semantics, defaults, accepted values, percentage rounding, validation constraints, and minimal reference YAML.
 
@@ -1017,6 +1017,8 @@ For an unprotected unit with applied v1 and target v2:
 
 After local v1 recovery, a later ordinary rollout may adopt v2 when budgets, order, partition and coordination permit. Distinguish that valid template replacement from stale recovery events deleting a new UID: the earlier recovery action grants no deletion permission for replacement UIDs and cannot expand its scope. None does not disable ordinary template rollout.
 
+PodDeleted events may be lost during restart or leader takeover. A new process observing a missing Pod or whole Role refills from actual objects, latest counts and applicable history while retaining healthy survivors. Do not persist completion markers/timestamps or use old Pod markers to reconstruct offline deletion causes and broaden recovery scope.
+
 While one controller process remains active, a RoleRecreate or ServingGroupRecreate still completes its configured scope and uses original Pod UID/owner checks to isolate same-name replacements. After a controller restart, the controller need not continue the pre-restart deletion batch and must not reconstruct it from Pod annotations or a persisted deletion transaction. It converges from surviving Pods, the latest configuration, applied historical templates, partition and current budgets. If a whole-group recovery deleted only prefill before restart while decode remains healthy, the new controller may refill prefill from the SG's correct historical template and retain the decode UID. If the refilled workload is still faulty, a new recovery decision begins only under the current recoveryPolicy, grace and health conditions.
 
 Terminating Pods and actual unavailable capacity still consume current capacity and deletion allowance, so restart grants no duplicate credit. Complete Ready classification, candidate order, roleCoordination, UID/owner fencing, stale-event isolation and historical-template rules remain unchanged. None and grace=-1 cannot be bypassed. See [SG A.4 post-restart deletion convergence](servinggroup-compound-rollout.en.md#legacy-deletion-records).
@@ -1064,9 +1066,11 @@ Before acting on a delayed task, use the latest policy and grace and verify Mode
 
 For example, when a worker in Role instance 0 restarts and remains non-Ready: `recoveryPolicy=None, restartGracePeriodSeconds=0` and `recoveryPolicy=RoleRecreate, restartGracePeriodSeconds=-1` retain all UIDs while availability drops. If that worker is actually deleted, `None` replaces only it, whereas `recoveryPolicy=RoleRecreate, restartGracePeriodSeconds=-1` replaces the entry and workers of instance 0. Other Role instances and groups retain their UIDs. A transient error that becomes Ready before a finite deadline also preserves the original UIDs.
 
-For the same continuous fault on the same ModelServing/Pod UIDs, preserve the first-observed time across controller restarts and active-controller changes. Offline time counts toward grace; do not start another full waiting period. The deadline is the trusted first-observed time plus the latest finite grace. Ready recovery ends that fault episode; a later fault or new Pod UID cannot inherit the old deletion permission. Migration for old objects without a trusted start time requires a separate design; do not substitute Pod creation time or a guessed fault time.
+Within one process, preserve the first observation of a continuous fault on the same ModelServing/Pod UIDs. After controller restart or leader takeover, observe again and start a full grace period; do not persist cross-process fault starts or count the predecessor's offline time. Ready ends the observation; a new Pod UID inherits no deletion authority. None/-1 schedules no proactive deletion; enabling finite recovery starts from a new observation in this process.
 
-For grace=60 seconds, a fault first observed at t=0, controller exit at t=40 and restart at t=50 leaves about 10 seconds. Restart at t=70 does not add another 60 seconds, but acting still requires rechecking current UIDs, health, policy and grace.
+For grace=60 seconds: observe at t=0, exit at t=40, and observe again in a new process at t=50; wait 60 seconds from t=50. Ready within that interval preserves the UID. Acting still requires rechecking current UIDs, health, policy and grace.
+
+Reuse the existing aggregate status schema; add no per-SG/Role/Pod membership, completion facts, fault timestamps or revision maps. Conditions have fixed types and bounded summaries; LastTransitionTime changes only on status transitions, and unchanged aggregates are not rewritten. currentRevision retains the necessary last fully completed template baseline; derived empty-group Ready/version counts cannot automatically advance it.
 
 ## 7. `evictionStrategy`
 

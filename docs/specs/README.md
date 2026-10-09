@@ -1,8 +1,8 @@
 # ModelServing 规范 / Specifications
 
-本目录是 Kthena 源码、rollout runner 和人工评审共享的最终契约。当前版本 **2.8（2026-10-09）**；文档预期、历史实现、runner 覆盖和实际测试结果分别记录，不互相替代。工作与审批规则见 workspace [AGENTS.md](../../../AGENTS.md)。
+本目录是 Kthena 源码、rollout runner 和人工评审共享的最终契约。当前版本 **2.9（2026-10-09）**；文档预期、历史实现、runner 覆盖和实际测试结果分别记录，不互相替代。工作与审批规则见 workspace [AGENTS.md](../../../AGENTS.md)。
 
-This directory holds the shared final contract for source changes, runner expectations and human review. Version **2.8 (2026-10-09)** defines expectations; it does not imply implementation compliance or a passing cluster run.
+This directory holds the shared final contract for source changes, runner expectations and human review. Version **2.9 (2026-10-09)** defines expectations; it does not imply implementation compliance or a passing cluster run.
 
 ## 文档入口 / Documents
 
@@ -22,6 +22,10 @@ This directory holds the shared final contract for source changes, runner expect
 Use `<topic>.<language>.md`, with lower-case kebab-case topics and `en` / `zh-CN` locales. Keep versions inside documents and SOURCES.json, preserving stable links. Maintain both editions in the same change, with matching clause numbers, scenario IDs, numeric tables and semantics. Record explicit semantic approval and provenance; never regenerate expectations from observed implementation. Earlier editions remain recoverable from Git or the recorded original sources.
 
 ## 本次批准的修订 / Approved changes
+
+**2.9（2026-10-09）**：按用户明确取舍，整体移除私有成员 ConfigMap，五类成员表不迁移到 status/owner annotation。新进程或主备接管重新起算故障宽限，允许重启期间删除事件丢失并按当前事实补缺；连续运行的删除事件仍保持 recoveryPolicy 范围。所有 Role 期望为零且实际 Pod 已消失时不保存空组个体身份，后续按当前 partition 新建；现存 v2 进入保护区不回滚。沿用 status 字段，只保留计数、必要历史基线及有界 Condition 摘要，稳定状态不重复写。该修改未上线，无存量成员CM兼容或清理。非空身份、Terminating、预算、UID、历史模板和插件 ConfigMap 保持。批准原文、2.8 快照、源码和实际验证见 [066 proposal](../../../issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md)。本条取代下述历史 2.4/2.8 的故障计时及空组/创建事实保留要求。
+
+**2.9 (2026-10-09)**: Remove the private member ConfigMap without relocating its five tables to status or owner annotations. A new process/leader starts grace from a fresh observation and may refill after missed offline deletion events; continuously handled deletion events retain recoveryPolicy scope. After all Role counts are zero and actual Pods are gone, discard individual empty-group identities and place future capacity using current partition. An existing protected v2 instance is retained. Reuse the status schema with counts, the necessary historical baseline and bounded Condition summaries; stable status is not rewritten. This version was never deployed; no legacy member-CM migration or cleanup is needed. Nonempty identities, Terminating occupancy, budgets, UIDs, historical templates and plugin ConfigMaps remain. See task 066 for approval, version 2.8 snapshots and actual verification. This supersedes the historical 2.4/2.8 timing and empty-group/completion-fact persistence requirements below.
 
 **2.8（2026-10-09）**：用户纠正 SG 内 Role 数量扩缩的逐组预算门槛。Role replicas 在所有非删除组独立应用，允许多个或全部组暂时 NotReady；最新数量决定完整性，历史模板/worker布局仍保留。worker和Pod模板变化仍按原滚动预算执行。SG §0.6/A.4/SG-R01、API §1.4.2 及 RUN-652 同步修订。空组、surge身份、故障计时与创建事实保留。批准原文、旧版快照、具体差异及独立验证见 [064 proposal](../../../issues/bugs/064-restore-independent-role-scaling-DONE/PROPOSAL_COMMIT.md)。此前 SG-R01 的串行结果不构成本版通过。
 

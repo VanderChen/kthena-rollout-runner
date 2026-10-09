@@ -1,5 +1,5 @@
 {
-  "purpose": "Final bilingual contract 2.8: independently scale Role replicas in all non-deleting SGs; allow temporary concurrent unavailability while preserving template rollout budgets, historical worker layouts and recovery state.",
+  "purpose": "Final bilingual contract 2.9: remove private member ConfigMap without per-member status migration; fresh-process grace/refill, stateless empty groups, existing aggregate status and unchanged physical/history/budget/plugin safeguards.",
   "originalImport": {
     "importedOn": "2026-10-05",
     "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
@@ -16,9 +16,9 @@
     {
       "path": "modelserving-api-reference.en.md",
       "language": "en",
-      "version": "2.8",
-      "sha256": "c78bd9a3fec9f478012d6f865c8e80c6d6d24994fc1d7b4375ea0adca1a06288",
-      "bytes": 86663,
+      "version": "2.9",
+      "sha256": "46c25c1f069d8c86cd7bf196ed6cd52b79a70c4f7e5065a02b5306e37fc45783",
+      "bytes": 87347,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.zh-CN.md",
       "priorEdition": {
@@ -30,19 +30,24 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09.",
       "priorEdition2_7": {
         "sha256": "d0f771b788aa120815eab795ea26f97e3fb2b0543d83b528d755a5af41a8593b",
         "bytes": 86209,
         "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/modelserving-api-reference.en.md"
+      },
+      "priorEdition2_8": {
+        "sha256": "c78bd9a3fec9f478012d6f865c8e80c6d6d24994fc1d7b4375ea0adca1a06288",
+        "bytes": 86663,
+        "snapshot": "issues/bugs/066-members-state-redesign-DONE/before-specs-2.8/modelserving-api-reference.en.md"
       }
     },
     {
       "path": "modelserving-api-reference.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.8",
-      "sha256": "4f183891c3467525efe83fa066f2959eaa5418f52124d99f4229c54e4e4fd23d",
-      "bytes": 67691,
+      "version": "2.9",
+      "sha256": "cc0a33eff5977e6d7850530db993b69e37556d105dc53f258217b85adb3ed9f1",
+      "bytes": 68329,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.en.md",
       "priorEdition": {
@@ -54,19 +59,24 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09.",
       "priorEdition2_7": {
         "sha256": "97b6f151ec52e1a9011e461758d2feaa44e7f477bd05aedc29dde26459c70213",
         "bytes": 67253,
         "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/modelserving-api-reference.zh-CN.md"
+      },
+      "priorEdition2_8": {
+        "sha256": "4f183891c3467525efe83fa066f2959eaa5418f52124d99f4229c54e4e4fd23d",
+        "bytes": 67691,
+        "snapshot": "issues/bugs/066-members-state-redesign-DONE/before-specs-2.8/modelserving-api-reference.zh-CN.md"
       }
     },
     {
       "path": "servinggroup-compound-rollout.en.md",
       "language": "en",
-      "version": "2.8",
-      "sha256": "2f0162bef16c697090b87ec7fc6042813e6577a76a2b018817eb83961cd2b82c",
-      "bytes": 110288,
+      "version": "2.9",
+      "sha256": "5811572c14003ee48a37ae3bff403b314425af558fe89fd7ced130e99a0a1a29",
+      "bytes": 111125,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.zh-CN.md",
       "priorEdition": {
@@ -95,19 +105,24 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09.",
       "priorEdition2_7": {
         "sha256": "44c2ecdce26b738202426a42c1214a516047eefa5627c55441d37ef5e14eea9d",
         "bytes": 109843,
         "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/servinggroup-compound-rollout.en.md"
+      },
+      "priorEdition2_8": {
+        "sha256": "2f0162bef16c697090b87ec7fc6042813e6577a76a2b018817eb83961cd2b82c",
+        "bytes": 110288,
+        "snapshot": "issues/bugs/066-members-state-redesign-DONE/before-specs-2.8/servinggroup-compound-rollout.en.md"
       }
     },
     {
       "path": "servinggroup-compound-rollout.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.8",
-      "sha256": "90d69883213cc904267bdf4d89f03a1088ebef1417826f53921df3f345bb0583",
-      "bytes": 118157,
+      "version": "2.9",
+      "sha256": "e8a8444f4eb62aebcf22c5e9b3f4916202a2bb5239a0a941975cf0715eda0b1d",
+      "bytes": 118878,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.en.md",
       "priorEdition": {
@@ -136,11 +151,16 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09.",
       "priorEdition2_7": {
         "sha256": "91bca93eb04fcbb96dbd19c52d701ac72e5e44862ed87fc55577950f4ca85408",
         "bytes": 118040,
         "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/servinggroup-compound-rollout.zh-CN.md"
+      },
+      "priorEdition2_8": {
+        "sha256": "90d69883213cc904267bdf4d89f03a1088ebef1417826f53921df3f345bb0583",
+        "bytes": 118157,
+        "snapshot": "issues/bugs/066-members-state-redesign-DONE/before-specs-2.8/servinggroup-compound-rollout.zh-CN.md"
       }
     }
   ],
@@ -1298,6 +1318,29 @@
       },
       "implementationCommit": "b1e243adf6b541b7273cf4037fa659e9ae86de88",
       "runnerCompatibility": "Recognize and validate the existing optional surge-groups.json, recovery.json and created.json fields in the UID-owned state ConfigMap; preserve unknown-field rejection. The prior two-key check misjudged RUN-307 before recovery began."
+    },
+    {
+      "date": "2026-10-09",
+      "version": "2.9",
+      "approval": [
+        "故障宽限时间，这个不重要，controller都重启了，大概率也逾期了，所以重新计时就好",
+        "全0组没有状态需要保留",
+        "重启期间的删除事件我允许丢失",
+        "请开始修改并验证",
+        "好的，沿用status就行，请继续修改",
+        "注意，不需要考虑存量configmap，这个修改还没有上线，直接回退这个依赖就好"
+      ],
+      "proposal": "issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md sections 10-13",
+      "clauses": [
+        "API 6.1",
+        "API 6.2",
+        "SG 0.5/0.6",
+        "SG A.4/A.5"
+      ],
+      "before": "Private member tables preserve empty identities, whole-role completion and fault start across restarts.",
+      "after": "No member-state object/table; new process restarts grace and refills missed deletions. Empty slots use current partition; preserve existing nonempty instances and historical baseline. Reuse aggregate status with bounded messages and no-op suppression. Undeployed change: no existing-CM compatibility, inspection or cleanup.",
+      "priorSnapshot": "issues/bugs/066-members-state-redesign-DONE/before-specs-2.8",
+      "coverage": "Task-specific Go/runner/Kind results are recorded in the proposal; no complete suite compliance claim."
     }
   ],
   "naming": {
@@ -1460,6 +1503,48 @@
           "afterSHA256": "2a0b24e56b6e090a7d9a1bab22591ca6441402da1f62cc67fbf8ef143e6192fa"
         }
       ]
+    },
+    {
+      "date": "2026-10-10",
+      "version": "2.9",
+      "semanticChange": false,
+      "scope": "Task 066 runner member-state removal, interrupted recovery and compatible coordinated partition fixture; existing plugin/UID/history/budget assertions retained.",
+      "controllerCommit": "e299cfda7a9117f36822d2b4a46240cfc639815c",
+      "controllerImage": "kthena-controller-manager:dev-067-combined",
+      "controllerImageID": "sha256:1d1027d4cf6e8224f614d9fbaae3ebb27cf6cea57e6e40d403f2a06b717487c8",
+      "verificationRecord": "issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md sections 18-19",
+      "unitValidation": {
+        "go": "make test: all Go packages, race and vet passed",
+        "python": {
+          "total": 121,
+          "passed": 113,
+          "skipped": 8,
+          "skipReason": "Existing historical-evidence-dependent tests without RUNNER_KIND_ARTIFACTS"
+        }
+      },
+      "kindValidation": {
+        "restartConvergence": {
+          "cases": [
+            "RC-01",
+            "RC-02",
+            "RC-03",
+            "RC-04"
+          ],
+          "result": "PASS",
+          "singleCompleteAttempt": "runner-restart-production-final"
+        },
+        "goRunner": {
+          "cases": [
+            "RUN-307",
+            "RUN-113"
+          ],
+          "result": "PASS"
+        },
+        "absenceChecks": "24 RC snapshots and both Go final snapshots contain no private member ConfigMap; legitimate ranktables retained"
+      },
+      "limitations": "Does not migrate the 84 historical recovery cases or claim complete 2.9 compliance. Earlier failed/incomplete/invalid attempts are preserved separately. Task 068 remains separate.",
+      "executorSHA256": "77ab5e9a6fd3ec1e18bfc86b160e6b65434d6ab3ad0d62a044dd536cc20f074c",
+      "suiteSHA256": "6f9d36249258568f2d7749982903cbcef7e46e4689c4acca7855ec70fa2d705a"
     }
   ],
   "readabilityRevisions": [

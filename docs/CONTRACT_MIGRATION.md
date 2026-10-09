@@ -88,3 +88,7 @@ controller 在批次中途重启后，不恢复或补完重启前的旧事务。
 RUN-436/RUN-439 的说明和输入哈希同步迁移为上述收敛语义：检查重启不重复取得删除额度、不误删同名新 UID，并在释放实际 Terminating 对象后合法完成；不再断言重启前的所有旧 UID 必须由同一批次替换。058 的产品单测及 Kind 另外覆盖局部 SG 中断后的历史模板补齐和健康幸存实例保留。现有终态断言不能替代中途预算、版本和 UID 检查。
 
 2026-10-08 执行覆盖补充：新增独立 `cases/restart-convergence/suite.json` 的 RC-01～04，执行与结果说明见 [RESTART_CONVERGENCE.md](RESTART_CONVERGENCE.md)。通过 controller API 代理构造真实部分故障恢复，在新进程 initialSync 后验证首次历史补建、健康幸存 UID、缺员占预算及后续合法滚动；每例带持续运行时完整恢复范围对照。RUN-436/439 仍是普通滚动重启，其生成器现使用显式 2.6 覆盖层保留原矩阵并可重生成已批准内容。本次不全局放松 84 个旧 recovery 用例的重复创建断言，也不改写旧 FAIL 原始证据。
+
+2026-10-09，任务066迁移为契约2.9：删除私有成员ConfigMap允许特例；正常终态存在该对象即为多余资源，插件ConfigMap校验保持。RC-01～04的重启切点以故障UID消失和实际幸存者DELETE拒绝确认，不再要求created.json。grace-restart/RUN-431～432测试的是容器原地重启，并未覆盖controller新进程计时，本任务新增真实Kind新进程grace验证；历史跨进程计时结论不作为2.9通过。任务058离线整项Role旧范围预期已由用户替换为补缺，原始证据保留。
+
+RC执行器同时补齐有界resourceVersion冲突重试，以及RC-04按既有API§5共同名义比例提交协调Role的partition；只有prefill改变模板。历史补齐、健康UID、预算和持续运行恢复范围的断言保持。实际执行基线、失败尝试分类和证据见 [066验证记录](../../issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md#19-runner-对齐新-production-验证2026-10-10)。本次范围不代表其余历史恢复用例已完成2.9迁移。

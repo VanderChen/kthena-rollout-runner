@@ -1,6 +1,6 @@
 # ModelServing API 参考
 
-版本 2.8 · 2026-10-09 · [English](modelserving-api-reference.en.md)
+版本 2.9 · 2026-10-09 · [English](modelserving-api-reference.en.md)
 
 本文规定字段路径、默认值、可变性、合法范围、百分比取整和跨字段约束。Mutable 表示更新后的完整对象通过校验时可原地修改；Immutable 表示值和可选对象的存在性均不可变，即使滚动完成或副本数为零也不例外。
 
@@ -962,6 +962,8 @@ spec:
 
 局部补回 v1 后，仍可在预算、顺序、partition 和协调允许时正常滚动为 v2。这次合法模板替换与旧恢复事件误删新 UID 必须区分：旧恢复动作不能自动获得新 UID 的删除许可，恢复范围也不得扩大。None 不关闭正常模板滚动。
 
+controller 重启或主备接管期间的 PodDeleted 事件允许丢失。新进程只观察到缺失 Pod 或整项 Role 时，依据现存对象、最新数量及适用历史模板补缺并保留健康幸存者；不持久保存完整创建标记或时间戳，也不凭旧 Pod 标记追溯离线删除原因并扩大恢复范围。
+
 controller 存活期间，一次 RoleRecreate/ServingGroupRecreate 仍按配置范围完成，并以原始 Pod UID/owner 校验隔离同名替代对象。controller 重启后不要求继续重启前的整批删除计划，也不从 Pod annotation 或持久化删除事务恢复该计划；应按现存 Pod、最新配置、已应用历史模板、partition 和当前预算重新收敛。若整组恢复在重启前只删除了 prefill，decode 仍健康，重启后允许按该 SG 正确历史模板补齐 prefill 并保留 decode UID。补齐后仍故障时，才按当前 recoveryPolicy、grace 和健康条件开始新的恢复判断。
 
 Terminating Pod 和实际不可用容量仍计入当前容量与删除预算，不能因重启重复取得额度；完整 Ready、候选顺序、roleCoordination、UID/owner、旧事件隔离和历史模板规则不变。None 与 grace=-1 不能被绕过。具体边界见 [SG A.4 重启后删除收敛](servinggroup-compound-rollout.zh-CN.md#legacy-deletion-records)。
@@ -1011,9 +1013,11 @@ spec:
 
 -1 是哨兵值，不是立即超时或超长睡眠。真实 PodDeleted 不等待宽限；有限宽限内恢复 Ready 则保留 UID。延迟任务执行前读取最新 policy/grace 并验证 ModelServing/Pod UID；切到 None/-1 必须取消旧任务的删除效果，有限宽限增减按最新配置判断。旧对象事件不能删除同名新 UID，controller 重启后仍须保持这些规则。
 
-同一 ModelServing/Pod UID 的同一持续故障，首次观察时间必须跨 controller 重启和活动 controller 切换保留；离线时间计入宽限，不重新领取完整等待期。到期时间为可信首次观察时间加最新有限 grace。恢复 Ready 结束该次故障；后续新故障、新 Pod UID 不能继承旧删除许可。旧对象没有可信起点时的迁移方式须另行明确，不能拿 Pod 创建时间或猜测时间替代已观察故障起点。
+同一进程内，对同一 ModelServing/Pod UID 的持续故障保留首次观察时间；controller 重启或活动 controller 切换后重新观察并起算完整宽限，不记录跨进程故障起点，不计前任离线时间。恢复 Ready 结束该次观察；新 Pod UID 不继承旧删除许可。None/-1 不调度主动删除，重新启用有限宽限时从本进程新观察起算。
 
-例如 grace=60 秒：t=0 首次观察故障，t=40 controller 退出，t=50 恢复时只剩约 10 秒；若 t=70 才恢复，不再另等 60 秒，但仍须按最新 UID、健康、policy 和 grace 复核后才可动作。
+例如 grace=60 秒：t=0 首次观察故障，t=40 controller 退出，t=50 新进程重新观察后从 t=50 等待 60 秒；期限内恢复 Ready 则保留 UID。最终动作仍须复核最新 UID、健康、policy 和 grace。
+
+沿用现有汇总 status 字段，不新增逐 SG/Role/Pod 成员、创建事实、故障时间或 revision 映射。Conditions 按固定类型更新，Message 使用有界摘要；LastTransitionTime 只随状态转换变化，汇总未变不重复提交。currentRevision 保留必要的最近完整模板基线；全零组的派生 Ready/版本计数不能自动推进该基线。
 
 ## 7. `evictionStrategy`
 

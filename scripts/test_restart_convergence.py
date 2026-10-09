@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import unittest
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('restart', ROOT / 'scripts/run-restart-convergence.py')
@@ -24,6 +25,82 @@ class RestartVerdictTests(unittest.TestCase):
 
     def test_historical_refill_keeps_healthy_survivor(self):
         r.assert_refill(self.pods, 'decode', 'old', {'prefill': 'p'}, {'prefill', 'decode'})
+
+    def update_execution(self, case_id='RC-01'):
+        execution = r.Execution.__new__(r.Execution)
+        execution.case = next(c for c in json.loads(r.SUITE.read_text())['cases'] if c['id'] == case_id)
+        execution.phase = 'full-rollout'
+        obj = r.workload(execution.case, 'test')
+        obj['metadata']['resourceVersion'] = '1'
+        obj['status'] = {'observedGeneration': 1}
+        execution.get = Mock(side_effect=lambda *args: copy.deepcopy(obj))
+        execution.call = Mock()
+        execution.save = Mock()
+        return execution, obj
+
+    def test_update_retries_conflict_with_latest_object(self):
+        execution, first = self.update_execution()
+        latest = copy.deepcopy(first)
+        latest['metadata'].update(resourceVersion='2', annotations={'retained': 'new'})
+        execution.get.side_effect = [first, latest]
+        execution.call.side_effect = [r.Inconclusive('Error from server (Conflict): modified'), None]
+        with patch.object(r.time, 'sleep'):
+            execution.update(1, target=True)
+        self.assertEqual(execution.get.call_count, 2)
+        submitted = execution.call.call_args.kwargs['obj']
+        self.assertEqual(submitted['metadata']['resourceVersion'], '2')
+        self.assertEqual(submitted['metadata']['annotations'], {'retained': 'new'})
+        self.assertNotIn('status', submitted)
+        self.assertEqual(submitted['spec']['rolloutStrategy']['rollingUpdateConfiguration']['partition'], 1)
+        for role in submitted['spec']['template']['roles']:
+            self.assertEqual(r.version({'spec': role['entryTemplate']['spec']}), 'B')
+        self.assertIn('full-rollout-conflict-1-input', [c.args[0] for c in execution.save.call_args_list])
+
+    def test_update_does_not_retry_other_errors(self):
+        execution, _ = self.update_execution()
+        execution.call.side_effect = r.Inconclusive('Error from server (Invalid): partition')
+        with self.assertRaisesRegex(r.Inconclusive, 'Invalid'):
+            execution.update(0)
+        self.assertEqual(execution.call.call_count, 1)
+
+    def test_update_conflict_retries_are_bounded(self):
+        execution, _ = self.update_execution()
+        execution.call.side_effect = r.Inconclusive('Error from server (Conflict): modified')
+        with patch.object(r.time, 'sleep'), self.assertRaisesRegex(r.Inconclusive, 'Conflict'):
+            execution.update(0)
+        self.assertEqual(execution.call.call_count, 5)
+        self.assertEqual(execution.get.call_count, 5)
+
+    def test_role_partition_updates_preserve_coordination_and_template_scope(self):
+        for case_id in ['RC-03', 'RC-04']:
+            for partition in [1, 0]:
+                with self.subTest(case=case_id, partition=partition):
+                    execution, _ = self.update_execution(case_id)
+                    execution.update(partition, target=True)
+                    roles = {x['name']: x for x in execution.call.call_args.kwargs['obj']['spec']['template']['roles']}
+                    self.assertEqual(roles['prefill']['partition'], partition)
+                    self.assertEqual(roles['decode']['partition'], partition if case_id == 'RC-04' else 2)
+                    self.assertEqual(r.version({'spec': roles['prefill']['entryTemplate']['spec']}), 'B')
+                    self.assertEqual(r.version({'spec': roles['decode']['entryTemplate']['spec']}), 'A')
+
+    def test_partial_recovery_uses_live_boundary_without_completion_table(self):
+        initial = {'prefill': 'p', 'decode': 'old'}
+        self.assertTrue(r.partial_recovery_established(self.pods[:1], initial, 'decode', 'prefill', 1))
+
+    def test_partial_recovery_rejects_unestablished_boundaries(self):
+        initial = {'prefill': 'p', 'decode': 'old'}
+        terminating = pod('prefill', 'p')
+        terminating['metadata']['deletionTimestamp'] = 'now'
+        for name, pods, hits in [
+            ('no-rejected-delete', [pod('prefill', 'p')], 0),
+            ('failed-uid-still-present', [pod('prefill', 'p'), pod('decode', 'old', ready=False)], 1),
+            ('survivor-missing', [], 1),
+            ('survivor-replaced', [pod('prefill', 'replacement')], 1),
+            ('survivor-terminating', [terminating], 1),
+            ('survivor-not-ready', [pod('prefill', 'p', ready=False)], 1),
+        ]:
+            with self.subTest(name=name):
+                self.assertFalse(r.partial_recovery_established(pods, initial, 'decode', 'prefill', hits))
 
     def test_rejects_replacing_whole_old_batch(self):
         self.pods[0]['metadata']['uid'] = 'replayed'

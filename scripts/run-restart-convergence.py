@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 The Kthena Rollout Runner Authors.
 # SPDX-License-Identifier: Apache-2.0
-"""Run contract 2.6 partial recovery/restart cases against an isolated Kind controller.
+"""Run contract 2.9 partial recovery/restart cases against an isolated Kind controller.
 
 Uses the existing runner fault proxy. Observation/admission bypass the proxy.
 No controller deployment, RBAC, credentials or cluster is installed by this script.
@@ -38,6 +38,15 @@ def version(p):
 
 def uidmap(pods):
     return {p['metadata']['name']: p['metadata']['uid'] for p in pods}
+
+
+def partial_recovery_established(pods, initial, failed, survivor, delete_hits):
+    """Prove a partial recovery from live objects and a rejected DELETE."""
+    current = {p['metadata']['name']: p for p in pods}
+    healthy = current.get(survivor)
+    return (initial[failed] not in uidmap(pods).values() and delete_hits > 0
+            and healthy is not None and healthy['metadata']['uid'] == initial[survivor]
+            and ready(healthy))
 
 
 def assert_retained(pods, expected):
@@ -205,28 +214,31 @@ class Execution:
     def hits(self, rid):
         return next((r['hits'] for r in self.control('GET', '/v1/state')['rules'] if r['id'] == rid), 0)
 
-    def facts(self):
-        facts = {}
-        for cm in self.get('configmaps')['items']:
-            facts.update(json.loads(cm.get('data', {}).get('created.json', '{}')))
-        return facts
-
     def update(self, partition, target=False):
-        obj = self.get('modelserving', 'current')
-        obj.pop('status', None)
-        if self.case['mode'] == 'SG':
-            obj['spec']['rolloutStrategy']['rollingUpdateConfiguration']['partition'] = partition
-        for r in obj['spec']['template']['roles']:
-            if self.case['mode'] == 'Role':
-                if r['name'] != 'prefill':
-                    continue
-                r['partition'] = partition
-            if target:
-                for key in ['entryTemplate', 'workerTemplate']:
-                    if key in r:
-                        r[key] = template('B')
-        self.save(self.phase + '-input', obj)
-        self.call('replace', '-f', '-', obj=obj)
+        for attempt in range(5):
+            obj = self.get('modelserving', 'current')
+            obj.pop('status', None)
+            if self.case['mode'] == 'SG':
+                obj['spec']['rolloutStrategy']['rollingUpdateConfiguration']['partition'] = partition
+            for r in obj['spec']['template']['roles']:
+                if self.case['mode'] == 'Role':
+                    if self.case['coordination'] or r['name'] == 'prefill':
+                        r['partition'] = partition
+                    if r['name'] != 'prefill':
+                        continue
+                if target:
+                    for key in ['entryTemplate', 'workerTemplate']:
+                        if key in r:
+                            r[key] = template('B')
+            self.save(self.phase + '-input', obj)
+            try:
+                self.call('replace', '-f', '-', obj=obj)
+                return
+            except Inconclusive as exc:
+                if 'Error from server (Conflict)' not in str(exc) or attempt == 4:
+                    raise
+                self.save(f'{self.phase}-conflict-{attempt + 1}-input', obj)
+                time.sleep(.2)
 
     def controller_pods(self):
         return json.loads(self.call('-n', self.args.controller_namespace, 'get', 'pods', '-l',
@@ -292,7 +304,6 @@ class Execution:
         self.start_watch()
         total = 4 + 2 * c['workers']
         before = self.poll('all A Ready', lambda: self.all_ready(total), fixture=True)
-        self.poll('durable completion facts', lambda: sum(len(v) for v in self.facts().values()) == 4, fixture=True)
         if c['mode'] == 'SG':
             rev = before[0]['metadata']['labels']['modelserving.volcano.sh/revision']
             self.poll('completed A baseline', lambda: self.get('modelserving', 'current').get('status', {}).get('currentRevision') == rev, fixture=True)
@@ -312,12 +323,8 @@ class Execution:
         self.phase = 'partial-recovery'
         self.call('-n', self.ns, 'exec', failed, '--', 'touch', '/tmp/fail')
         def partial():
-            ps, facts = self.pods(), self.facts()
-            cleared = ('current-0' not in facts if c['policy'] == 'ServingGroupRecreate'
-                       else 'prefill-0' not in facts.get('current-0', {}))
-            return ps if (initial[failed] not in uidmap(ps).values() and
-                          uidmap(ps).get(survivor) == initial[survivor] and
-                          cleared and self.hits(deletion) > 0) else None
+            ps = self.pods()
+            return ps if partial_recovery_established(ps, initial, failed, survivor, self.hits(deletion)) else None
         self.poll('established partial recovery', partial, fixture=True)
         self.snapshot('partial-recovery')
         self.scale(0)
@@ -439,7 +446,7 @@ def main():
     if not cases or (args.ids and set(args.ids) - {c['id'] for c in cases}):
         parser.error('unknown case ID')
     args.artifacts.mkdir(parents=True, exist_ok=False)
-    provenance = {'contractVersion': '2.6', 'controllerCommit': args.controller_commit,
+    provenance = {'contractVersion': suite['contractVersion'], 'controllerCommit': args.controller_commit,
         'controllerImage': args.controller_image,
         'executorSHA256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         'suiteSHA256': hashlib.sha256(SUITE.read_bytes()).hexdigest(), 'cases': [c['id'] for c in cases]}

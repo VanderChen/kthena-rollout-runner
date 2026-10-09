@@ -1,6 +1,6 @@
-# ServingGroupRollingUpdate 组合场景预期行为规范 v2.8
+# ServingGroupRollingUpdate 组合场景预期行为规范 v2.9
 
-版本 2.8 · 2026-10-09 · [English](servinggroup-compound-rollout.en.md)
+版本 2.9 · 2026-10-09 · [English](servinggroup-compound-rollout.en.md)
 
 本文描述**设计预期**；实现符合程度与实际 Kind 验证结果另行记录。正文保留 `ServingGroupRollingUpdate` 的全部 35 个组合场景；共用原则也说明 `RoleRollingUpdate` 的适用范围。[附录 B](#budget-lookup)提供两种模式的预算与行为对照，不代表新增了相同数量的 Role 执行用例。
 
@@ -82,6 +82,8 @@ partition 限制模板更新，不禁止显式缩容删除受保护实例。受�
 局部故障修复沿用所属滚动单元已经应用的模板和 worker 布局，不借修复提前应用最新目标。ServingGroupRollingUpdate 的滚动单元是完整 SG，RoleRollingUpdate 的滚动单元是一个 Role 实例；完整滚动单元重建才按动作当时的 partition 选择受保护基线或最新目标。已有 v2 单元因 partition 提高而被保护时，仅修其中一个 Pod/Role 仍保持该单元已应用的 v2；只有整个单元重建才重新按保护区基线选择，可能回到 v1。历史无法可靠确定时等待并报告，不猜测最新版本。 这里的“槽位新建/重建”指完整滚动单元；局部故障补员按本段处理，恢复范围见 API §6.1。
 
 ### 0.6 扩缩容、稀疏序号与 surge 身份
+
+当所有 Role 期望 replicas 均为 0 且实际 Pod 已消失时，空组没有个体状态需要保留：不保存旧稀疏序号、已应用 revision 或临时 surge 来源。逻辑规模按最新 spec 推导；后续非空扩容视为新建，按当前 partition 在保护区使用可追溯历史基线、其他槽位使用目标模板。currentRevision 基线保留，全零计数不能使其提前推进。仍 Terminating 的 Pod 继续占位；部分 Role 非零或期望为正的故障缺失不适用此简化。下表稀疏/surge 身份规则适用于仍有实际成员的单元。
 
 同时扩缩容和更新时，先安排最新规模下的正式容量，再考虑健康旧单元的破坏性滚动。正式扩容槽须先安置，但新实例不必全部 Ready；每次健康删除仍须重新检查预算。Role.replicas 扩缩是独立数量操作，所有非删除中的 SG 按最新数量推进，不按 SG 滚动 maxUnavailable/maxSurge 分批放行，也不等待其他组 Ready。数量变化可使多个乃至全部 SG 暂时 NotReady；各组以最新 Role 数量和各实例适用的历史 worker 布局判断完整 Ready。保护组新增实例仍用适用历史模板。模板/worker 更新和独立驱逐继续遵守各自预算。
 
@@ -757,13 +759,13 @@ controller 重启后，放弃精确延续旧批次，按当前事实重新收敛
 | 旧 Pod 仍 Terminating 或当前单元不可用 | 把实际占用/不可用计入当前容量与预算；不得因进程内计划消失重新取得删除额度 | 原 UID 未物理消失时不复用名称或容量槽，也不额外删除另一健康单元 |
 | 补齐后仍满足当前故障条件 | 重新按当前 recoveryPolicy、grace 和完整健康判断开始新的恢复 episode | None/grace=-1 不主动删除；有限 grace 可多等待一次检测周期 |
 
-局部补齐必须使用可追溯的历史模板、已应用 worker 布局及 partition 规则；Role 实例数量始终取最新 spec；后续仍需更新的实例按当前预算、顺序和 roleCoordination 正常滚动。UID/owner 前置条件、旧事件隔离、完整 Ready、Terminating 容量占用和同名新 UID 保护均保留。真正的离线完整 Role 丢失若有可靠完成事实，仍按当前 recoveryPolicy 的恢复范围处理；只有 controller 自己启动但未完成的旧删除批次在重启后不再重放。
+局部补齐必须使用可追溯的历史模板、已应用 worker 布局及 partition 规则；Role 实例数量始终取最新 spec；后续仍需更新的实例按当前预算、顺序和 roleCoordination 正常滚动。UID/owner 前置条件、旧事件隔离、完整 Ready、Terminating 容量占用和同名新 UID 保护均保留。新进程只观察到缺失 Pod 或整项 Role 时直接按当前事实补缺，允许重启/接管期间的删除事件丢失；不再持久保存完整创建事实或凭旧标记扩大恢复范围。连续运行期间可靠处理的删除事件仍按 recoveryPolicy 执行。
 
 <a id="restart-convergence-cases"></a>
 
-**恢复中断后重启：过程与用例速查（2.6）**
+**恢复中断后重启：过程与用例速查（2.9）**
 
-以下四例使用 `desiredReplicas=2`、`maxUnavailable=1`、`maxSurge=0`。SG 模式的单位是完整组；Role 模式是 prefill 的一个完整 entry + worker 实例，decode 保持原版本。先完整运行 A，再提交 B 且 `partition=2`；用真实 Failed Pod 触发恢复。仅在确认故障 UID 已消失、健康成员 DELETE 被拒绝、该恢复范围的完成事实已清除后重启，避免把“离线外部删除完整 Role”误当成“controller 已启动的部分恢复”。
+以下四例使用 `desiredReplicas=2`、`maxUnavailable=1`、`maxSurge=0`。SG 模式的单位是完整组；Role 模式是 prefill 的一个完整 entry + worker 实例，decode 保持原版本。先完整运行 A，再提交 B 且 `partition=2`；用真实 Failed Pod 触发恢复。仅在确认故障 UID 已消失、健康成员 DELETE 被拒绝后重启，避免把“离线外部删除完整 Role”误当成“controller 已启动的部分恢复”。
 
 | 用例 | 恢复中断点 | 重启后必须保留的健康成员 | 补建与后续更新 |
 | --- | --- | --- | --- |
@@ -783,7 +785,7 @@ controller 重启后，放弃精确延续旧批次，按当前事实重新收敛
 | partition 1→0 | 低位 A 现在应更新 | 允许正常滚动替换先前保留的 A UID，最终目标 B Ready | 将“保留幸存者”误解成永久禁止后续合法滚动 |
 | 不再重启，注入一次新的真实故障 | 上一轮已稳定；仍配置主动恢复 | 正常完成新的 Role/SG 恢复范围，仅替换该范围 UID | 将重启简化推广为 controller 连续运行时也只补单 Pod |
 
-补齐后如果仍不健康，只能依据**当前**故障条件、recoveryPolicy 与 grace 再次判断：纯 NotReady 不自动触发主动恢复，None 或 grace=-1 不主动删除；已有故障起点跨重启计时规则仍然有效。这些边界沿用 API §6 与 `recovery-contract` / `grace-restart`，并非 RC-01～04 新增的故障计时覆盖。旧 Pod 仍 Terminating 的正常滚动重启另见 `controller-restart/RUN-436、RUN-439`；它们不能代替本表的部分故障恢复用例。
+补齐后如果仍不健康，只能依据**当前**故障条件、recoveryPolicy 与 grace 再次判断：纯 NotReady 不自动触发主动恢复，None 或 grace=-1 不主动删除；新进程重新观察并起算grace，不持久保存前任故障起点。这些边界沿用 API §6 与 `recovery-contract` / `grace-restart`，并非 RC-01～04 新增的故障计时覆盖。旧 Pod 仍 Terminating 的正常滚动重启另见 `controller-restart/RUN-436、RUN-439`；它们不能代替本表的部分故障恢复用例。
 
 执行入口与证据要求见 [重启收敛用例说明](../RESTART_CONVERGENCE.md)。用例定义、判定器通过和真实 Kind 结果分别记录；不能以最终 B Ready 单独判定上述中途行为正确。
 
@@ -794,7 +796,7 @@ controller 重启后，放弃精确延续旧批次，按当前事实重新收敛
 - **身份债**：单独记录 `missingOrdinals` 与范围外保留组；不能把它误报成版本未完成，也不能在下次普通 reconcile 中无缘无故把缩容保留下来的健康组删除。故障造成的缺位仍应走修复逻辑，不与“缩容允许的稳定债”混淆。
 - **阻塞**：坏目标、历史 revision 丢失、maxScaleDown 耗尽、预算/容量不足或协调限制挡住候选时停止相应新动作并报告原因；SG 不再仅因健康高位存在就阻塞合法低位旧坏修复。不隐式放宽 maxUnavailable/maxSurge，不把已发删除回滚，不为表面连续而增加额外重建。
 
-实现上需要持久区分保留组、临时 surge 和缩容产生的身份债（仅靠 count/ordinal 不足以在重启后判断），保存/恢复 live 历史版本，并以真实 Ready、Deleting、最新 desiredReplicas、实际活动组数 activeReplicas 和目标版未就绪数 unavailableTargetReplicas 结算预算；在途删除/创建须占位，不能按短暂对象数反复领取 maxScaleDown。这是有限的控制器状态与选择逻辑，不依赖不可实现的 Pod 重命名。本文不宣称现有 production 已符合，也不把静态推导当成 Kind 通过记录。所有复合场景的可观察过程和取舍见 [场景过程表](#scenario-tables)。
+实现上由实际 Pod 的身份、版本及 surge 标记区分非空保留组、临时容量和缩容身份债，结合 ControllerRevision 和汇总历史基线恢复模板；不创建成员 ConfigMap 或等价 status/owner annotation 表，并以真实 Ready、Deleting、最新 desiredReplicas、实际活动组数 activeReplicas 和目标版未就绪数 unavailableTargetReplicas 结算预算；在途删除/创建须占位，不能按短暂对象数反复领取 maxScaleDown。这是有限的控制器状态与选择逻辑，不依赖不可实现的 Pod 重命名。本文不宣称现有 production 已符合，也不把静态推导当成 Kind 通过记录。所有复合场景的可观察过程和取舍见 [场景过程表](#scenario-tables)。
 
 <a id="budget-lookup"></a>
 

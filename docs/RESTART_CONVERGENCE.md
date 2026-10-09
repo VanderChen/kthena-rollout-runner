@@ -1,12 +1,16 @@
 # 恢复中断后的 controller 重启用例
 
-契约为 [2.6 行为预期表](specs/servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases)，输入为 [restart-convergence/suite.json](../cases/restart-convergence/suite.json)。RC-01～04 分别覆盖 SG 整组恢复、SG 内 Role 恢复、独立 Role 恢复和协调 Role 恢复。它们使用独立 Python 入口，与 `recovery-contract` 相同，不由通用 Go Job case loader 执行，也不替换旧 RUN-435～440。
+契约为 [2.9 行为预期表](specs/servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases)，输入为 [restart-convergence/suite.json](../cases/restart-convergence/suite.json)。RC-01～04 分别覆盖 SG 整组恢复、SG 内 Role 恢复、独立 Role 恢复和协调 Role 恢复。它们使用独立 Python 入口，与 `recovery-contract` 相同，不由通用 Go Job case loader 执行，也不替换旧 RUN-435～440。
 
-每例先完成 A，再提交受 partition 保护的 B。真实 Failed Pod 触发恢复；代理仅拒绝 controller 对健康幸存 Pod 的 DELETE 和对缺员的 POST，runner 直接观察 apiserver。必须看到原故障 UID 消失、幸存 Pod DELETE 命中和对应 `created.json` 完成事实清除，才能确认“恢复已经开始但尚未完成”的重启切点。这是测试夹具的实施证据，不新增用户 API 或持久删除事务要求。
+每例先完成 A，再提交受 partition 保护的 B。真实 Failed Pod 触发恢复；代理仅拒绝 controller 对健康幸存 Pod 的 DELETE 和对缺员的 POST，runner 直接观察 apiserver。必须看到原故障 UID 消失、原幸存 Pod 仍为同 UID 且 Ready、幸存 Pod DELETE 拒绝命中，才能确认“恢复已经开始但尚未完成”的重启切点。这是测试夹具的实施证据，不新增用户 API 或持久删除事务要求。
 
 重启后 partition 2→1。POST 暂不放行时，缺员占用唯一的 maxUnavailable，所有健康 UID 必须保留。放行后首次补建必须是历史 A，完整 Ready 后高位可滚 B；再将 partition 降为 0，允许先前保留的低位 A 正常滚 B。最后再制造一次真实故障，验证 controller 连续运行时仍完成配置的全部 Role/SG 恢复范围。
 
+RC-04 按已批准的协调 partition 比例校验，同时提交 prefill/decode 的 partition 2→1→0；只有 prefill 更新模板，decode 始终为 A。RC-03 独立 Role 模式仍只改变 prefill 的 partition。spec 更新遇到 resourceVersion Conflict 时最多重读重试5次，非Conflict错误立即报告，保留冲突输入和命令记录。
+
 执行前准备一个**隔离的、允许重启的**单副本 Kind controller、Volcano，以及已配置到该 controller 的 runner fault proxy。观察连接必须直连 apiserver。脚本不改 controller 镜像或启动参数，仅暂停并恢复同一个 Deployment；新 Pod 必须换 UID、同镜像且完成 initialSync。套件不适合指向共享生产 controller。
+
+验证切点需要在 controller 暂停期间提交 partition 更新，admission webhook 必须独立保持可用。若 webhook 与待重启 controller 共用进程，可在隔离集群用同镜像、同证书和现有 ServiceAccount 启动独立 webhook Deployment，临时将 webhook Service 指向它，结束后恢复。当前二进制在全部 controller 禁用时会回退为全部启用；066 夹具先确认集群无 ModelBooster，再用 `--controllers=modelbooster --leader-elect=false`，并检查日志确认 ModelServing/Autoscaler 已禁用。不要禁用校验或移动 partition 更新时机来规避连接失败；admission 不可用或额外 ModelServing controller 干扰均属于无效夹具。
 
 ```sh
 # 从 workspace 根目录执行；路径、镜像和源码 SHA 使用当前环境真实值。
@@ -28,6 +32,6 @@
 
 `PASS` 要求阶段断言和 watch 审计都通过；夹具未建立、缺少 watch 证据或环境异常为 `INCONCLUSIVE`；已建立场景中的错误版本、健康误删、Ready 预算突破或无法收敛为 `FAIL`。保留每次尝试与失败原因；不能把部分结果相加宣称全套通过。脚本清除自己安装的代理规则并恢复自己暂停的 controller；保留测试 namespace 和证据供检查，不清理其他任务的资源。
 
-边界：RC-04 配置了 maxSkew=50%，但不代替所有顺序、百分比与依赖组合的专项验证；本套件不迁移 84 个历史恢复用例。None、grace=-1、纯 NotReady 和故障起点跨重启计时仍遵循 API §6 及各自用例，不能因为不要求延续旧删除批次而放松。
+边界：RC-04 配置了 maxSkew=50%，但不代替所有顺序、百分比与依赖组合的专项验证；本套件不迁移 84 个历史恢复用例。None、grace=-1、纯 NotReady 和新进程重新起算故障宽限仍遵循 API §6 及各自用例，不能因为不要求延续旧删除批次而放松。
 
-本轮真实执行结果与无效夹具尝试记录于 [052 报告](../../issues/features/052-runner-spec-contract-alignment-IP/restart-convergence-20261008/README.md)。
+初始2.6的真实执行结果与无效夹具尝试记录于 [052 报告](../../issues/features/052-runner-spec-contract-alignment-IP/restart-convergence-20261008/README.md)。去除成员CM依赖后的2.9执行、controller提交及完整证据记录于 [066报告](../../issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md#18-runner-实施继续2026-10-09)。每次执行的 `provenance.json` 从suite读取契约版本，并记录输入及脚本SHA256。

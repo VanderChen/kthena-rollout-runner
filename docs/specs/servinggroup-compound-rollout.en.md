@@ -1,6 +1,6 @@
 # ServingGroupRollingUpdate compound rollout expectations
 
-Version 2.8 · 2026-10-09 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
+Version 2.9 · 2026-10-09 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
 
 This document defines **design expectations**; implementation compliance and actual Kind results are recorded separately. The main tables retain all 35 `ServingGroupRollingUpdate` scenarios. Shared principles also state their scope for `RoleRollingUpdate`. [Appendix B](#budget-lookup) compares budgets and behavior in both modes; it does not add an equivalent set of executable Role cases.
 
@@ -82,6 +82,8 @@ Partition limits template updates but does not prevent explicit scale-down from 
 A local fault repair retains the enclosing rollout unit’s applied template and worker layout; it must not apply the newest target merely because a member failed. The rollout unit is a complete SG in ServingGroupRollingUpdate and one Role instance in RoleRollingUpdate. Rebuilding a whole rollout unit selects the protected baseline or latest target using partition at action time. If partition rises around an existing v2 unit, a local Pod/Role repair still retains that unit’s applied v2; only a whole-unit rebuild reselects the protected baseline and may return to v1. If the relevant history cannot be established, wait and report rather than guess the latest version. Slot creation/recreation above means a complete rollout unit; local member repair follows this paragraph and API section 6.1.
 
 ### 0.6 Scaling, sparse ordinals and surge identity
+
+When every desired Role count is zero and actual Pods are gone, an empty group has no individual state to retain: discard sparse ordinals, applied revisions and temporary surge origin. Derive logical scale from the latest spec. Future nonempty expansion is new placement using current partition: traceable historical baseline below partition, target elsewhere. Retain currentRevision; empty derived counts cannot advance that baseline. Terminating Pods still occupy slots. Partially zero workloads and missing positive-desired fault capacity do not use this simplification. The sparse/surge rules below apply to units with actual members.
 
 When scaling and updating together, arrange formal capacity for the latest desired size before destructive rollout of healthy old units. Formal scale-out slots must be placed first, but new instances need not all be Ready; every healthy deletion still requires a fresh budget check. Role replica changes scale all non-deleting groups toward the latest counts without an SG rolling-budget admission barrier or a wait for another group to become Ready. Multiple or all groups may temporarily be NotReady. Group completeness uses current Role counts and each instance's applicable historical worker layout. Protected groups retain their applicable historical Pod and worker templates. Template rollout and eviction keep their own budgets.
 
@@ -720,13 +722,13 @@ After controller restart, abandon exact continuation of the old batch and conver
 | An old Pod is still Terminating or the current unit is unavailable | Count actual occupancy/unavailability in current capacity and budgets; losing process-local state grants no duplicate deletion credit | Do not reuse the name or slot while the old UID exists, and do not delete another healthy unit with the same allowance |
 | The refilled workload still satisfies current fault conditions | Start a new recovery episode under current recoveryPolicy, grace and complete health checks | None/grace=-1 performs no proactive deletion; finite grace may wait another detection cycle |
 
-Local refill uses traceable historical templates, applied worker layouts and current partition rules; Role instance counts always come from the latest spec. Units that still need an update continue through normal current budgets, order and roleCoordination. UID/owner preconditions, stale-event isolation, complete Ready classification, Terminating occupancy and same-name replacement protection remain mandatory. A genuinely lost complete Role with reliable completion facts still follows the current recoveryPolicy scope; only an incomplete controller-initiated batch is not replayed after restart.
+Local refill uses traceable historical templates, applied worker layouts and current partition rules; Role instance counts always come from the latest spec. Units that still need an update continue through normal current budgets, order and roleCoordination. UID/owner preconditions, stale-event isolation, complete Ready classification, Terminating occupancy and same-name replacement protection remain mandatory. A new process observing only missing Pods or a whole Role refills from current facts and may lose restart/takeover deletion events. Do not persist completion facts or use old markers to broaden recovery. Reliably handled deletion events during continuous operation still follow recoveryPolicy.
 
 <a id="restart-convergence-cases"></a>
 
-**Interrupted recovery and restart: trace and case lookup (2.6)**
+**Interrupted recovery and restart: trace and case lookup (2.9)**
 
-All four cases use `desiredReplicas=2`, `maxUnavailable=1`, `maxSurge=0`. A unit is a complete group in SG mode, or a complete prefill entry + worker instance in Role mode; decode stays at its original version in Role mode. Establish fully Ready A, submit B with `partition=2`, then trigger recovery through a real Failed Pod. Restart only after the failed UID is gone, the healthy survivor DELETE has been rejected and the recovery scope's completion facts have been cleared. This distinguishes an already-started partial recovery from an externally deleted complete Role while the controller is offline.
+All four cases use `desiredReplicas=2`, `maxUnavailable=1`, `maxSurge=0`. A unit is a complete group in SG mode, or a complete prefill entry + worker instance in Role mode; decode stays at its original version in Role mode. Establish fully Ready A, submit B with `partition=2`, then trigger recovery through a real Failed Pod. Restart only after the failed UID is gone and the healthy survivor DELETE has been rejected. This distinguishes an already-started partial recovery from an externally deleted complete Role while the controller is offline.
 
 | Case | Interrupted recovery boundary | Healthy members that must survive restart | Refill and later update |
 | --- | --- | --- | --- |
@@ -746,7 +748,7 @@ The common observable trace is:
 | partition 1→0 | Low A now requires an update | Ordinary rollout may replace the previously retained A UIDs; eligible targets finish B Ready | Treat survivor retention as a permanent exemption from future lawful rollout |
 | Inject another real fault without restarting | Prior rollout is stable; active recovery is still configured | Complete the new configured Role/SG scope, replacing only those UIDs | Apply restart simplification to uninterrupted recovery by repairing only one Pod |
 
-If refill remains unhealthy, reassess only under **current** health, recoveryPolicy and grace: pure NotReady alone does not trigger proactive recovery; None and grace=-1 do not proactively delete. Existing fault-start persistence across restart still applies. Those boundaries retain API §6 and `recovery-contract` / `grace-restart` coverage; RC-01–04 do not add grace-timing coverage. Rolling restarts with a still-Terminating old Pod remain separate in `controller-restart/RUN-436` and `RUN-439`; they do not replace these partial fault-recovery cases.
+If refill remains unhealthy, reassess only under **current** health, recoveryPolicy and grace: pure NotReady alone does not trigger proactive recovery; None and grace=-1 do not proactively delete. A new process observes again and starts grace without persisting the predecessor's fault start. Those boundaries retain API §6 and `recovery-contract` / `grace-restart` coverage; RC-01–04 do not add grace-timing coverage. Rolling restarts with a still-Terminating old Pod remain separate in `controller-restart/RUN-436` and `RUN-439`; they do not replace these partial fault-recovery cases.
 
 See [restart convergence execution](../RESTART_CONVERGENCE.md) for the command and evidence requirements. Definitions, validator tests and actual Kind outcomes are recorded separately; final B Ready alone does not establish the intermediate guarantees above.
 
@@ -757,7 +759,7 @@ See [restart convergence execution](../RESTART_CONVERGENCE.md) for the command a
 - Track holes and out-of-range retained identities separately. They are not inherently incomplete versions and do not authorize deletion on an ordinary reconcile. Fault-created missing capacity still requires recovery and must not be confused with stable scale-down debt.
 - Bad targets, missing history, exhausted maxScaleDown, insufficient capacity/budget or coordination blockers stop the relevant new actions and report the cause. Do not silently relax maxUnavailable/maxSurge, reverse accepted deletion or add rebuilds for superficial continuity.
 
-A controller must preserve enough state across restart to distinguish retained groups, temporary surge and scale-down identity debt; count/ordinal alone is insufficient. Save/recover live historical templates and account for real Ready/Deleting/latest desiredReplicas/actual activeReplicas/target unavailableTargetReplicas with in-flight reservations. This needs finite controller state and selection logic, not impossible Pod renaming. The contract does not claim current production compliance or substitute static reasoning for Kind verification.
+Use actual Pod identities, revisions and surge markers to distinguish nonempty retained groups, temporary capacity and scale-down identity debt, with ControllerRevision and the aggregate baseline for templates. Do not create a member ConfigMap or equivalent status/owner annotation table. Recover live historical templates and account for real Ready/Deleting/latest desiredReplicas/actual activeReplicas/target unavailableTargetReplicas with in-flight reservations. This needs finite controller state and selection logic, not impossible Pod renaming. The contract does not claim current production compliance or substitute static reasoning for Kind verification.
 
 <a id="budget-lookup"></a>
 

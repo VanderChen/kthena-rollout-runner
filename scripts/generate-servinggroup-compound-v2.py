@@ -347,8 +347,7 @@ c.hold("protected-low-history-retained", "0:A,1:B", same={0: "baseline"}, stable
 
 c = Case("R01", spec(3, u=1, p=1, workers=1, worker_version="W1"))
 c.update("historical-and-new-worker-templates", "0:A,1:B,2:B", version="B", worker_version="W2", release="all")
-c.update("first-group-applies-second-member", "0:A,1:B,2:B!", members=2, group_members={2: 2},
-         conditions=[condition(2, kind="unit", version="B", ready=False)])
+c.update("all-groups-apply-second-member", "0:A!,1:B!,2:B!", members=2, group_members={0: 2, 1: 2, 2: 2})
 # The Role member increase is the request under test; the next checkpoint
 # verifies three exact group member counts and retains the protected W1 group.
 c.hold("all-members-ready", "0:A,1:B,2:B", release="all", members={0: 2, 1: 2, 2: 2}, same=None); add(c)

@@ -1,6 +1,6 @@
 # ModelServing API 参考
 
-版本 2.7 · 2026-10-08 · [English](modelserving-api-reference.en.md)
+版本 2.8 · 2026-10-09 · [English](modelserving-api-reference.en.md)
 
 本文规定字段路径、默认值、可变性、合法范围、百分比取整和跨字段约束。Mutable 表示更新后的完整对象通过校验时可原地修改；Immutable 表示值和可选对象的存在性均不可变，即使滚动完成或副本数为零也不例外。
 
@@ -156,6 +156,8 @@ spec:
 **注意事项**
 
 仅限既有 Role；重新校验 Role 预算、gang 最小数、驱逐阈值、拓扑冲突和依赖容量。
+
+Role.replicas 扩缩是独立数量操作，所有非删除中的 SG 按最新数量推进，不按 SG 滚动 maxUnavailable/maxSurge 分批放行，也不等待其他组 Ready。数量变化可使多个乃至全部 SG 暂时 NotReady；各组以最新 Role 数量和各实例适用的历史 worker 布局判断完整 Ready。保护组新增实例仍用适用历史模板。模板/worker 更新和独立驱逐继续遵守各自预算。
 
 #### 1.4.3 `spec.template.roles[].entryTemplate`
 

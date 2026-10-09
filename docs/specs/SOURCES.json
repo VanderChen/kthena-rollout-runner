@@ -1,5 +1,5 @@
 {
-  "purpose": "Final bilingual contract 2.7: actual version capacity, independent partitions with common nominal fraction validation, and constrained full-rollout terminal quantization. Earlier approved contracts and original provenance remain; execution coverage is recorded separately.",
+  "purpose": "Final bilingual contract 2.8: independently scale Role replicas in all non-deleting SGs; allow temporary concurrent unavailability while preserving template rollout budgets, historical worker layouts and recovery state.",
   "originalImport": {
     "importedOn": "2026-10-05",
     "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
@@ -16,9 +16,9 @@
     {
       "path": "modelserving-api-reference.en.md",
       "language": "en",
-      "version": "2.7",
-      "sha256": "d0f771b788aa120815eab795ea26f97e3fb2b0543d83b528d755a5af41a8593b",
-      "bytes": 86209,
+      "version": "2.8",
+      "sha256": "c78bd9a3fec9f478012d6f865c8e80c6d6d24994fc1d7b4375ea0adca1a06288",
+      "bytes": 86663,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.zh-CN.md",
       "priorEdition": {
@@ -30,14 +30,19 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08."
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "priorEdition2_7": {
+        "sha256": "d0f771b788aa120815eab795ea26f97e3fb2b0543d83b528d755a5af41a8593b",
+        "bytes": 86209,
+        "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/modelserving-api-reference.en.md"
+      }
     },
     {
       "path": "modelserving-api-reference.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.7",
-      "sha256": "97b6f151ec52e1a9011e461758d2feaa44e7f477bd05aedc29dde26459c70213",
-      "bytes": 67253,
+      "version": "2.8",
+      "sha256": "4f183891c3467525efe83fa066f2959eaa5418f52124d99f4229c54e4e4fd23d",
+      "bytes": 67691,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.en.md",
       "priorEdition": {
@@ -49,14 +54,19 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08."
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "priorEdition2_7": {
+        "sha256": "97b6f151ec52e1a9011e461758d2feaa44e7f477bd05aedc29dde26459c70213",
+        "bytes": 67253,
+        "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/modelserving-api-reference.zh-CN.md"
+      }
     },
     {
       "path": "servinggroup-compound-rollout.en.md",
       "language": "en",
-      "version": "2.7",
-      "sha256": "44c2ecdce26b738202426a42c1214a516047eefa5627c55441d37ef5e14eea9d",
-      "bytes": 109843,
+      "version": "2.8",
+      "sha256": "2f0162bef16c697090b87ec7fc6042813e6577a76a2b018817eb83961cd2b82c",
+      "bytes": 110288,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.zh-CN.md",
       "priorEdition": {
@@ -85,14 +95,19 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08."
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "priorEdition2_7": {
+        "sha256": "44c2ecdce26b738202426a42c1214a516047eefa5627c55441d37ef5e14eea9d",
+        "bytes": 109843,
+        "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/servinggroup-compound-rollout.en.md"
+      }
     },
     {
       "path": "servinggroup-compound-rollout.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.7",
-      "sha256": "91bca93eb04fcbb96dbd19c52d701ac72e5e44862ed87fc55577950f4ca85408",
-      "bytes": 118040,
+      "version": "2.8",
+      "sha256": "90d69883213cc904267bdf4d89f03a1088ebef1417826f53921df3f345bb0583",
+      "bytes": 118157,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.en.md",
       "priorEdition": {
@@ -121,7 +136,12 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08."
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09.",
+      "priorEdition2_7": {
+        "sha256": "91bca93eb04fcbb96dbd19c52d701ac72e5e44862ed87fc55577950f4ca85408",
+        "bytes": 118040,
+        "snapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7/servinggroup-compound-rollout.zh-CN.md"
+      }
     }
   ],
   "semanticRevisions": [
@@ -1238,6 +1258,46 @@
           "scope": "Task-specific tests; no claim of full runner conformance"
         }
       }
+    },
+    {
+      "version": "2.8",
+      "date": "2026-10-09",
+      "task": "issues/bugs/064-restore-independent-role-scaling-DONE/PROPOSAL_COMMIT.md",
+      "approval": [
+        "这个行为是不正确的，需要修正，扩缩容则是扩缩容行为，我们约束过只有worker replica变化时滚动行为，回退这个修改，但是需要分析对原始问题的影响，role的扩容就是同时进行的，允许这个时候存在多租unready",
+        "分析完成后请开始修复"
+      ],
+      "clauses": [
+        "API 1.4.2",
+        "SG 0.6",
+        "SG A.4",
+        "SG-R01"
+      ],
+      "before": "Per-SG applied Role counts and SG budget serialize nested replica changes.",
+      "after": "Latest Role counts apply independently across non-deleting SGs; concurrent temporary unavailability is allowed. Historical Pod/worker templates and template-rollout/eviction budgets remain.",
+      "cases": [
+        "servinggroup-compound-v2/RUN-652",
+        "normal SG Role-replica Ready accounting"
+      ],
+      "priorSnapshot": "issues/bugs/064-restore-independent-role-scaling-DONE/before-specs-2.7",
+      "validation": {
+        "unit": "Kthena full non-e2e Go gate; controller/webhook race and vet; runner make test passed",
+        "kind": {
+          "cluster": "kthena-fix-064",
+          "image": "kthena-controller-manager:fix-064-final",
+          "directedCases": 7,
+          "compoundPassed": [
+            "RUN-651",
+            "RUN-652"
+          ],
+          "recoveryPassed": [
+            "RUN-307"
+          ]
+        },
+        "scope": "Task-specific evidence; no claim of complete compound, recovery or e2e coverage."
+      },
+      "implementationCommit": "b1e243adf6b541b7273cf4037fa659e9ae86de88",
+      "runnerCompatibility": "Recognize and validate the existing optional surge-groups.json, recovery.json and created.json fields in the UID-owned state ConfigMap; preserve unknown-field rejection. The prior two-key check misjudged RUN-307 before recovery began."
     }
   ],
   "naming": {

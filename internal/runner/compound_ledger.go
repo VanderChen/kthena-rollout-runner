@@ -199,14 +199,7 @@ func (l *NormalLedger) compoundAfter(kind, event string, o *unstructured.Unstruc
 		if b.C > b.N+b.S {
 			l.fail(fmt.Sprintf("COMPOUND_SURGE_VIOLATION: created group=%d active=%d ceiling=%d", groupOrdinal, b.C, b.N+b.S))
 		}
-		if kind == "pods" && len(l.History) >= 2 && sameTemplates(l.History[len(l.History)-2], l.Model) {
-			role := o.GetLabels()[LabelRole]
-			previous, hadPrevious := l.Base.Roles[role]
-			current, hasCurrent := l.Model.Roles[role]
-			if hadPrevious && hasCurrent && current.R > previous.R && ordinal(o.GetLabels()[LabelRoleID]) >= previous.R && b.R < b.N-b.U {
-				l.fail(fmt.Sprintf("COMPOUND_ROLE_READY_BUDGET: added member to group=%d Ready=%d minimum=%d", groupOrdinal, b.R, b.N-b.U))
-			}
-		}
+
 	}
 	if kind != "pods" || event == "DELETED" {
 		return

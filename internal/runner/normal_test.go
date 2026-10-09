@@ -404,7 +404,7 @@ func TestNormalExplicitGangMinimumPreservesRoleDistribution(t *testing.T) {
 	}
 }
 
-func TestNormalRoleExpansionDoesNotReclassifyHealthyServingGroup(t *testing.T) {
+func TestNormalRoleExpansionRequiresLatestCountForReady(t *testing.T) {
 	l, o := normalFixture(t, "RUN-227")
 	s := normalCase(t, "RUN-227").Scenario.Steps[0]
 	if err := l.Transition(s.Spec, "B", s.Expect, o); err != nil {
@@ -415,11 +415,15 @@ func TestNormalRoleExpansionDoesNotReclassifyHealthyServingGroup(t *testing.T) {
 	if err := l.Transition(next.Spec, "expand-role", next.Expect, o); err != nil {
 		t.Fatal(err)
 	}
-	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 2 {
-		t.Fatalf("expansion erased the two still-serving old SGs: %+v", metrics)
+	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 0 {
+		t.Fatalf("expanded groups with missing Role instances must not count Ready: %+v", metrics)
 	}
 	deleteNormal(l, o, "frontend", 1, 0)
-	requireNormalViolation(t, l, "BUDGET_VIOLATION")
+	for _, violation := range l.Violations {
+		if strings.Contains(violation, "BUDGET_VIOLATION") {
+			t.Fatalf("deleting an already unavailable old group does not remove Ready capacity: %v", l.Violations)
+		}
+	}
 }
 
 func TestNormalAtomicRoleExpansionKeepsAccurateOldCapacity(t *testing.T) {
@@ -428,13 +432,17 @@ func TestNormalAtomicRoleExpansionKeepsAccurateOldCapacity(t *testing.T) {
 	if err := l.Transition(s.Spec, "atomic-expand", s.Expect, o); err != nil {
 		t.Fatal(err)
 	}
-	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 3 {
-		t.Fatalf("three complete old layouts must remain available: %+v", metrics)
+	if metrics := l.Metrics(o["pods"]); len(metrics) != 1 || metrics[0].Ready != 0 {
+		t.Fatalf("atomic replica expansion must require the latest count: %+v", metrics)
 	}
 	deleteNormal(l, o, "frontend", 1, 0)
-	requireNormalViolation(t, l, "BUDGET_VIOLATION")
+	for _, violation := range l.Violations {
+		if strings.Contains(violation, "BUDGET_VIOLATION") {
+			t.Fatalf("deleting an already unavailable old group does not remove Ready capacity: %v", l.Violations)
+		}
+	}
 	requireNormalViolation(t, l, "ORDER_MISMATCH")
-	if len(l.Starts) != 1 || l.Starts[0].ReadyBefore != 3 || l.Starts[0].Minimum != 3 {
+	if len(l.Starts) != 1 || l.Starts[0].ReadyBefore != 0 || l.Starts[0].Minimum != 3 {
 		t.Fatalf("wrong evidence for actual zero-unavailable violation: %+v", l.Starts)
 	}
 }

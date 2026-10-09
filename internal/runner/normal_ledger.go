@@ -224,11 +224,8 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 			cohortReady := true
 			for name, layout := range candidate.Roles {
 				readyMinimum := layout.R
-				if baseline, ok := l.Base.Roles[name]; ok {
-					readyMinimum = baseline.R
-				}
 				if current, ok := l.Model.Roles[name]; ok {
-					readyMinimum = min(readyMinimum, current.R)
+					readyMinimum = current.R
 					layout.R = current.R
 				}
 				expected += layout.R
@@ -250,19 +247,13 @@ func (l *NormalLedger) units(objects map[string]*unstructured.Unstructured) map[
 				if count != layout.R {
 					matched = false
 				}
-				// A group that has received an added member must satisfy its
-				// applied membership target before it earns SG Ready credit.
-				// Groups still on the old membership retain their old target.
-				if l.CompoundV2 {
-					if current, ok := l.Model.Roles[name]; ok && count > readyMinimum {
-						readyMinimum = current.R
-					}
-				}
-				cohortReady = cohortReady && readyCount >= readyMinimum
+				// Replica counts are live scaling intent for every group. Worker
+				// completeness still follows each instance's observed template.
+				cohortReady = cohortReady && count == readyMinimum && readyCount == readyMinimum
 			}
 			// Newly added Roles/replicas can coexist with the old membership.
-			// Pending additions do not remove the old cohort's serving capacity;
-			// an explicit reduction only requires its smaller remaining capacity.
+			// A Role replica change immediately changes the required count;
+			// historical worker templates remain valid during that scale operation.
 			// Exact target membership remains a separate final-state predicate.
 			u.Ready = u.Ready || cohortReady
 			actual := 0

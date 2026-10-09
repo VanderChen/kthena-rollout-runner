@@ -482,12 +482,12 @@ func TestCompoundRoleMemberIncreaseConsumesReadyCredit(t *testing.T) {
 	if l.units(objects["pods"])["model-2"].Ready {
 		t.Fatal("partially grown group counted Ready")
 	}
-	if !l.units(objects["pods"])["model-1"].Ready {
-		t.Fatal("untouched old-membership group lost Ready credit")
+	if l.units(objects["pods"])["model-1"].Ready {
+		t.Fatal("group missing its new required member retained stale Ready credit")
 	}
 }
 
-func TestCompoundRoleMemberIncreaseCannotDropSecondGroupBelowFloor(t *testing.T) {
+func TestCompoundRoleMemberIncreaseMayMakeAllGroupsUnavailable(t *testing.T) {
 	l, objects := compoundFixture(t, "RUN-652")
 	current := cloneMap(l.Model.Spec)
 	role := listValue(mapValue(current, "template"), "roles")[0].(map[string]interface{})
@@ -495,7 +495,7 @@ func TestCompoundRoleMemberIncreaseCannotDropSecondGroupBelowFloor(t *testing.T)
 	if err := l.Transition(current, "grow-role", ScenarioExpectation{}, objects); err != nil {
 		t.Fatal(err)
 	}
-	for _, group := range []int{2, 1} {
+	for _, group := range []int{2, 1, 0} {
 		var added *unstructured.Unstructured
 		for _, member := range []struct{ kind, version string }{{"entry", "A"}, {"worker-1", "W1"}} {
 			p := normalTestPod("SG", "frontend", 1, member.version, false, member.kind)
@@ -510,7 +510,12 @@ func TestCompoundRoleMemberIncreaseCannotDropSecondGroupBelowFloor(t *testing.T)
 		}
 		l.compoundAfter("pods", "ADDED", added, objects)
 	}
-	requireNormalViolation(t, l, "COMPOUND_ROLE_READY_BUDGET")
+	if err := l.error(); err != nil {
+		t.Fatalf("independent member scaling must be allowed: %v", err)
+	}
+	if b := l.compoundBudget(objects); b.R != 0 || b.C != 3 {
+		t.Fatalf("all three existing groups should be unavailable without surge: %+v", b)
+	}
 }
 
 func TestCompoundShrinkDoesNotCommitServingSurge(t *testing.T) {

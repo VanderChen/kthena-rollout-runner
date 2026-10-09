@@ -1,6 +1,6 @@
-# ServingGroupRollingUpdate 组合场景预期行为规范 v2.2
+# ServingGroupRollingUpdate 组合场景预期行为规范 v2.8
 
-版本 2.7 · 2026-10-08 · [English](servinggroup-compound-rollout.en.md)
+版本 2.8 · 2026-10-09 · [English](servinggroup-compound-rollout.en.md)
 
 本文描述**设计预期**；实现符合程度与实际 Kind 验证结果另行记录。正文保留 `ServingGroupRollingUpdate` 的全部 35 个组合场景；共用原则也说明 `RoleRollingUpdate` 的适用范围。[附录 B](#budget-lookup)提供两种模式的预算与行为对照，不代表新增了相同数量的 Role 执行用例。
 
@@ -83,7 +83,7 @@ partition 限制模板更新，不禁止显式缩容删除受保护实例。受�
 
 ### 0.6 扩缩容、稀疏序号与 surge 身份
 
-同时扩缩容和更新时，先安排最新规模下的正式容量，再考虑健康旧单元的破坏性滚动。正式扩容槽须先安置，但新实例不必全部 Ready；每次健康删除仍须重新检查预算。SG 模式下，Role 实例数增加若会使整组暂时 NotReady，应分批应用，未轮到的组按已应用的成员目标判断 Ready，守住同一可用性底线。
+同时扩缩容和更新时，先安排最新规模下的正式容量，再考虑健康旧单元的破坏性滚动。正式扩容槽须先安置，但新实例不必全部 Ready；每次健康删除仍须重新检查预算。Role.replicas 扩缩是独立数量操作，所有非删除中的 SG 按最新数量推进，不按 SG 滚动 maxUnavailable/maxSurge 分批放行，也不等待其他组 Ready。数量变化可使多个乃至全部 SG 暂时 NotReady；各组以最新 Role 数量和各实例适用的历史 worker 布局判断完整 Ready。保护组新增实例仍用适用历史模板。模板/worker 更新和独立驱逐继续遵守各自预算。
 
 | 场景 | 身份与顺序原则 |
 | --- | --- |
@@ -649,15 +649,16 @@ maxUnavailable 设为 25%：期望 5 组时向下取整，可容忍 1 组不可�
 
 ### SG-R01：partition 灰度中只扩 Role 成员数
 
-`desiredReplicas=3,partition=1`，sg-0 使用历史 v1 的 worker 模板 W1，sg-1 和 sg-2 使用 v2 的 worker 模板 W2。仅将 `roles[].replicas` 从 1 扩到 2，不产生新的 SG 版本，也不触发序号补洞。默认 `maxUnavailable=1,maxSurge=0`；按每组已应用的成员目标判断完整 Ready。未轮到的组仍以旧成员数提供服务，不会因全局 spec 刚改变就同时失去 Ready 信用。
+`desiredReplicas=3,partition=1,maxUnavailable=1,maxSurge=0`。sg-0 使用历史 v1/W1，sg-1、sg-2 使用 v2/W2。仅将 Role replicas 从1改为2，三个组独立扩容，不生成新的模板 revision，不新增 SG surge、不重排组序号；原有 Pod UID 保留。故意保持所有新成员 NotReady 时，允许三个 SG 同时 NotReady。partition 只保护模板，不阻止数量扩缩。
 
-| 阶段 | 每组 Role 成员数 | sg-0 | sg-1 | sg-2 | 整组 Ready | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 初始 | 1 | v1/W1×1 Ready（受保护） | v2/W2×1 Ready | v2/W2×1 Ready | 3 | 灰度稳态 |
-| 扩 sg-2 | 2 | v1/W1×1 Ready（受保护） | v2/W2×1 Ready | v2/W2×1 Ready+v2/W2×1 NotReady | 2→3 | 只给一组应用新成员目标，等 W2 Ready |
-| 扩 sg-1 | 2 | v1/W1×1 Ready（受保护） | v2/W2×1 Ready+v2/W2×1 NotReady | v2/W2×2 Ready | 2→3 | 仍守住 desiredReplicas-maxUnavailable=2 |
-| 扩 sg-0 | 2 | v1/W1×1 Ready（受保护）+v1/W1×1 NotReady | v2/W2×2 Ready | v2/W2×2 Ready | 2→3 | 受保护组仍使用历史 W1 模板 |
-| 终态 | 2 | v1/W1×2 Ready（受保护） | v2/W2×2 Ready | v2/W2×2 Ready | 3 | 不重滚 SG 模板，不把 W2 套给 sg-0 |
+| 阶段 | 每组 Role 期望数 | sg-0 | sg-1 | sg-2 | 整组 Ready |
+| --- | --- | --- | --- | --- | --- |
+| 初始 | 1 | v1/W1×1 Ready（保护） | v2/W2×1 Ready | v2/W2×1 Ready | 3 |
+| 全部新增成员尚未 Ready | 2 | v1/W1×1 Ready + v1/W1×1 NotReady | v2/W2×1 Ready + v2/W2×1 NotReady | v2/W2×1 Ready + v2/W2×1 NotReady | 可为0 |
+| 分别就绪 | 2 | 历史 W1×2 | W2×2 | W2×2 | 按实际就绪恢复，无跨组屏障 |
+| 终态 | 2 | v1/W1×2 Ready（保护） | v2/W2×2 Ready | v2/W2×2 Ready | 3 |
+
+缩容同样不等待其他组 Ready，实际 Terminating 占位仍保留。纯 Role 数量变化不要求先用 SG surge 提供容量。真实模板滚动和驱逐仍受各自预算约束。2026-10-09 用户纠正取代此前 SG-R01 的逐组扩容表；旧表与验证记录保留于任务064快照和 Git 历史。
 
 ## 7. 验收与反例清单
 
@@ -737,7 +738,7 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 
 例如 `desiredReplicas=5,maxUnavailable=2,maxSurge=0`，同一批次选最高的 sg-4/3 更新，但错误版本 B 使两组都 NotReady，此时 `activeReplicas=5,unavailableTargetReplicas=2,maxScaleDown=5-3-2=0`，健康的 sg-2 不能再删除。目标修正为 C 后，坏 B 转为旧版，`unavailableTargetReplicas=0,maxScaleDown=2`，可按 4→3 同批清理并创建 C；两组 C 均未 Ready 时不能继续删除健康的 sg-2；其中一组完整 Ready 后，readyReplicas=4、unavailableTargetReplicas=1、maxScaleDown=1、maxHealthyScaleDown=1，即可滚 sg-2，不必等另一组。若两组都在下次协调前 Ready，则可同批滚动 2/1（readyReplicas 从 5 降到 3）；此后仍逐 Ready 结算，再滚 sg-0。若起初五组 A 都 NotReady，readyReplicas=0 已低于预算底线，提交 B 后仍有 `activeReplicas=5,unavailableTargetReplicas=0,maxScaleDown=2`，可先按 4→3 替换；每个完整 B Ready 后按新额度继续选择 2→1、0，不等待固定批次全部 Ready。不能因“故障已超 maxUnavailable”拒绝所有恢复动作，也不能一次重建五组。这是**不扩大既有可用性缺口**的规则，不是放宽 maxUnavailable，也不是低序号优先。稀疏扩容后的 sg-2=v1 Ready、sg-1=v2 NotReady、目标 v3，若 maxScaleDown=1/maxHealthyScaleDown=0，默认可先原位修 sg-1，Ready 不下降；它 Ready 后再滚健康 sg-2。相同协调 Role 状态仍受最高候选顺序限制而等待。maxScaleDown 耗尽、新目标仍坏、protected 故障、依赖或调度容量不足也可能阻塞，不能保证自动解除所有故障。
 
-完整滚动单元的新建/重建版本由**动作当时**的最新 partition 决定：`ordinal<partition` 用该次灰度固定且仍可追溯的受保护历史模板，`ordinal≥partition` 用最新目标模板。现存 B 因 partition 增大落入保护区时保留 B；之后它若被删除，重建可回到历史 A，这并不构成主动回滚。受保护基线取进入这轮灰度前最近一次全量完成的模板；A→B→C 的中途提交不自动把基线推进到 B。解除保护并完成全量目标后，才可把新目标作为以后灰度的基线。历史模板不可确认时安全等待，不得猜测为最新模板。Role 副本数变动只改变每组内部数量，受保护组继续使用历史 Pod/worker 模板；它本身不产生 SG 模板 revision。若增加必需 Role 成员会使整组暂时 NotReady，应按实时 `desiredReplicas-maxUnavailable` 底线分批给各组应用新成员数，不能一次令所有旧组失去 Ready 信用。未轮到的组仍以自己**已应用** 的旧成员目标判断 Ready，而非在全局 spec 改变瞬间全部计为缺员；已轮到的组必须等新增成员 Ready 才恢复整组 Ready。若其他故障已耗尽 maxUnavailable，则等待修复或使用合法 surge，不放宽预算。
+完整滚动单元的新建/重建版本由**动作当时**的最新 partition 决定：`ordinal<partition` 用该次灰度固定且仍可追溯的受保护历史模板，`ordinal≥partition` 用最新目标模板。现存 B 因 partition 增大落入保护区时保留 B；之后它若被删除，重建可回到历史 A，这并不构成主动回滚。受保护基线取进入这轮灰度前最近一次全量完成的模板；A→B→C 的中途提交不自动把基线推进到 B。解除保护并完成全量目标后，才可把新目标作为以后灰度的基线。历史模板不可确认时安全等待，不得猜测为最新模板。Role.replicas 扩缩是独立数量操作，所有非删除中的 SG 按最新数量推进，不按 SG 滚动 maxUnavailable/maxSurge 分批放行，也不等待其他组 Ready。数量变化可使多个乃至全部 SG 暂时 NotReady；各组以最新 Role 数量和各实例适用的历史 worker 布局判断完整 Ready。保护组新增实例仍用适用历史模板。模板/worker 更新和独立驱逐继续遵守各自预算。
 
 局部故障修复沿用所属滚动单元已经应用的模板和 worker 布局，不借修复提前应用最新目标。ServingGroupRollingUpdate 的滚动单元是完整 SG，RoleRollingUpdate 的滚动单元是一个 Role 实例；完整滚动单元重建才按动作当时的 partition 选择受保护基线或最新目标。已有 v2 单元因 partition 提高而被保护时，仅修其中一个 Pod/Role 仍保持该单元已应用的 v2；只有整个单元重建才重新按保护区基线选择，可能回到 v1。历史无法可靠确定时等待并报告，不猜测最新版本。 先局部恢复旧版再进行合法模板滚动是允许路径；旧恢复动作不能因此删除新 UID。
 
@@ -756,7 +757,7 @@ controller 重启后，放弃精确延续旧批次，按当前事实重新收敛
 | 旧 Pod 仍 Terminating 或当前单元不可用 | 把实际占用/不可用计入当前容量与预算；不得因进程内计划消失重新取得删除额度 | 原 UID 未物理消失时不复用名称或容量槽，也不额外删除另一健康单元 |
 | 补齐后仍满足当前故障条件 | 重新按当前 recoveryPolicy、grace 和完整健康判断开始新的恢复 episode | None/grace=-1 不主动删除；有限 grace 可多等待一次检测周期 |
 
-局部补齐必须使用可追溯的历史模板、已应用成员布局及 partition 规则；后续仍需更新的实例按当前预算、顺序和 roleCoordination 正常滚动。UID/owner 前置条件、旧事件隔离、完整 Ready、Terminating 容量占用和同名新 UID 保护均保留。真正的离线完整 Role 丢失若有可靠完成事实，仍按当前 recoveryPolicy 的恢复范围处理；只有 controller 自己启动但未完成的旧删除批次在重启后不再重放。
+局部补齐必须使用可追溯的历史模板、已应用 worker 布局及 partition 规则；Role 实例数量始终取最新 spec；后续仍需更新的实例按当前预算、顺序和 roleCoordination 正常滚动。UID/owner 前置条件、旧事件隔离、完整 Ready、Terminating 容量占用和同名新 UID 保护均保留。真正的离线完整 Role 丢失若有可靠完成事实，仍按当前 recoveryPolicy 的恢复范围处理；只有 controller 自己启动但未完成的旧删除批次在重启后不再重放。
 
 <a id="restart-convergence-cases"></a>
 

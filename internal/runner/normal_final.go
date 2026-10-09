@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -579,8 +580,15 @@ func validGroupMembersState(cm *unstructured.Unstructured, owner string) bool {
 		return false
 	}
 	data, _, err := unstructured.NestedStringMap(cm.Object, "data")
-	if err != nil || len(data) != 2 {
+	if err != nil {
 		return false
+	}
+	for key := range data {
+		switch key {
+		case "targets.json", "revisions.json", "surge-groups.json", "recovery.json", "created.json":
+		default:
+			return false
+		}
 	}
 	var targets map[string]map[string]int32
 	var revisions map[string]string
@@ -598,5 +606,56 @@ func validGroupMembersState(cm *unstructured.Unstructured, owner string) bool {
 			}
 		}
 	}
-	return len(targets) == len(revisions)
+	if len(targets) != len(revisions) {
+		return false
+	}
+	// These existing optional fields share the owned ConfigMap. They preserve
+	// identity and recovery facts, and do not grant member-count Ready credit.
+	if raw, exists := data["surge-groups.json"]; exists {
+		var groups []string
+		if json.Unmarshal([]byte(raw), &groups) != nil {
+			return false
+		}
+		for _, group := range groups {
+			n := ordinal(group)
+			if n < 0 || group != fmt.Sprintf("model-%d", n) {
+				return false
+			}
+		}
+	}
+	if raw, exists := data["recovery.json"]; exists {
+		var episodes map[string]struct {
+			UID       string    `json:"uid"`
+			StartedAt time.Time `json:"startedAt"`
+		}
+		if json.Unmarshal([]byte(raw), &episodes) != nil {
+			return false
+		}
+		for name, episode := range episodes {
+			if name == "" || episode.UID == "" || episode.StartedAt.IsZero() {
+				return false
+			}
+		}
+	}
+	if raw, exists := data["created.json"]; exists {
+		var groups map[string]map[string]struct {
+			Role          string `json:"role"`
+			GroupInstance string `json:"groupInstance"`
+			RoleInstance  string `json:"roleInstance"`
+			Revision      string `json:"revision"`
+			Hash          string `json:"hash"`
+		}
+		if json.Unmarshal([]byte(raw), &groups) != nil {
+			return false
+		}
+		for group, roles := range groups {
+			for id, fact := range roles {
+				n := ordinal(id)
+				if group == "" || fact.Role == "" || n < 0 || id != fmt.Sprintf("%s-%d", fact.Role, n) || fact.Revision == "" || fact.Hash == "" {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }

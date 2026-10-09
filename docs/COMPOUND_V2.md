@@ -1,6 +1,8 @@
 # ServingGroup 组合滚动 v2 用例
 
-设计基准是本仓保存的 [SG v2.6 预期过程表](specs/servinggroup-compound-rollout.zh-CN.md) （原始来源为 workspace issue 033）。它描述期望行为，不代表当前控制器已通过。`cases/servinggroup-compound-v2/` 的 35 个 case 分别保留 `designID`：S01～S07 对应 RUN-618～624，C01～C16 对应 RUN-625～640，P01～P11 对应 RUN-641～651，R01 对应 RUN-652。用例输入由 `scripts/generate-servinggroup-compound-v2.py` 生成，`TestCompoundCatalogueIsExecutable` 验证目录、ID 和设计映射。
+契约2.8（2026-10-09）纠正 SG-R01/RUN-652：所有SG独立扩大Role实例数量，三个新增实例尚未Ready时允许整组Ready为0；保留历史worker模板、旧UID和组数。同步生成器、数量Ready计数及增员判定，模板删除/顺序/surge预算保持。旧串行RUN-652结果不算本版验证，本轮RUN-651/652及恢复RUN-307通过，具体证据与原始失败记录见 [任务064](../../issues/bugs/064-restore-independent-role-scaling-DONE/PROPOSAL_COMMIT.md)；不代表完整套件通过。
+
+设计基准是本仓保存的 [SG v2.8 预期过程表](specs/servinggroup-compound-rollout.zh-CN.md) （原始来源为 workspace issue 033）。它描述期望行为，不代表当前控制器已通过。`cases/servinggroup-compound-v2/` 的 35 个 case 分别保留 `designID`：S01～S07 对应 RUN-618～624，C01～C16 对应 RUN-625～640，P01～P11 对应 RUN-641～651，R01 对应 RUN-652。用例输入由 `scripts/generate-servinggroup-compound-v2.py` 生成，`TestCompoundCatalogueIsExecutable` 验证目录、ID 和设计映射。
 
 **2026-10-07 执行器迁移：** 规范 2.2 已落实到 RUN-622/632 的生成器、YAML 和通用顺序判定：SG/独立 Role 默认旧 NotReady 优先、同类降序；有 coordination 的稳定 Role 不跳过，标记明确且未转正的临时 surge 单独回收。Q/B/I 与 protected 全量 Ready 断言保留。RUN-624 最终只放行新版本，旧错误版本持续 NotReady。16 个查表行仍不是新增 executable case；实际运行结果见 workspace [051 验证记录](../../issues/features/051-production-baseline-realignment-DONE/runner-production-20261007/README.md)，不因执行器迁移而宣称产品全套通过。
 

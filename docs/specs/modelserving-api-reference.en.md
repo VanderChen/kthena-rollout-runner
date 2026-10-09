@@ -1,6 +1,6 @@
 # ModelServing API Reference
 
-Version 2.7 · 2026-10-08 · [简体中文](modelserving-api-reference.zh-CN.md)
+Version 2.8 · 2026-10-09 · [简体中文](modelserving-api-reference.zh-CN.md)
 
 This reference lists field paths, semantics, defaults, accepted values, percentage rounding, validation constraints, and minimal reference YAML.
 
@@ -160,6 +160,8 @@ spec:
 **Notes**
 
 Existing named Roles only; revalidate Role budgets, gang minima, eviction thresholds, topology conflicts and dependency capacity.
+
+Role replica changes scale all non-deleting groups toward the latest counts without an SG rolling-budget admission barrier or a wait for another group to become Ready. Multiple or all groups may temporarily be NotReady. Group completeness uses current Role counts and each instance's applicable historical worker layout. Protected groups retain their applicable historical Pod and worker templates. Template rollout and eviction keep their own budgets.
 
 #### 1.4.3 `spec.template.roles[].entryTemplate`
 

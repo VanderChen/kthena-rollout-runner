@@ -1,6 +1,6 @@
 # ServingGroupRollingUpdate compound rollout expectations
 
-Version 2.7 · 2026-10-08 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
+Version 2.8 · 2026-10-09 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
 
 This document defines **design expectations**; implementation compliance and actual Kind results are recorded separately. The main tables retain all 35 `ServingGroupRollingUpdate` scenarios. Shared principles also state their scope for `RoleRollingUpdate`. [Appendix B](#budget-lookup) compares budgets and behavior in both modes; it does not add an equivalent set of executable Role cases.
 
@@ -83,7 +83,7 @@ A local fault repair retains the enclosing rollout unit’s applied template and
 
 ### 0.6 Scaling, sparse ordinals and surge identity
 
-When scaling and updating together, arrange formal capacity for the latest desired size before destructive rollout of healthy old units. Formal scale-out slots must be placed first, but new instances need not all be Ready; every healthy deletion still requires a fresh budget check. In SG mode, increasing Role instance counts must be applied in batches if it temporarily makes whole groups NotReady. Groups not yet selected use their applied member targets for Ready checks, preserving the same availability floor.
+When scaling and updating together, arrange formal capacity for the latest desired size before destructive rollout of healthy old units. Formal scale-out slots must be placed first, but new instances need not all be Ready; every healthy deletion still requires a fresh budget check. Role replica changes scale all non-deleting groups toward the latest counts without an SG rolling-budget admission barrier or a wait for another group to become Ready. Multiple or all groups may temporarily be NotReady. Group completeness uses current Role counts and each instance's applicable historical worker layout. Protected groups retain their applicable historical Pod and worker templates. Template rollout and eviction keep their own budgets.
 
 | Scenario | Identity and ordering rule |
 | --- | --- |
@@ -95,7 +95,6 @@ When scaling and updating together, arrange formal capacity for the latest desir
 | Temporary surge still supplies required Ready capacity | Wait for replacement capacity to become Ready before cleanup; a retained high-ordinal group is not thereby temporary surge |
 
 Only explicit scale-down can add stable holes. In-flight gaps from rollout or failures must still be repaired, not treated as a new stable sparse result. See SG-S01–S04, SG-C14 and SG-P11 for detailed counterexamples.
-
 ### 0.7 Completion, blocking and how to read the tables
 
 Distinguish scale completion, a partition canary stopping point and full adoption of the target version. Rollout completion requires all eligible retained units to reach the latest target and become Ready, issued replacements to finish, temporary surge to be removed and the desired scale to be met. Existing sparse ordinals that cannot be repaired without disruption may remain. A canary stopping point may still contain historical versions and must not be reported as full target adoption.
@@ -612,15 +611,16 @@ desiredReplicas=2 retains {0:v1,3:v1}; submit v2 at partition=2/maxUnavailable=1
 
 ### SG-R01: Increase Role members during a partition canary
 
-desiredReplicas=3/partition=1: protected 0 uses historical worker W1; 1/2 use target W2. Raising Role replicas from 1 to 2 creates no SG template revision and does not trigger hole compaction. Under maxUnavailable=1/maxSurge=0, apply new membership to 2, wait Ready, then 1, then 0 using W1. Groups not yet selected retain Ready credit against their own applied old membership; the global replica edit cannot make all groups unavailable at once.
+For desiredReplicas=3, partition=1, maxUnavailable=1 and maxSurge=0, group 0 uses historical v1/W1 while groups 1/2 use v2/W2. Raising Role replicas from 1 to 2 scales all three groups independently. It creates no template revision or SG surge and preserves existing Pod UIDs and group ordinals. Holding all new members NotReady may make all three groups NotReady. Partition protects templates, not replica scaling.
 
-| Step | Role members per group | sg-0 | sg-1 | sg-2 | Ready groups |
+| Step | Desired Role count per group | sg-0 | sg-1 | sg-2 | Ready groups |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 1 | v1/W1×1 Ready (protected) | v2/W2×1 Ready | v2/W2×1 Ready | 3 |
-| 2 | 2 | v1/W1×1 Ready (protected) | v2/W2×1 Ready | v2/W2×1 Ready+v2/W2×1 NotReady | 2→3 |
-| 3 | 2 | v1/W1×1 Ready (protected) | v2/W2×1 Ready+v2/W2×1 NotReady | v2/W2×2 Ready | 2→3 |
-| 4 | 2 | v1/W1×1 Ready (protected)+v1/W1×1 NotReady | v2/W2×2 Ready | v2/W2×2 Ready | 2→3 |
-| 5 | 2 | v1/W1×2 Ready (protected) | v2/W2×2 Ready | v2/W2×2 Ready | 3 |
+| Initial | 1 | v1/W1×1 Ready (protected) | v2/W2×1 Ready | v2/W2×1 Ready | 3 |
+| All additions held NotReady | 2 | v1/W1×1 Ready + v1/W1×1 NotReady | v2/W2×1 Ready + v2/W2×1 NotReady | v2/W2×1 Ready + v2/W2×1 NotReady | May be 0 |
+| Independent readiness | 2 | Historical W1×2 | W2×2 | W2×2 | Actual Ready count, no cross-group barrier |
+| Complete | 2 | v1/W1×2 Ready (protected) | v2/W2×2 Ready | v2/W2×2 Ready | 3 |
+
+Scale-down likewise does not wait for other groups to become Ready; Terminating resources still occupy capacity. Pure Role scaling does not require an SG surge first. Template rollout and eviction retain their respective budgets. The user's 2026-10-09 correction supersedes the prior serial SG-R01 table, preserved in task 064's snapshot and Git history.
 
 ## 7. Acceptance and counterexamples
 
@@ -701,7 +701,7 @@ The desiredReplicas=5/maxUnavailable=2 examples show why both rejecting all reco
 
 When creating/recreating a complete rollout unit, ordinal<partition uses the fixed, traceable historical template for this canary, and ordinal>=partition uses latest target. Increasing partition protects an existing B without rolling it back; if it later disappears, historical A may be recreated in its protected slot. The baseline is the most recently fully completed template before this canary; intermediate A→B→C submissions do not promote B. Only full adoption after releasing protection establishes the target as a future baseline. If history cannot be established, wait safely rather than guess the newest template.
 
-Role replica changes affect internal membership, not SG template revision. Protected groups keep historical Pod/worker templates. If adding required members makes groups temporarily non-Ready, apply membership in batches that respect real desiredReplicas-maxUnavailable. Groups not yet selected remain evaluated against their own applied old membership; global desired-count edits cannot instantly revoke Ready credit everywhere. A selected group becomes Ready again only when all new members are Ready. Existing faults that consume maxUnavailable require recovery or legal surge, not relaxed budgets.
+Role replica changes scale all non-deleting groups toward the latest counts without an SG rolling-budget admission barrier or a wait for another group to become Ready. Multiple or all groups may temporarily be NotReady. Group completeness uses current Role counts and each instance's applicable historical worker layout. Protected groups retain their applicable historical Pod and worker templates. Template rollout and eviction keep their own budgets.
 
 A local fault repair retains the enclosing rollout unit’s applied template and worker layout; it must not apply the newest target merely because a member failed. The rollout unit is a complete SG in ServingGroupRollingUpdate and one Role instance in RoleRollingUpdate. Rebuilding a whole rollout unit selects the protected baseline or latest target using partition at action time. If partition rises around an existing v2 unit, a local Pod/Role repair still retains that unit’s applied v2; only a whole-unit rebuild reselects the protected baseline and may return to v1. If the relevant history cannot be established, wait and report rather than guess the latest version. Local old-version repair followed by a valid template rollout is permitted; the earlier recovery action cannot delete replacement UIDs.
 
@@ -720,7 +720,7 @@ After controller restart, abandon exact continuation of the old batch and conver
 | An old Pod is still Terminating or the current unit is unavailable | Count actual occupancy/unavailability in current capacity and budgets; losing process-local state grants no duplicate deletion credit | Do not reuse the name or slot while the old UID exists, and do not delete another healthy unit with the same allowance |
 | The refilled workload still satisfies current fault conditions | Start a new recovery episode under current recoveryPolicy, grace and complete health checks | None/grace=-1 performs no proactive deletion; finite grace may wait another detection cycle |
 
-Local refill uses traceable historical templates, applied membership and current partition rules. Units that still need an update continue through normal current budgets, order and roleCoordination. UID/owner preconditions, stale-event isolation, complete Ready classification, Terminating occupancy and same-name replacement protection remain mandatory. A genuinely lost complete Role with reliable completion facts still follows the current recoveryPolicy scope; only an incomplete controller-initiated batch is not replayed after restart.
+Local refill uses traceable historical templates, applied worker layouts and current partition rules; Role instance counts always come from the latest spec. Units that still need an update continue through normal current budgets, order and roleCoordination. UID/owner preconditions, stale-event isolation, complete Ready classification, Terminating occupancy and same-name replacement protection remain mandatory. A genuinely lost complete Role with reliable completion facts still follows the current recoveryPolicy scope; only an incomplete controller-initiated batch is not replayed after restart.
 
 <a id="restart-convergence-cases"></a>
 

@@ -6,8 +6,9 @@ package runner
 import (
 	"crypto/sha256"
 	"fmt"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestAppliedMembersConfigMapIsNarrowlyRecognized(t *testing.T) {
@@ -20,6 +21,18 @@ func TestAppliedMembersConfigMapIsNarrowlyRecognized(t *testing.T) {
 	}}
 	if !validGroupMembersState(cm, "owner") {
 		t.Fatal("valid internal state rejected")
+	}
+	// Match the current production state seen in RUN-307. Legacy two-field
+	// records remain valid, while independent recovery/surge facts coexist.
+	for key, raw := range map[string]string{
+		"surge-groups.json": `["model-3"]`,
+		"recovery.json":     `{"model-0-frontend-0-0":{"uid":"pod-uid","startedAt":"2026-10-09T06:15:30Z"}}`,
+		"created.json":      `{"model-0":{"frontend-0":{"role":"frontend","groupInstance":"sg-uid","roleInstance":"role-uid","revision":"rev","hash":"hash"}}}`,
+	} {
+		_ = unstructured.SetNestedField(cm.Object, raw, "data", key)
+		if !validGroupMembersState(cm, "owner") {
+			t.Fatalf("valid shared state rejected after adding %s", key)
+		}
 	}
 	for _, tc := range []struct {
 		name   string
@@ -35,6 +48,24 @@ func TestAppliedMembersConfigMapIsNarrowlyRecognized(t *testing.T) {
 		}},
 		{"extra-data", func(o *unstructured.Unstructured) {
 			_ = unstructured.SetNestedField(o.Object, "unexpected", "data", "other")
+		}},
+		{"invalid-surge", func(o *unstructured.Unstructured) {
+			_ = unstructured.SetNestedField(o.Object, `["other-3"]`, "data", "surge-groups.json")
+		}},
+		{"missing-recovery-uid", func(o *unstructured.Unstructured) {
+			_ = unstructured.SetNestedField(o.Object, `{"pod":{"startedAt":"2026-10-09T06:15:30Z"}}`, "data", "recovery.json")
+		}},
+		{"missing-recovery-time", func(o *unstructured.Unstructured) {
+			_ = unstructured.SetNestedField(o.Object, `{"pod":{"uid":"pod-uid"}}`, "data", "recovery.json")
+		}},
+		{"invalid-created-json", func(o *unstructured.Unstructured) {
+			_ = unstructured.SetNestedField(o.Object, `{`, "data", "created.json")
+		}},
+		{"wrong-created-role", func(o *unstructured.Unstructured) {
+			_ = unstructured.SetNestedField(o.Object, `{"model-0":{"frontend-0":{"role":"backend","revision":"rev","hash":"hash"}}}`, "data", "created.json")
+		}},
+		{"missing-created-revision", func(o *unstructured.Unstructured) {
+			_ = unstructured.SetNestedField(o.Object, `{"model-0":{"frontend-0":{"role":"frontend","hash":"hash"}}}`, "data", "created.json")
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

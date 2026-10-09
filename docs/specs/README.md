@@ -1,8 +1,8 @@
 # ModelServing 规范 / Specifications
 
-本目录是 Kthena 源码、rollout runner 和人工评审共享的最终契约。当前版本 **2.7（2026-10-08）**；文档预期、历史实现、runner 覆盖和实际测试结果分别记录，不互相替代。工作与审批规则见 workspace [AGENTS.md](../../../AGENTS.md)。
+本目录是 Kthena 源码、rollout runner 和人工评审共享的最终契约。当前版本 **2.8（2026-10-09）**；文档预期、历史实现、runner 覆盖和实际测试结果分别记录，不互相替代。工作与审批规则见 workspace [AGENTS.md](../../../AGENTS.md)。
 
-This directory holds the shared final contract for source changes, runner expectations and human review. Version **2.7 (2026-10-08)** defines expectations; it does not imply implementation compliance or a passing cluster run.
+This directory holds the shared final contract for source changes, runner expectations and human review. Version **2.8 (2026-10-09)** defines expectations; it does not imply implementation compliance or a passing cluster run.
 
 ## 文档入口 / Documents
 
@@ -22,6 +22,10 @@ This directory holds the shared final contract for source changes, runner expect
 Use `<topic>.<language>.md`, with lower-case kebab-case topics and `en` / `zh-CN` locales. Keep versions inside documents and SOURCES.json, preserving stable links. Maintain both editions in the same change, with matching clause numbers, scenario IDs, numeric tables and semantics. Record explicit semantic approval and provenance; never regenerate expectations from observed implementation. Earlier editions remain recoverable from Git or the recorded original sources.
 
 ## 本次批准的修订 / Approved changes
+
+**2.8（2026-10-09）**：用户纠正 SG 内 Role 数量扩缩的逐组预算门槛。Role replicas 在所有非删除组独立应用，允许多个或全部组暂时 NotReady；最新数量决定完整性，历史模板/worker布局仍保留。worker和Pod模板变化仍按原滚动预算执行。SG §0.6/A.4/SG-R01、API §1.4.2 及 RUN-652 同步修订。空组、surge身份、故障计时与创建事实保留。批准原文、旧版快照、具体差异及独立验证见 [064 proposal](../../../issues/bugs/064-restore-independent-role-scaling-DONE/PROPOSAL_COMMIT.md)。此前 SG-R01 的串行结果不构成本版通过。
+
+**2.8 (2026-10-09)**: The user corrected the per-group budget barrier for nested Role scaling. Non-deleting SGs scale independently, and multiple or all groups may temporarily be NotReady. Completeness uses current counts with historical Pod/worker layouts. Worker and Pod template changes retain their rollout budgets. API 1.4.2, SG 0.6/A.4/SG-R01 and RUN-652 are revised together. Empty-group and surge identities, recovery timing and creation facts remain. See task 064 for approval, snapshots, scoped changes and independent verification. Earlier serial SG-R01 results are not conformance evidence for this version.
 
 **2.7（2026-10-08）**：协调进度改为实际目标 Ready/完整正式容量，不扣 partition，灰度停点仍参与。配置阶段校验共同名义 partition 比例，独立取整、不传播；已有不兼容对象的无关更新兼容，并暂停继续选择稳定旧删除。全量收尾循环可有条件许可调用方最后一步，保留预算与旧依赖，明确可能暂时超过 maxSkew。具体审批、原版快照、源码差异和独立验证见 [059 proposal](../../../issues/bugs/059-role-coordination-skew-boundaries-DONE/PROPOSAL_COMMIT.md)。原工单“一个 Role 保留 v1、其余全 v2”预期已由用户纠正，不作为新验收目标。runner 的用例生成器/判定尚未迁移到本次新语义，历史结果不能视为 2.7 通过。
 

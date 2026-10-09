@@ -324,26 +324,28 @@
         }
       },
       {
-        "name": "first-group-applies-second-member",
+        "name": "all-groups-apply-second-member",
         "action": "update",
-        "until": "conditions",
+        "until": "compound",
         "release": "none",
         "stableSeconds": 0,
         "holdSeconds": 0,
         "expect": {
           "compound": {
             "active": 3,
-            "ready": 2,
+            "ready": 0,
             "groups": [
               {
                 "ordinal": 0,
                 "version": "A",
-                "ready": true
+                "ready": false,
+                "members": 2
               },
               {
                 "ordinal": 1,
                 "version": "B",
-                "ready": true
+                "ready": false,
+                "members": 2
               },
               {
                 "ordinal": 2,
@@ -478,16 +480,7 @@
               "maxUnavailable": 1
             }
           }
-        },
-        "conditions": [
-          {
-            "kind": "unit",
-            "group": 2,
-            "count": 1,
-            "version": "B",
-            "ready": false
-          }
-        ]
+        }
       },
       {
         "name": "all-members-ready",

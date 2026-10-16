@@ -1,6 +1,6 @@
 {
   "format": "rollout-runner/restart-convergence-v1",
-  "contractVersion": "2.9",
+  "contractVersion": "2.11",
   "reference": "docs/specs/servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases",
   "executor": "scripts/run-restart-convergence.py",
   "fixture": "Real Failed Pod, controller-only DELETE/POST errors, same-image controller replacement with initialSync, schedulerName=volcano",
@@ -11,7 +11,7 @@
       "policy": "ServingGroupRecreate",
       "coordination": false,
       "workers": 0,
-      "description": "整组恢复仅删除 decode 后重启，补历史 decode 并保留 prefill"
+      "description": "SG整组恢复部分删除后重启，续删原标记prefill，按历史A重建完整SG并保留预算约束下的其他组"
     },
     {
       "id": "RC-02",
@@ -19,7 +19,7 @@
       "policy": "RoleRecreate",
       "coordination": false,
       "workers": 1,
-      "description": "SG 内 Role 恢复仅删除 worker 后重启，保留 entry 和另一 Role"
+      "description": "SG内Role恢复部分删除后重启，续删原标记entry，重建原Role范围并保留decode"
     },
     {
       "id": "RC-03",
@@ -27,7 +27,7 @@
       "policy": "RoleRecreate",
       "coordination": false,
       "workers": 1,
-      "description": "独立 Role 部分恢复后重启，按历史布局补 worker 并保持当前预算"
+      "description": "独立Role部分恢复后重启，续删原标记entry，按历史布局重建entry/worker并保持预算"
     },
     {
       "id": "RC-04",
@@ -35,16 +35,16 @@
       "policy": "RoleRecreate",
       "coordination": true,
       "workers": 1,
-      "description": "配置百分比协调约束的 Role 部分恢复后重启，仍按当前预算及保护规则收敛"
+      "description": "协调Role部分恢复后重启，续删原标记范围，保持协调、历史模板与预算约束"
     }
   ],
   "assertions": [
     "A full Ready baseline precedes desired B with partition=2",
-    "Actual failed Pod disappears and survivor DELETE is rejected before restart; no member ConfigMap or durable completion fact is required",
+    "Actual failed UID is gone; surviving original has deletion-scope and rejected DELETE before restart; no private member CM is required",
     "Restart changes controller UID without changing image or template, and completes initialSync",
-    "partition 2->1 while stopped; missing low unit consumes maxUnavailable=1; healthy survivor and other unit UIDs stay unchanged while POST is blocked",
+    "partition 2->1 while stopped; finish marked original scope after restart; preserve all out-of-scope UIDs while POST is blocked, without extra budget",
     "Coordinated Roles submit compatible partitions together (prefill/decode both 2->1->0); only prefill changes template, decode stays A",
-    "First replacement uses historical A, a new UID and the applied entry/worker layout; surviving healthy UIDs remain until partition release",
+    "Every original in the marked Role/SG scope is replaced; first replacement uses historical A and complete applied layout; unmarked replacements are never absorbed",
     "High eligible unit reaches B only after refill; partition 1->0 then converges all eligible units to B",
     "A fresh fault in the continuously running controller still replaces exactly the configured Role/SG scope"
   ],

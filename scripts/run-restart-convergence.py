@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 The Kthena Rollout Runner Authors.
 # SPDX-License-Identifier: Apache-2.0
-"""Run contract 2.9 partial recovery/restart cases against an isolated Kind controller.
+"""Run contract 2.11 marked deletion/restart cases against an isolated Kind controller.
 
 Uses the existing runner fault proxy. Observation/admission bypass the proxy.
 No controller deployment, RBAC, credentials or cluster is installed by this script.
@@ -46,7 +46,8 @@ def partial_recovery_established(pods, initial, failed, survivor, delete_hits):
     healthy = current.get(survivor)
     return (initial[failed] not in uidmap(pods).values() and delete_hits > 0
             and healthy is not None and healthy['metadata']['uid'] == initial[survivor]
-            and ready(healthy))
+            and ready(healthy)
+            and healthy['metadata'].get('annotations', {}).get('workload.kthena.io/deletion-scope') in ('Role', 'ServingGroup'))
 
 
 def assert_retained(pods, expected):
@@ -65,10 +66,22 @@ def assert_refill(pods, failed, old_uid, retained, expected_names):
     assert new['metadata']['uid'] != old_uid, 'missing member was not replaced'
 
 
+def recovery_scope(case, initial):
+    prefix = 'current-0-' if case.get('policy', 'ServingGroupRecreate') == 'ServingGroupRecreate' else 'current-0-prefill-0-'
+    return {name for name in initial if name.startswith(prefix)}
+
+
+def assert_scope_replaced(pods, initial, scope):
+    actual = uidmap(pods)
+    assert all(name in actual and actual[name] != initial[name] for name in scope), 'marked recovery scope was not completed'
+
+
 def audit_events(events, case, initial, failed, protected, low):
     """Check intermediate identities/Ready credit, not just the final snapshot."""
     live, first_refill = {}, None
     saw_failed = False
+    scope = recovery_scope(case, initial)
+    deleted_originals, replacements = set(), {}
     held = {'restart-budget-held', 'historical-refill', 'legal-high-rollout'}
     started = False
     for item in events:
@@ -88,8 +101,16 @@ def audit_events(events, case, initial, failed, protected, low):
             started = True
         if phase in held and name in protected:
             assert uid == protected[name] and event['type'] != 'DELETED' and not p['metadata'].get('deletionTimestamp'), ('replayed survivor deletion', name)
-        if phase == 'restart-budget-held' and name != failed:
+        if phase == 'restart-budget-held' and name not in scope:
             assert uid == initial[name] and event['type'] != 'DELETED' and not p['metadata'].get('deletionTimestamp'), ('extra budget after restart', name)
+        if event['type'] == 'DELETED' and name in scope and uid == initial[name]:
+            deleted_originals.add(name)
+        if phase in held and name in scope and uid != initial[name]:
+            assert version(p) == 'A', 'first observed replacement skipped historical A'
+            if name in replacements:
+                assert uid == replacements[name], 'old recovery absorbed a replacement UID'
+            replacements[name] = uid
+            assert event['type'] != 'DELETED' and not p['metadata'].get('deletionTimestamp'), 'replacement deleted before partition release'
         if started and name == failed and uid != initial[failed] and first_refill is None:
             assert version(p) == 'A', 'first observed refill skipped historical A'
             first_refill = uid
@@ -110,6 +131,7 @@ def audit_events(events, case, initial, failed, protected, low):
             assert available >= 1, 'complete Ready units fell below desiredReplicas-maxUnavailable=1'
     if not saw_failed or not started or not first_refill:
         raise Inconclusive('watch does not establish Failed, restart and first-refill boundaries')
+    assert scope <= deleted_originals, 'marked original deletion scope was not completed'
     return {'firstRefillUID': first_refill, 'minAvailable': 1, 'events': len(events)}
 
 
@@ -312,7 +334,8 @@ class Execution:
         survivor = 'current-0-prefill-0-0'
         # The protected rollout unit includes all SG members or one full Role.
         low = {n for n in initial if n.startswith('current-0-' if c['mode'] == 'SG' else 'current-0-prefill-0-')}
-        retained = {n: uid for n, uid in initial.items() if n != failed}
+        scope = recovery_scope(c, initial)
+        retained = {n: uid for n, uid in initial.items() if n not in scope}
         protected = {n: uid for n, uid in retained.items() if n in low or (c['mode'] == 'Role' and '-decode-' in n)}
         self.audit_input = (c, initial, failed, protected, low)
         self.phase = 'desired-b-protected'
@@ -355,6 +378,7 @@ class Execution:
             return ps if len(unit) == len(low) and all(ready(p) for p in unit) else None
         first = self.poll('historical unit refill', refilled)
         assert_refill(first, failed, initial[failed], protected, low)
+        assert_scope_replaced(first, initial, scope)
         refill_uid = uidmap(first)[failed]
         self.snapshot('historical-refill')
         self.phase = 'legal-high-rollout'

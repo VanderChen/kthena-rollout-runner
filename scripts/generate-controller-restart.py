@@ -14,10 +14,10 @@ recovery=importlib.util.module_from_spec(loader);loader.loader.exec_module(recov
 
 
 def contract_row(source):
-    """Keep the immutable catalogue; apply the approved 2.6 restart expectation."""
+    """Keep the immutable catalogue; apply the approved 2.11 restart expectation."""
     row = copy.deepcopy(source)
     if row['id'] in ('RUN-436', 'RUN-439'):
-        row['expect'] = '重启后不重放原删除批次；按实际Pod、最新配置、历史模板、partition与当前预算重新收敛，不重复取得删除额度、不误删同名新UID；不要求原批次所有旧UID都被替换'
+        row['expect'] = '重启后完成deletion-scope标记的原UID删除，再按实际Pod、最新配置、历史模板、partition与当前预算重新收敛；不重复取得删除额度、不吸纳同名新UID或范围外成员'
     return row
 
 

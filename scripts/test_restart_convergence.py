@@ -23,7 +23,7 @@ class RestartVerdictTests(unittest.TestCase):
     def setUp(self):
         self.pods = [pod('prefill', 'p'), pod('decode', 'new')]
 
-    def test_historical_refill_keeps_healthy_survivor(self):
+    def test_historical_refill_keeps_out_of_scope_member(self):
         r.assert_refill(self.pods, 'decode', 'old', {'prefill': 'p'}, {'prefill', 'decode'})
 
     def update_execution(self, case_id='RC-01'):
@@ -85,6 +85,7 @@ class RestartVerdictTests(unittest.TestCase):
 
     def test_partial_recovery_uses_live_boundary_without_completion_table(self):
         initial = {'prefill': 'p', 'decode': 'old'}
+        self.pods[0]['metadata']['annotations'] = {'workload.kthena.io/deletion-scope': 'ServingGroup'}
         self.assertTrue(r.partial_recovery_established(self.pods[:1], initial, 'decode', 'prefill', 1))
 
     def test_partial_recovery_rejects_unestablished_boundaries(self):
@@ -102,7 +103,7 @@ class RestartVerdictTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(r.partial_recovery_established(pods, initial, 'decode', 'prefill', hits))
 
-    def test_rejects_replacing_whole_old_batch(self):
+    def test_rejects_replacing_out_of_scope_member(self):
         self.pods[0]['metadata']['uid'] = 'replayed'
         with self.assertRaisesRegex(AssertionError, 'unexpected replacement'):
             r.assert_refill(self.pods, 'decode', 'old', {'prefill': 'p'}, {'prefill', 'decode'})
@@ -131,8 +132,10 @@ class RestartVerdictTests(unittest.TestCase):
         failed = copy.deepcopy(ps[1]); failed['status'] = {'phase': 'Failed', 'conditions': []}
         events += [{'phase': 'partial-recovery', 'event': {'type': 'MODIFIED', 'object': failed}},
                    {'phase': 'restart-budget-held', 'event': {'type': 'DELETED', 'object': failed}},
+                   {'phase': 'restart-budget-held', 'event': {'type': 'DELETED', 'object': ps[0]}},
+                   {'phase': 'historical-refill', 'event': {'type': 'ADDED', 'object': pod(names[0], 'new-prefill')}},
                    {'phase': 'historical-refill', 'event': {'type': 'ADDED', 'object': pod(names[1], 'new')}}]
-        args = ({'mode': 'SG'}, r.uidmap(ps), names[1], {names[0]: '0'}, set(names[:2]))
+        args = ({'mode': 'SG'}, r.uidmap(ps), names[1], {}, set(names[:2]))
         return events, args
 
     def test_trace_accepts_refill_then_legal_full_rollout(self):
@@ -152,6 +155,19 @@ class RestartVerdictTests(unittest.TestCase):
         events.append({'phase': 'historical-refill', 'event': {'type': 'DELETED', 'object': events[2]['event']['object']}})
         with self.assertRaisesRegex(AssertionError, 'Ready units fell'):
             r.audit_events(events, *args)
+
+    def test_trace_requires_original_marked_survivor_deletion(self):
+        events, args = self.trace()
+        events = [e for e in events if not (e['phase'] == 'restart-budget-held' and e['event']['type'] == 'DELETED' and e['event']['object']['metadata']['name'].endswith('prefill-0-0'))]
+        with self.assertRaisesRegex(AssertionError, 'original deletion scope'):
+            r.audit_events(events, *args)
+
+    def test_scope_requires_replacing_all_original_uids(self):
+        initial = {'current-0-prefill-0-0': 'p', 'current-0-decode-0-0': 'd'}
+        scope = r.recovery_scope({'policy': 'ServingGroupRecreate'}, initial)
+        with self.assertRaisesRegex(AssertionError, 'scope was not completed'):
+            r.assert_scope_replaced([pod(n, uid) for n, uid in initial.items()], initial, scope)
+        r.assert_scope_replaced([pod(n, uid + '-new') for n, uid in initial.items()], initial, scope)
 
     def test_trace_missing_trigger_is_inconclusive(self):
         events, args = self.trace()
@@ -175,7 +191,7 @@ class RestartVerdictTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('generator', ROOT / 'scripts/generate-controller-restart.py')
         gen = importlib.util.module_from_spec(spec); spec.loader.exec_module(gen)
         row = {'id': 'RUN-436', 'expect': 'original immutable source'}
-        self.assertIn('不重放原删除批次', gen.contract_row(row)['expect'])
+        self.assertIn('完成deletion-scope标记的原UID删除', gen.contract_row(row)['expect'])
         self.assertEqual(row['expect'], 'original immutable source')
 
 

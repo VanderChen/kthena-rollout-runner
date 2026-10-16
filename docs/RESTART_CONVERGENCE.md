@@ -1,10 +1,8 @@
 # 恢复中断后的 controller 重启用例
 
-契约为 [2.9 行为预期表](specs/servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases)，输入为 [restart-convergence/suite.json](../cases/restart-convergence/suite.json)。RC-01～04 分别覆盖 SG 整组恢复、SG 内 Role 恢复、独立 Role 恢复和协调 Role 恢复。它们使用独立 Python 入口，与 `recovery-contract` 相同，不由通用 Go Job case loader 执行，也不替换旧 RUN-435～440。
+契约为 [2.11 行为预期表](specs/servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases)，输入为 [restart-convergence/suite.json](../cases/restart-convergence/suite.json)。RC-01～04分别覆盖SG整组、SG内Role、独立Role和协调Role的部分删除重启。旧2.9的范围内健康幸存UID保留结果仅作历史记录。
 
-每例先完成 A，再提交受 partition 保护的 B。真实 Failed Pod 触发恢复；代理仅拒绝 controller 对健康幸存 Pod 的 DELETE 和对缺员的 POST，runner 直接观察 apiserver。必须看到原故障 UID 消失、原幸存 Pod 仍为同 UID 且 Ready、幸存 Pod DELETE 拒绝命中，才能确认“恢复已经开始但尚未完成”的重启切点。这是测试夹具的实施证据，不新增用户 API 或持久删除事务要求。
-
-重启后 partition 2→1。POST 暂不放行时，缺员占用唯一的 maxUnavailable，所有健康 UID 必须保留。放行后首次补建必须是历史 A，完整 Ready 后高位可滚 B；再将 partition 降为 0，允许先前保留的低位 A 正常滚 B。最后再制造一次真实故障，验证 controller 连续运行时仍完成配置的全部 Role/SG 恢复范围。
+每例先完成A再提交partition=2的B。真实Failed触发恢复；故障UID消失、原健康成员带有deletion-scope且其DELETE被代理拒绝后才建立有效切点。重启并把partition 2→1，先完成原标记Role/SG范围的DELETE，范围内全部原UID必须换代；无标记的新UID和范围外成员必须保留。缺员POST阻断期间不得额外删除其他完整单位；放行后先完整恢复保护区历史A，再允许高位B滚动，最后partition 1→0完成全量。新Pod不得继承删除标记，旧操作不得反复删新UID。
 
 RC-04 按已批准的协调 partition 比例校验，同时提交 prefill/decode 的 partition 2→1→0；只有 prefill 更新模板，decode 始终为 A。RC-03 独立 Role 模式仍只改变 prefill 的 partition。spec 更新遇到 resourceVersion Conflict 时最多重读重试5次，非Conflict错误立即报告，保留冲突输入和命令记录。
 
@@ -32,6 +30,6 @@ RC-04 按已批准的协调 partition 比例校验，同时提交 prefill/decode
 
 `PASS` 要求阶段断言和 watch 审计都通过；夹具未建立、缺少 watch 证据或环境异常为 `INCONCLUSIVE`；已建立场景中的错误版本、健康误删、Ready 预算突破或无法收敛为 `FAIL`。保留每次尝试与失败原因；不能把部分结果相加宣称全套通过。脚本清除自己安装的代理规则并恢复自己暂停的 controller；保留测试 namespace 和证据供检查，不清理其他任务的资源。
 
-边界：RC-04 配置了 maxSkew=50%，但不代替所有顺序、百分比与依赖组合的专项验证；本套件不迁移 84 个历史恢复用例。None、grace=-1、纯 NotReady 和新进程重新起算故障宽限仍遵循 API §6 及各自用例，不能因为不要求延续旧删除批次而放松。
+边界：RC-04 配置了 maxSkew=50%，但不代替所有顺序、百分比与依赖组合的专项验证；本套件不迁移 84 个历史恢复用例。None、grace=-1、纯 NotReady 和新进程重新起算故障宽限仍遵循 API §6 及各自用例，不能因为恢复删除标记而放松。
 
 初始2.6的真实执行结果与无效夹具尝试记录于 [052 报告](../../issues/features/052-runner-spec-contract-alignment-IP/restart-convergence-20261008/README.md)。去除成员CM依赖后的2.9执行、controller提交及完整证据记录于 [066报告](../../issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md#18-runner-实施继续2026-10-09)。每次执行的 `provenance.json` 从suite读取契约版本，并记录输入及脚本SHA256。

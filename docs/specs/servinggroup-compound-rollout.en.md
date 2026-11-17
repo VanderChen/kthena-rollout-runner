@@ -1,6 +1,6 @@
 # ServingGroupRollingUpdate compound rollout expectations
 
-Version 2.9 · 2026-10-09 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
+Version 2.12 · 2026-11-09 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
 
 This document defines **design expectations**; implementation compliance and actual Kind results are recorded separately. The main tables retain all 35 `ServingGroupRollingUpdate` scenarios. Shared principles also state their scope for `RoleRollingUpdate`. [Appendix B](#budget-lookup) compares budgets and behavior in both modes; it does not add an equivalent set of executable Role cases.
 
@@ -38,6 +38,8 @@ For example, an SG has 3 instances of a Role, and each instance changes from 1 w
 A unit counts as one Ready only when **all required members are Ready**. In Role mode, a Ready entry alone does not make the instance Ready, and worker Pod counts are not available Role counts. Roles and SGs do not borrow each other's Role budgets; multiple SGs may advance their own Role rollouts concurrently.
 
 Inactive-layer budgets are allowed but ignored. `roleCoordination` applies only in Role mode; dependency and progress constraints supplement the local budgets. Mode restrictions are in [API §2](modelserving-api-reference.en.md#2-rolloutstrategytype).
+
+The ordinary rollout budget and identity guarantees below describe a rollout that keeps its mode. A legal mode change during an active rollout has the narrow [convergence-only contract](modelserving-api-reference.en.md#mode-switch-convergence): reach the latest desired counts, applicable templates and complete Ready units once configuration is stable and runnable, without intermediate budget or original-instance guarantees or permanent waiting on the previous mode. Foreign-owner isolation, restart deletion scopes, all-zero behavior and settled no-op changes remain unchanged.
 
 ### 0.3 Budgets: account for actual capacity before allowing actions
 
@@ -86,6 +88,8 @@ A local fault repair retains the enclosing rollout unit’s applied template and
 When every desired Role count is zero and actual Pods are gone, an empty group has no individual state to retain: discard sparse ordinals, applied revisions and temporary surge origin. Derive logical scale from the latest spec. Future nonempty expansion is new placement using current partition: traceable historical baseline below partition, target elsewhere. Retain currentRevision; empty derived counts cannot advance that baseline. Terminating Pods still occupy slots. Partially zero workloads and missing positive-desired fault capacity do not use this simplification. The sparse/surge rules below apply to units with actual members.
 
 When scaling and updating together, arrange formal capacity for the latest desired size before destructive rollout of healthy old units. Formal scale-out slots must be placed first, but new instances need not all be Ready; every healthy deletion still requires a fresh budget check. Role replica changes scale all non-deleting groups toward the latest counts without an SG rolling-budget admission barrier or a wait for another group to become Ready. Multiple or all groups may temporarily be NotReady. Group completeness uses current Role counts and each instance's applicable historical worker layout. Protected groups retain their applicable historical Pod and worker templates. Template rollout and eviction keep their own budgets.
+
+**Coordinated expansion exception in 2.10:** Only Role mode with roleCoordination may temporarily stage default Gang requirements for dependency-gated new capacity, then restore final requirements, under [API section 8.1](modelserving-api-reference.en.md#81-staged-requirements-during-rolecoordination-expansion-210). Final Role.replicas, explicit Gang minima, budgets and formal progress based on latest counts, old dependency retention and independent SG progress remain unchanged; no all-Ready barrier is introduced. SG mode and the independent expansion rules of SG-R01 remain unchanged.
 
 | Scenario | Identity and ordering rule |
 | --- | --- |
@@ -691,6 +695,8 @@ Thus {0,3} at desiredReplicas=2 expanded to desiredReplicas=3 yields {0,1,3}, st
 
 ### A.4. Operation ordering and version selection
 
+Role expansion with roleCoordination also follows API section 8.1: a dependency stage may temporarily use lower default Gang requirements, then restore final requirements once caller creation is permitted. These stage values apply only to the corresponding scheduling requirements; they are not another desiredReplicas value and grant no scale-down or additional healthy-deletion permission. The version selection, in-flight accounting, budgets, recovery and per-Ready progress below remain unchanged. Ordinary failure-related missing members must not be mistaken for unopened expansion capacity and used to lower the threshold automatically.
+
 Recompute desiredReplicas/partition/maxUnavailable/maxSurge/target from latest spec. Previously planned future actions are not commitments; accepted API creates/deletes remain facts. Recreating an already deleted slot completes an issued action and is not newly skipping a higher candidate. Subsequent SG/independent Role selection prioritizes old NotReady, descending within each health class; coordinated Role stable selection remains descending without skipping.
 
 1. Recognize deleting/creating groups and surge, reclassify using new desiredReplicas/partition. A deleting group retains its name and physical reservation until fully gone.
@@ -709,48 +715,33 @@ A local fault repair retains the enclosing rollout unit’s applied template and
 
 <a id="legacy-deletion-records"></a>
 
-**Deletion convergence after controller restart (2.6)**
+**Deletion continuation after controller restart (2.11)**
 
-The deletion-marker and transaction version has not been deployed, so there is no legacy-record compatibility burden. The controller does not persist the Pod set, operation phase or cross-restart authority for a Role/SG deletion batch, and no Pod annotation carries that authority. While the controller process remains active, RoleRecreate and ServingGroupRecreate still complete their configured scope, with original UID and owner checks preventing retries from absorbing same-name replacements.
+On 2026-10-16 the user explicitly approved restoring `workload.kthena.io/deletion-scope=Role|ServingGroup`. Mark selected original Pods before DELETE; intentional deletion callbacks do not start new recovery. After restart, finish deleting marked original UIDs before recreating capacity using current counts and applicable history/partition. A healthy marked member still belongs to the deletion; never absorb unmarked replacements or unrelated members. No operation, phase or private member CM is added; cancellation after preparation with no DELETE and a partition change is out of scope. Strip template/plugin markers. Unmarked offline losses still refill, new-process grace restarts, and occupancy/budget rules remain.
 
-After controller restart, abandon exact continuation of the old batch and converge from current facts:
-
-| Fact at restart | Expected handling | Example |
-| --- | --- | --- |
-| No DELETE from the old batch was issued | Re-evaluate latest configuration, partition, candidates and budgets; the discarded plan grants no authority | Raising partition immediately protects the original Pods that still exist |
-| A whole-group or Role deletion completed only partly and healthy members survive | Refill missing members from the enclosing rollout unit's applied historical template; once Ready, retain healthy survivors rather than deleting them to finish the old batch | Prefill was deleted while decode survived; refill same-version prefill and retain the decode UID |
-| An old Pod is still Terminating or the current unit is unavailable | Count actual occupancy/unavailability in current capacity and budgets; losing process-local state grants no duplicate deletion credit | Do not reuse the name or slot while the old UID exists, and do not delete another healthy unit with the same allowance |
-| The refilled workload still satisfies current fault conditions | Start a new recovery episode under current recoveryPolicy, grace and complete health checks | None/grace=-1 performs no proactive deletion; finite grace may wait another detection cycle |
-
-Local refill uses traceable historical templates, applied worker layouts and current partition rules; Role instance counts always come from the latest spec. Units that still need an update continue through normal current budgets, order and roleCoordination. UID/owner preconditions, stale-event isolation, complete Ready classification, Terminating occupancy and same-name replacement protection remain mandatory. A new process observing only missing Pods or a whole Role refills from current facts and may lose restart/takeover deletion events. Do not persist completion facts or use old markers to broaden recovery. Reliably handled deletion events during continuous operation still follow recoveryPolicy.
+| Fact at restart | Expected handling |
+| --- | --- |
+| Current-owner Role/ServingGroup deletion markers exist | Restore surviving marked original UIDs and finish deletion; Ready does not cancel the intent |
+| An unmarked same-name replacement exists | Preserve it; finish only remaining marked originals |
+| No marker, only offline missing members | Refill using current counts and applicable history without broadening recovery |
+| An original Pod is still Terminating | Wait for physical removal before reusing its name/capacity; no duplicate budget |
 
 <a id="restart-convergence-cases"></a>
 
-**Interrupted recovery and restart: trace and case lookup (2.9)**
+**Interrupted recovery restart continuation: RC-01–04 (2.11)**
 
-All four cases use `desiredReplicas=2`, `maxUnavailable=1`, `maxSurge=0`. A unit is a complete group in SG mode, or a complete prefill entry + worker instance in Role mode; decode stays at its original version in Role mode. Establish fully Ready A, submit B with `partition=2`, then trigger recovery through a real Failed Pod. Restart only after the failed UID is gone and the healthy survivor DELETE has been rejected. This distinguishes an already-started partial recovery from an externally deleted complete Role while the controller is offline.
+Establish fully Ready A, submit B with partition=2, and trigger a real Failed Pod. Prove the failed UID is gone and a marked healthy original has a rejected DELETE before restarting. Change partition 2→1 while stopped. Resume marked deletions first. While missing-member POST remains blocked, preserve out-of-scope UIDs and maxUnavailable=1. Rebuild complete protected historical A after release, then permit high B and the partition 1→0 full rollout.
 
-| Case | Interrupted recovery boundary | Healthy members that must survive restart | Refill and later update |
-| --- | --- | --- | --- |
-| [RC-01](../../cases/restart-convergence/suite.json): SG + ServingGroupRecreate | Group 0 decode is gone; prefill survives | Original prefill UID; all group 1 UIDs while missing decode consumes the budget | Refill historical A decode; group 1 may roll to B once group 0 is completely Ready |
-| RC-02: SG + RoleRecreate | Group 0 prefill worker is gone; entry survives | Original entry and same-group decode UIDs; group 1 remains budget constrained | Refill with the enclosing SG's applied A template and worker layout, without replacing its healthy entry |
-| RC-03: independent Role + RoleRecreate | Prefill instance 0 worker is gone; entry survives | Instance 0 entry and all other Role UIDs; no deletion of healthy prefill instance 1 while incomplete | Refill historical A worker; instance 1 may roll to B after the whole instance becomes Ready |
-| RC-04: coordinated Role + RoleRecreate | Same as RC-03, with roleCoordination and maxSkew=50% | Same as RC-03; restart grants no skipping, extra allowance or coordination exemption | Converge under current partition, budgets and coordination; this is not exhaustive maxSkew/dependency/order coverage |
+| Case | Original deletion scope that must finish | Retained scope |
+| --- | --- | --- |
+| [RC-01](../../cases/restart-convergence/suite.json): SG + ServingGroupRecreate | Remaining marked group-0 prefill; all original group-0 UIDs eventually replaced | Every group-1 UID while budget is occupied |
+| RC-02: SG + RoleRecreate | Remaining marked prefill-0 entry; replace entry and worker | Same-group decode during the original Role recovery, and group-1 UIDs while budget is occupied; later lawful rollout remains permitted |
+| RC-03: independent Role + RoleRecreate | Remaining marked prefill-0 entry; replace entry and worker | Other Role and prefill-1 while budget is occupied |
+| RC-04: coordinated Role + RoleRecreate | Same as RC-03, retaining coordination and partition compatibility | Same as RC-03; no extra allowance or skipping |
 
-The common observable trace is:
+Direct observations must prove original marked-member DELETEs, replacement of every original in scope, first historical versions, complete Ready before budget release, out-of-scope UID retention and no old-operation deletion of fresh UIDs. Final Ready alone is insufficient. New fault recovery still uses current policy/grace. Unmarked offline losses, new-process grace and rolling-Terminating restarts retain independent coverage. Prior 2.9 results retaining healthy in-scope survivor UIDs remain historical evidence, not 2.11 conformance.
 
-| Phase | Current facts and action | Allowed result | Failure condition |
-| --- | --- | --- | --- |
-| Stop after partial recovery; partition 2→1 | Low unit is missing a member; healthy high A becomes eligible | A new controller UID starts with the same image and completes initialSync | PASS without establishing a genuine partial recovery boundary |
-| Temporarily reject missing-member POST after restart | One complete Ready unit; zero healthy deletion allowance | Retain survivors and all high-unit UIDs while awaiting refill | Replay survivor deletion or roll the high unit, dropping Ready 1→0 |
-| Release the POST fault | Low unit remains protected by partition=1 | First replacement UID uses historical A; complete entry/worker Ready; retain healthy survivors | Refill protected members with B, release unit credit for entry-only Ready, or delete the fresh replacement again |
-| Resume the current rollout after refill | Low A is completely Ready and allowance returns | Legally roll high to B; Ready remains at least 1 | Delete healthy survivors to finish an obsolete batch, or exceed the budget |
-| partition 1→0 | Low A now requires an update | Ordinary rollout may replace the previously retained A UIDs; eligible targets finish B Ready | Treat survivor retention as a permanent exemption from future lawful rollout |
-| Inject another real fault without restarting | Prior rollout is stable; active recovery is still configured | Complete the new configured Role/SG scope, replacing only those UIDs | Apply restart simplification to uninterrupted recovery by repairing only one Pod |
-
-If refill remains unhealthy, reassess only under **current** health, recoveryPolicy and grace: pure NotReady alone does not trigger proactive recovery; None and grace=-1 do not proactively delete. A new process observes again and starts grace without persisting the predecessor's fault start. Those boundaries retain API §6 and `recovery-contract` / `grace-restart` coverage; RC-01–04 do not add grace-timing coverage. Rolling restarts with a still-Terminating old Pod remain separate in `controller-restart/RUN-436` and `RUN-439`; they do not replace these partial fault-recovery cases.
-
-See [restart convergence execution](../RESTART_CONVERGENCE.md) for the command and evidence requirements. Definitions, validator tests and actual Kind outcomes are recorded separately; final B Ready alone does not establish the intermediate guarantees above.
+See [RESTART_CONVERGENCE](../RESTART_CONVERGENCE.md) for execution and evidence requirements.
 
 ### A.5. Completion, blocking and implementability
 

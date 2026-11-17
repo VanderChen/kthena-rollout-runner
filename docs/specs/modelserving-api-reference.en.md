@@ -1,6 +1,6 @@
 # ModelServing API Reference
 
-Version 2.9 · 2026-10-09 · [简体中文](modelserving-api-reference.zh-CN.md)
+Version 2.12 · 2026-11-09 · [简体中文](modelserving-api-reference.zh-CN.md)
 
 This reference lists field paths, semantics, defaults, accepted values, percentage rounding, validation constraints, and minimal reference YAML.
 
@@ -163,6 +163,8 @@ Existing named Roles only; revalidate Role budgets, gang minima, eviction thresh
 
 Role replica changes scale all non-deleting groups toward the latest counts without an SG rolling-budget admission barrier or a wait for another group to become Ready. Multiple or all groups may temporarily be NotReady. Group completeness uses current Role counts and each instance's applicable historical worker layout. Protected groups retain their applicable historical Pod and worker templates. Template rollout and eviction keep their own budgets.
 
+With roleCoordination configured, dependency-gated expansion within a group may temporarily stage default Gang requirements as described in section 8.1. Final Role.replicas, independent progress across SGs and complete Ready semantics remain unchanged. This does not impose a global barrier waiting for all new capacity to become Ready.
+
 #### 1.4.3 `spec.template.roles[].entryTemplate`
 
 Path: `spec.template.roles[].entryTemplate`
@@ -315,6 +317,12 @@ spec:
 
 ServingGroup mode allows but ignores Role budgets and forbids roleCoordination. Role mode allows but ignores top-level budgets (including an empty object) and forbids ServingGroupRecreate. Existing immutable coordination prevents switching back to ServingGroup mode. Role budgets are independent per Role per ServingGroup: three groups with Role maxUnavailable=1 may each have one unavailable instance. The original reference recommends spec.replicas=1 when one group suffices. See sections 2.1–2.2 for detailed stages.
 
+<a id="mode-switch-convergence"></a>
+
+**Switching mode during a rollout**
+
+A legal mode switch during an active rollout promises convergence, rather than the previous mode's intermediate budget, original-Pod or temporary-origin guarantees. With a stable latest configuration and runnable workloads, reach its desired counts, applicable protected/target templates and complete Ready units, and retire excess temporary capacity. Do not wait indefinitely for the previous mode to resume. Normal validation and immutable-field restrictions still apply; no new in-progress switch ban or persistent transition plan is required. This exception does not relax foreign-owner isolation, restart deletion scopes, all-zero behavior or ordinary rollouts that keep their mode. A settled type-only change with no template change retains the existing no-replacement behavior.
+
 ### 2.1 `ServingGroupRollingUpdate`
 
 Path: `spec.rolloutStrategy.type`
@@ -393,7 +401,7 @@ The complete object must satisfy the cross-field rules in the parent section. Sn
 
 ### 2.3 Shared budgets and default candidate selection
 
-This section applies to both ServingGroup and Role rollout, with **no new ordering switch**. Resolve desiredReplicas/maxUnavailable/maxSurge/partition from the latest spec at the active level. One unit is a complete ServingGroup, or a complete instance of one Role within one ServingGroup. A Role contributes one Ready unit only when its entry and every required worker are Ready. Budgets are not shared across Roles or ServingGroups; unchanged Roles retain their UIDs.
+This section applies to both ServingGroup and Role rollout, with **no new ordering switch**. Resolve desiredReplicas/maxUnavailable/maxSurge/partition from the latest spec at the active level. One unit is a complete ServingGroup, or a complete instance of one Role within one ServingGroup. A Role contributes one Ready unit only when its entry and every required worker are Ready. Budgets are not shared across Roles or ServingGroups; unchanged Roles retain their UIDs. For a legal switch during an active rollout, the [convergence-only exception](#mode-switch-convergence) applies to its transition.
 
 | Rollout mode | Default old-instance selection | May skip a healthy higher old instance? |
 | --- | --- | --- |
@@ -1017,13 +1025,13 @@ For an unprotected unit with applied v1 and target v2:
 
 After local v1 recovery, a later ordinary rollout may adopt v2 when budgets, order, partition and coordination permit. Distinguish that valid template replacement from stale recovery events deleting a new UID: the earlier recovery action grants no deletion permission for replacement UIDs and cannot expand its scope. None does not disable ordinary template rollout.
 
-PodDeleted events may be lost during restart or leader takeover. A new process observing a missing Pod or whole Role refills from actual objects, latest counts and applicable history while retaining healthy survivors. Do not persist completion markers/timestamps or use old Pod markers to reconstruct offline deletion causes and broaden recovery scope.
+**Deletion-scope markers and controller restart (2.11)**
 
-While one controller process remains active, a RoleRecreate or ServingGroupRecreate still completes its configured scope and uses original Pod UID/owner checks to isolate same-name replacements. After a controller restart, the controller need not continue the pre-restart deletion batch and must not reconstruct it from Pod annotations or a persisted deletion transaction. It converges from surviving Pods, the latest configuration, applied historical templates, partition and current budgets. If a whole-group recovery deleted only prefill before restart while decode remains healthy, the new controller may refill prefill from the SG's correct historical template and retain the decode UID. If the refilled workload is still faulty, a new recovery decision begins only under the current recoveryPolicy, grace and health conditions.
+On 2026-10-16 the user explicitly approved restoring `workload.kthena.io/deletion-scope=Role|ServingGroup`. Mark selected original Pods before DELETE; intentional deletion callbacks do not start new recovery. After restart, finish deleting marked original UIDs before recreating capacity using current counts and applicable history/partition. A healthy marked member still belongs to the deletion; never absorb unmarked replacements or unrelated members. No operation, phase or private member CM is added; cancellation after preparation with no DELETE and a partition change is out of scope. Strip template/plugin markers. Unmarked offline losses still refill, new-process grace restarts, and occupancy/budget rules remain.
 
-Terminating Pods and actual unavailable capacity still consume current capacity and deletion allowance, so restart grants no duplicate credit. Complete Ready classification, candidate order, roleCoordination, UID/owner fencing, stale-event isolation and historical-template rules remain unchanged. None and grace=-1 cannot be bypassed. See [SG A.4 post-restart deletion convergence](servinggroup-compound-rollout.en.md#legacy-deletion-records).
+The marker commits deletion of that Pod UID. Restore marked intents before count management, missing-member repair or rollout. A Role marker covers that instance; a ServingGroup marker covers original group members. Delayed Role scale-down callbacks cannot broaden this scope. Retry failed marker writes before issuing DELETE for unmarked members. New Pods never inherit the marker. Recovery policy and grace still govern initiation of new fault recovery.
 
-See the [restart convergence lookup](servinggroup-compound-rollout.en.md#restart-convergence-cases) for phase expectations, SG/Role cases and survivor UID checks. Retention constrains the obsolete recovery plan; after partition is released, required updates may still replace those instances through lawful rollout.
+See [SG A.4 and RC-01–04](servinggroup-compound-rollout.en.md#restart-convergence-cases).
 
 ### 6.2 `restartGracePeriodSeconds`
 
@@ -1256,6 +1264,18 @@ sum(effectiveMinRoleReplicas[role] × (1 + workerReplicas[role]))
 ```
 
 A value of `0` is valid and removes that Role's contribution to the gang minimum without removing its desired replicas. Scheduling requires a compatible Volcano scheduler, CRDs, and plugins.
+
+### 8.1 Staged requirements during RoleCoordination expansion (2.10)
+
+Only Role mode with roleCoordination configured may advance expansion according to dependencies and temporarily lower the corresponding **default-derived Gang requirements** while new target instances must wait for dependency readiness before creation. A single final spec request may establish its minimum membership in stages, breaking the cycle in which missing caller instances prevent dependency scheduling while unavailable dependencies prevent caller creation. This does not authorize arbitrary Gang relaxation without coordination, without the relevant dependency gate, or merely because existing members failed.
+
+The user's final Role.replicas stays unchanged. Effective minSubGroups, minMember and corresponding resource requirements may be derived from the current stage; when the dependency gate opens, advance caller creation and restore the final Gang requirements. Before raising a stage requirement, its missing subgroups must already exist or be creatable under the current rules; a stage must not require callers that are still forbidden to be created. A stage does not reserve final resources for Roles that have not started and does not guarantee a complete placement for the final minimum set.
+
+Example: an existing ServingGroup expands decode and prefill from 4 to 6 while updating their templates, with prefill depending on decode, default Gang, no workers and no partition protection on the relevant new slots. It may first establish dependency capacity with decode6/prefill4 (minMember10). After at least one formal target-version decode instance is completely Ready, permit new target prefill creation and advance to decode6/prefill6 (minMember12). Neither both added decode instances nor the whole decode rollout must finish first. This is an approved expectation, not a claim of completed Kind verification for this configuration.
+
+Preserve these boundaries: explicit minRoleReplicas values and gangPolicy immutability remain unchanged, and explicit minima are not lowered automatically. Budgets, partition, maxSkew formal progress and final completion still use latest desired counts, not stage counts. Complete target readiness, formal/surge identity, old request-path retention, applicable-template selection and independent SG progress remain in force. The existing first-target startup gate for entry Roles and concurrent internal Role startup do not become full serialization along every edge; an already-started entry is not gated anew. Accepted actions, Terminating instances, faults and restarts remain grounded in observed facts; missing Pods alone do not justify repeatedly lowering stage requirements.
+
+This changes when default minima take effect within a coordinated expansion window: dependency capacity may run before the caller obtains its eventual resources, and final requirements must be restored. Other scenarios retain the minimum-set guarantee in section 8. The 2026-10-13 approval, old/new behavior and implementation/verification boundaries are recorded in the [069 proposal](../../../issues/features/069-production-after061-runner-DONE/PROPOSAL_COMMIT.md) and [focused review](../../../issues/features/069-production-after061-runner-DONE/RUN-160-ordered-scaling-review.md). No migration of already-stalled objects or compatibility with existing production coordination objects is required; the user confirmed production has no such configuration. On restart, recompute from latest spec, observed Pods and PodGroup rather than resume a persisted stage plan; preserve readiness, ownership, Terminating occupancy and budget checks. Implementation and executable coverage are recorded separately; this documentation revision cannot turn the original RUN-160 FAIL into PASS.
 
 ## 9. Network topology boundaries: `groupPolicy` and `rolePolicy`
 

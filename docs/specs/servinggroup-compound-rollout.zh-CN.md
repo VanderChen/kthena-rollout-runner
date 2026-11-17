@@ -1,6 +1,6 @@
-# ServingGroupRollingUpdate 组合场景预期行为规范 v2.9
+# ServingGroupRollingUpdate 组合场景预期行为规范 v2.12
 
-版本 2.9 · 2026-10-09 · [English](servinggroup-compound-rollout.en.md)
+版本 2.12 · 2026-11-09 · [English](servinggroup-compound-rollout.en.md)
 
 本文描述**设计预期**；实现符合程度与实际 Kind 验证结果另行记录。正文保留 `ServingGroupRollingUpdate` 的全部 35 个组合场景；共用原则也说明 `RoleRollingUpdate` 的适用范围。[附录 B](#budget-lookup)提供两种模式的预算与行为对照，不代表新增了相同数量的 Role 执行用例。
 
@@ -38,6 +38,8 @@ worker 数变化时，尚未轮到更新的旧实例仍按自己的历史 worker
 只有更新单元的**全部必需成员 Ready**，才计一个 Ready。Role 模式不能把 entry Ready 当成整个实例 Ready，也不能把 worker Pod 数直接当成可用 Role 数。不同 Role、不同 SG 不互借 Role 预算；多个 SG 可以各自推进 Role 滚动。
 
 非生效层预算允许配置但忽略。`roleCoordination` 仅适用于 Role 模式；依赖与进度约束叠加在本地预算之上。模式限制见 [API §2](modelserving-api-reference.zh-CN.md#2-rolloutstrategytype)。
+
+下文普通滚动预算和身份保证针对保持同一模式的滚动。运行中合法切换模式适用窄范围的[仅保证最终收敛契约](modelserving-api-reference.zh-CN.md#mode-switch-convergence)：配置稳定且目标可运行后达到最新期望数量、适用模板及完整Ready，不承诺过渡过程预算或原实例保持，也不得永久等待原模式。不同owner隔离、重启原删除范围、全零和稳定后的无操作变更规则保持不变。
 
 ### 0.3 预算：先核算实际容量，再批准动作
 
@@ -86,6 +88,8 @@ partition 限制模板更新，不禁止显式缩容删除受保护实例。受�
 当所有 Role 期望 replicas 均为 0 且实际 Pod 已消失时，空组没有个体状态需要保留：不保存旧稀疏序号、已应用 revision 或临时 surge 来源。逻辑规模按最新 spec 推导；后续非空扩容视为新建，按当前 partition 在保护区使用可追溯历史基线、其他槽位使用目标模板。currentRevision 基线保留，全零计数不能使其提前推进。仍 Terminating 的 Pod 继续占位；部分 Role 非零或期望为正的故障缺失不适用此简化。下表稀疏/surge 身份规则适用于仍有实际成员的单元。
 
 同时扩缩容和更新时，先安排最新规模下的正式容量，再考虑健康旧单元的破坏性滚动。正式扩容槽须先安置，但新实例不必全部 Ready；每次健康删除仍须重新检查预算。Role.replicas 扩缩是独立数量操作，所有非删除中的 SG 按最新数量推进，不按 SG 滚动 maxUnavailable/maxSurge 分批放行，也不等待其他组 Ready。数量变化可使多个乃至全部 SG 暂时 NotReady；各组以最新 Role 数量和各实例适用的历史 worker 布局判断完整 Ready。保护组新增实例仍用适用历史模板。模板/worker 更新和独立驱逐继续遵守各自预算。
+
+**2.10 的协调扩容例外**：仅 Role 模式配置 roleCoordination 时，依赖门控下的新增容量可按 [API §8.1](modelserving-api-reference.zh-CN.md#81-rolecoordination-扩容期间的阶段要求210) 临时阶段化默认 Gang 要求，再恢复最终要求。不改最终 Role.replicas、显式 Gang 下限、最新数量的预算/正式进度、旧依赖保留或各 SG 独立性；不增加全Ready屏障。本章 SG 模式及 SG-R01 的独立扩容规则不变。
 
 | 场景 | 身份与顺序原则 |
 | --- | --- |
@@ -730,6 +734,8 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 
 ### A.4. 操作偏序与版本选择
 
+配置 roleCoordination 的 Role 扩容还适用 API §8.1：允许依赖阶段临时采用较低默认 Gang 要求，调用方获准创建后恢复最终要求。此阶段值仅用于相应调度要求，不作为新的 desiredReplicas，不授予缩容或额外健康删除许可，不改变以下版本选择、在途、预算、恢复和逐 Ready 推进规则。不能把普通故障缺员视作尚未开放的扩容增量而自动下调门槛。
+
 每次以**最新 spec**重新推导 desiredReplicas、partition、maxUnavailable、maxSurge 和目标 revision，不把早先推导的未来动作当成承诺；已接受的 API 删除/创建按事实继续完成。为已发删除补建同名组是完成在途动作，不算在新目标下跳过高位组另选低位滚动；完成它以后，新发起的滚动按本模式规则选择：SG/独立 Role 旧 NotReady 优先，同类高到低；协调 Role 稳定候选不可跳过。
 
 1. 先识别 Deleting、在建和已有 surge，按新 desiredReplicas/partition 对所有存量组重分类。删除中的组在完全消失前不得复用同名 ordinal 或释放容量槽。
@@ -746,48 +752,33 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 
 <a id="legacy-deletion-records"></a>
 
-**controller 重启后的删除收敛（2.6）**
+**controller重启后的删除续行（2.11）**
 
-相关删除标记和事务版本尚未上线，因此没有旧记录兼容负担。controller 不持久化 Role/SG 删除批次的 Pod 集合、操作阶段或跨重启续删许可；Pod annotation 也不承担该权限。controller 存活期间仍按配置完成 RoleRecreate/ServingGroupRecreate 的范围，并用原始 UID 与 owner 校验保证重试不吸纳同名新实例。
+用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前标记原选定Pod，正常删除回调不再触发新故障恢复；controller重启后先完成标记的原UID删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation、阶段或私有成员CM；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失仍补缺，新进程grace重新起算，Terminating和预算规则保持。
 
-controller 重启后，放弃精确延续旧批次，按当前事实重新收敛：
-
-| 重启时事实 | 预期处理 | 例子 |
-| --- | --- | --- |
-| 原批次尚未发出 DELETE | 按最新配置、partition、候选和预算重新判断；旧计划不产生任何许可 | 提高 partition 后原 Pod 仍在，保护规则直接生效 |
-| 整组/Role 删除只完成一部分，另有健康成员幸存 | 按所属滚动单元已应用的历史模板补齐缺失成员；补齐 Ready 后保留健康幸存者，不为完成旧批次继续删除它 | SG 删除了 prefill、decode 尚存；重启后补回同版 prefill，decode UID 保留 |
-| 旧 Pod 仍 Terminating 或当前单元不可用 | 把实际占用/不可用计入当前容量与预算；不得因进程内计划消失重新取得删除额度 | 原 UID 未物理消失时不复用名称或容量槽，也不额外删除另一健康单元 |
-| 补齐后仍满足当前故障条件 | 重新按当前 recoveryPolicy、grace 和完整健康判断开始新的恢复 episode | None/grace=-1 不主动删除；有限 grace 可多等待一次检测周期 |
-
-局部补齐必须使用可追溯的历史模板、已应用 worker 布局及 partition 规则；Role 实例数量始终取最新 spec；后续仍需更新的实例按当前预算、顺序和 roleCoordination 正常滚动。UID/owner 前置条件、旧事件隔离、完整 Ready、Terminating 容量占用和同名新 UID 保护均保留。新进程只观察到缺失 Pod 或整项 Role 时直接按当前事实补缺，允许重启/接管期间的删除事件丢失；不再持久保存完整创建事实或凭旧标记扩大恢复范围。连续运行期间可靠处理的删除事件仍按 recoveryPolicy 执行。
+| 重启时事实 | 预期处理 |
+| --- | --- |
+| 有当前owner的Role/ServingGroup删除标记 | 恢复仍存在的标记原UID并完成删除；Ready不撤销删除意图 |
+| 原组/实例出现无标记的同名新UID | 保留替代对象，不吸入旧批次；仅处理仍存在的原标记UID |
+| 没有删除标记，仅观察到离线缺员 | 按当前数量和适用历史模板补缺，不凭缺员扩大恢复范围 |
+| 原Pod仍Terminating | 等待原UID物理消失再复用名称/容量；不重复取得预算 |
 
 <a id="restart-convergence-cases"></a>
 
-**恢复中断后重启：过程与用例速查（2.9）**
+**恢复中断后的重启续删：RC-01～04（2.11）**
 
-以下四例使用 `desiredReplicas=2`、`maxUnavailable=1`、`maxSurge=0`。SG 模式的单位是完整组；Role 模式是 prefill 的一个完整 entry + worker 实例，decode 保持原版本。先完整运行 A，再提交 B 且 `partition=2`；用真实 Failed Pod 触发恢复。仅在确认故障 UID 已消失、健康成员 DELETE 被拒绝后重启，避免把“离线外部删除完整 Role”误当成“controller 已启动的部分恢复”。
+四例均先建立完整Ready A，再提交partition=2的B；真实Failed触发恢复，确认故障UID已消失、原健康成员有删除标记且其DELETE被拒绝后重启。停机期间partition 2→1；重启先续删原标记成员。缺员POST被阻断期间，范围外成员保持原UID并遵守maxUnavailable=1；放行后按保护区历史A完整重建，再正常推进高位B及partition 1→0的全量滚动。
 
-| 用例 | 恢复中断点 | 重启后必须保留的健康成员 | 补建与后续更新 |
-| --- | --- | --- | --- |
-| [RC-01](../../cases/restart-convergence/suite.json) SG + ServingGroupRecreate | 组 0 的 decode 已删，prefill 尚存 | prefill 原 UID；预算被缺失 decode 占用时，组 1 全部原 UID | 先补历史 A decode；组 0 完整 Ready 后组 1 可滚 B |
-| RC-02：SG + RoleRecreate | 组 0 的 prefill worker 已删，entry 尚存 | prefill entry 与同组 decode 原 UID；组 1 同样受预算约束 | 按所属 SG 的 A 模板和 worker 布局补齐，不顺带重建健康 entry |
-| RC-03：独立 Role + RoleRecreate | prefill 实例 0 的 worker 已删，entry 尚存 | 实例 0 entry、另一 Role 的全部原 UID；缺员时不得删健康 prefill 实例 1 | 按实例 0 的 A 模板补 worker；完整实例 Ready 后实例 1 可滚 B |
-| RC-04：协调 Role + RoleRecreate | 同 RC-03，配置 roleCoordination、maxSkew=50% | 同 RC-03；重启不提供跳过、额外预算或解除协调约束的许可 | 按当前 partition、预算与协调规则收敛；本例不等于所有 maxSkew/依赖/顺序组合覆盖 |
+| 用例 | 重启后必须完成的原删除范围 | 保留范围 |
+| --- | --- | --- |
+| [RC-01](../../cases/restart-convergence/suite.json) SG + ServingGroupRecreate | 组0的剩余标记prefill；组0全部原成员最终换UID | 预算未恢复时组1全部UID |
+| RC-02 SG + RoleRecreate | prefill实例0的剩余标记entry；entry/worker均换UID | 原Role恢复期间同组decode、预算未恢复时组1全部UID；后续合法滚动仍可进行 |
+| RC-03 独立Role + RoleRecreate | prefill实例0的剩余标记entry；entry/worker均换UID | 另一Role、预算未恢复时prefill实例1 |
+| RC-04 协调Role + RoleRecreate | 同RC-03，且保持协调/partition兼容 | 同RC-03；不额外获得预算或跳过许可 |
 
-四例共用的可观察过程：
+必须直接观察原标记成员DELETE、原范围所有UID被替换、首次历史版本、完整Ready后释放预算、范围外UID保留及新UID不被旧操作再次删除。最终Ready不能替代这些过程证据。后续仍不健康时新恢复判断按当前policy/grace；无标记离线丢失、新进程故障宽限及正常Terminating滚动重启保持独立覆盖。既有2.9“保留范围内健康幸存UID”的结果仅作为历史证据，不能当作2.11通过。
 
-| 阶段 | 当前事实与动作 | 允许结果 | 必须判错的现象 |
-| --- | --- | --- | --- |
-| 部分恢复后停机，partition 2→1 | 低位缺一个成员；高位旧 A 健康且刚获得更新资格 | controller 换 UID、同镜像启动并完成 initialSync | 未形成真实部分恢复就把用例判 PASS |
-| 重启后暂时阻断缺员 POST | 完整 Ready 单位为 1；健康删除余量为 0 | 保留健康幸存者及高位全部 UID，等待补齐 | 为收尾旧恢复批次删幸存者；额外滚高位导致 Ready 1→0 |
-| 解除 POST 阻断 | 低位仍受 partition=1 保护 | 首次新 UID 使用历史 A，entry/worker 完整 Ready；原健康成员 UID 保持 | 用 B 补受保护局部缺员；仅 entry Ready 就释放整单元预算；再次删刚补建的新 UID |
-| 补齐后继续当前滚动 | 低位 A 完整 Ready，预算恢复 | 高位按正常规则滚 B，Ready 始终不少于 1 | 以“版本曾属于旧恢复”为由重删健康成员或突破预算 |
-| partition 1→0 | 低位 A 现在应更新 | 允许正常滚动替换先前保留的 A UID，最终目标 B Ready | 将“保留幸存者”误解成永久禁止后续合法滚动 |
-| 不再重启，注入一次新的真实故障 | 上一轮已稳定；仍配置主动恢复 | 正常完成新的 Role/SG 恢复范围，仅替换该范围 UID | 将重启简化推广为 controller 连续运行时也只补单 Pod |
-
-补齐后如果仍不健康，只能依据**当前**故障条件、recoveryPolicy 与 grace 再次判断：纯 NotReady 不自动触发主动恢复，None 或 grace=-1 不主动删除；新进程重新观察并起算grace，不持久保存前任故障起点。这些边界沿用 API §6 与 `recovery-contract` / `grace-restart`，并非 RC-01～04 新增的故障计时覆盖。旧 Pod 仍 Terminating 的正常滚动重启另见 `controller-restart/RUN-436、RUN-439`；它们不能代替本表的部分故障恢复用例。
-
-执行入口与证据要求见 [重启收敛用例说明](../RESTART_CONVERGENCE.md)。用例定义、判定器通过和真实 Kind 结果分别记录；不能以最终 B Ready 单独判定上述中途行为正确。
+执行与证据要求见 [RESTART_CONVERGENCE](../RESTART_CONVERGENCE.md)。
 
 ### A.5. 完成、阻塞和可实现性
 

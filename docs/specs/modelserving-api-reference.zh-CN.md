@@ -1,6 +1,6 @@
 # ModelServing API 参考
 
-版本 2.9 · 2026-10-09 · [English](modelserving-api-reference.en.md)
+版本 2.12 · 2026-11-09 · [English](modelserving-api-reference.en.md)
 
 本文规定字段路径、默认值、可变性、合法范围、百分比取整和跨字段约束。Mutable 表示更新后的完整对象通过校验时可原地修改；Immutable 表示值和可选对象的存在性均不可变，即使滚动完成或副本数为零也不例外。
 
@@ -159,6 +159,8 @@ spec:
 
 Role.replicas 扩缩是独立数量操作，所有非删除中的 SG 按最新数量推进，不按 SG 滚动 maxUnavailable/maxSurge 分批放行，也不等待其他组 Ready。数量变化可使多个乃至全部 SG 暂时 NotReady；各组以最新 Role 数量和各实例适用的历史 worker 布局判断完整 Ready。保护组新增实例仍用适用历史模板。模板/worker 更新和独立驱逐继续遵守各自预算。
 
+配置 roleCoordination 时，组内依赖门控下的扩容可按 §8.1 临时阶段化默认 Gang 要求；最终 Role.replicas、各 SG 独立推进和完整 Ready 的含义不变。这不是等待所有新增容量 Ready 的全局屏障。
+
 #### 1.4.3 `spec.template.roles[].entryTemplate`
 
 路径：`spec.template.roles[].entryTemplate`
@@ -311,6 +313,12 @@ spec:
 
 ServingGroup 模式允许但忽略 Role 预算，禁止 roleCoordination；Role 模式允许但忽略顶层预算（含空对象），禁止 ServingGroupRecreate。已有 roleCoordination 不可移除，因此不能切回 ServingGroup 模式。Role 预算按每个 ServingGroup 内的每种 Role 独立计算；例如三个组、Role maxUnavailable=1，可各有一个不可用实例。单组足够时，原参考建议搭配 spec.replicas=1。详细阶段见 §2.1–2.2。
 
+<a id="mode-switch-convergence"></a>
+
+**滚动中切换模式**
+
+合法地在滚动中切换模式时，仅保证最终收敛，不继续承诺原模式的中间预算、原Pod或临时来源保持。在最新配置稳定且目标工作负载可正常运行后，达到其期望数量、适用的保护区/目标模板及完整Ready，清退多余临时容量；不得永久等待切回原模式。原校验与不可变字段限制仍生效，不新增中途禁止切换或持久transition计划。本例外不放宽不同owner隔离、重启原删除范围、全零或未切换模式的普通滚动；已稳定且模板不变时仅切type仍保持原有不重建行为。
+
 ### 2.1 `ServingGroupRollingUpdate`
 
 路径：`spec.rolloutStrategy.type`
@@ -389,7 +397,7 @@ spec:
 
 ### 2.3 两层共用的预算与默认选择顺序
 
-本节同时适用于 ServingGroup 和 Role 滚动，**不新增顺序开关**。desiredReplicas/maxUnavailable/maxSurge/partition 均取最新 spec 的生效层；ServingGroup 以完整 ServingGroup 为单位，Role 以每个 ServingGroup 内同一种 Role 的完整实例为单位。Role 的 entry 和所有必需 worker Ready 才计一个 Ready；各 Role、各 ServingGroup 不互借预算，未改模板的 Role 保留 UID。
+本节同时适用于 ServingGroup 和 Role 滚动，**不新增顺序开关**。desiredReplicas/maxUnavailable/maxSurge/partition 均取最新 spec 的生效层；ServingGroup 以完整 ServingGroup 为单位，Role 以每个 ServingGroup 内同一种 Role 的完整实例为单位。Role 的 entry 和所有必需 worker Ready 才计一个 Ready；各 Role、各 ServingGroup 不互借预算，未改模板的 Role 保留 UID。合法地在滚动中切换模式时，其过渡过程适用[仅保证最终收敛的例外](#mode-switch-convergence)。
 
 | 滚动模式 | 默认旧实例选择 | 是否允许跳过健康高位旧实例 |
 | --- | --- | --- |
@@ -962,13 +970,13 @@ spec:
 
 局部补回 v1 后，仍可在预算、顺序、partition 和协调允许时正常滚动为 v2。这次合法模板替换与旧恢复事件误删新 UID 必须区分：旧恢复动作不能自动获得新 UID 的删除许可，恢复范围也不得扩大。None 不关闭正常模板滚动。
 
-controller 重启或主备接管期间的 PodDeleted 事件允许丢失。新进程只观察到缺失 Pod 或整项 Role 时，依据现存对象、最新数量及适用历史模板补缺并保留健康幸存者；不持久保存完整创建标记或时间戳，也不凭旧 Pod 标记追溯离线删除原因并扩大恢复范围。
+**删除范围标记与controller重启（2.11）**
 
-controller 存活期间，一次 RoleRecreate/ServingGroupRecreate 仍按配置范围完成，并以原始 Pod UID/owner 校验隔离同名替代对象。controller 重启后不要求继续重启前的整批删除计划，也不从 Pod annotation 或持久化删除事务恢复该计划；应按现存 Pod、最新配置、已应用历史模板、partition 和当前预算重新收敛。若整组恢复在重启前只删除了 prefill，decode 仍健康，重启后允许按该 SG 正确历史模板补齐 prefill 并保留 decode UID。补齐后仍故障时，才按当前 recoveryPolicy、grace 和健康条件开始新的恢复判断。
+用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前标记原选定Pod，正常删除回调不再触发新故障恢复；controller重启后先完成标记的原UID删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation、阶段或私有成员CM；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失仍补缺，新进程grace重新起算，Terminating和预算规则保持。
 
-Terminating Pod 和实际不可用容量仍计入当前容量与删除预算，不能因重启重复取得额度；完整 Ready、候选顺序、roleCoordination、UID/owner、旧事件隔离和历史模板规则不变。None 与 grace=-1 不能被绕过。具体边界见 [SG A.4 重启后删除收敛](servinggroup-compound-rollout.zh-CN.md#legacy-deletion-records)。
+标记是该Pod当前UID需要完成删除的意图；先恢复这些标记，再执行数量管理、故障补齐或模板滚动。Role标记只涉及对应实例；ServingGroup标记涉及原组成员，不能因迟到的Role缩容回调扩大范围。标记写入失败须重试，不先发送未标记成员DELETE。原标记成员删除完后，重建Pod不继承该标记。普通故障恢复的策略/grace判断仍用于发起新的操作。
 
-部分恢复重启的阶段表、SG/Role 用例及健康 UID 判定见 [重启收敛速查](servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases)。保留健康幸存者仅约束旧恢复计划；解除 partition 后需要更新的实例仍可按正常滚动替换。
+过程与RC-01～04见 [SG A.4](servinggroup-compound-rollout.zh-CN.md#restart-convergence-cases)。
 
 ### 6.2 `restartGracePeriodSeconds`
 
@@ -1185,6 +1193,18 @@ prefill 期望 3、最小 1，decode 期望 2 且未指定最小值，两者均�
 **注意事项**
 
 两种滚动模式均支持；实际调度依赖兼容的 Volcano、相关自定义资源定义和插件。扩缩容重新校验最小数，不能通过修改不可变最小数来缩容；未列入 map 的 Role 的派生最小数随其期望副本变化。
+
+### 8.1 RoleCoordination 扩容期间的阶段要求（2.10）
+
+仅在配置 roleCoordination 的 Role 模式下，扩容可按 dependencies 推进，并在需要等待依赖才能创建新增目标实例的阶段，临时降低对应的**默认派生 Gang 要求**。本条允许同一最终 spec 请求分阶段建立最小集合，解决调用方未创建使依赖无法调度、依赖未 Ready 又使调用方不能创建的循环。未配置协调、没有相关依赖门控或单纯故障缺员，不能据此任意降低 Gang 要求。
+
+用户最终 Role.replicas 不变。当前有效 minSubGroups、minMember 及相应资源要求可按阶段派生；依赖门控放行后推进调用方新增容量并恢复最终 Gang 要求。每次提高阶段要求，须保证缺少的子组已存在或能在当前规则下创建，不得要求尚未获得创建许可的调用方先补齐最小集合。阶段并不预留尚未启动 Role 的最终资源，不能承诺最终最小集合已有完整可用放置。
+
+例：一个已有 ServingGroup，decode/prefill 都由4扩至6且同时更新模板，prefill dependsOn decode，默认 Gang、worker=0、相关新槽不受 partition 保护。允许先按 decode6/prefill4（minMember10）建立依赖容量；至少一个正式 decode 目标版本实例完整 Ready 后，开放 prefill 新目标实例创建并推进至 decode6/prefill6（minMember12）。不要求两个新增 decode 都 Ready，也不要求 decode 先全量滚完。此表述是批准后的预期，不是该配置已通过 Kind 验证的声明。
+
+保留以下边界：显式 minRoleReplicas 键值和 gangPolicy 不可变规则不变，不自动低于显式下限；预算、partition、maxSkew 正式进度和最终完成性仍使用最新期望数量，不使用阶段数量。目标实例完整 Ready、正式/surge 身份、旧请求路径保留、按适用版本创建及各 SG 独立推进规则不变。当前入口首次目标启动与内部 Role 可共同起步的依赖规则不因此改成每条边全量串行，也不把已开始目标的入口重新关门。已接受动作、Terminating、故障和重启仍按真实事实处理；不能以当前 Pod 缺员为理由不断降低阶段门槛。
+
+本条改变的是协调扩容窗口内默认最小集合的生效时机：允许依赖阶段先运行、调用方随后等待资源；最终须恢复完整要求。其余场景仍遵守 §8 的最小集合保证。来源：2026-10-13 用户批准及旧/新行为、实施和验证边界见 [069 提案](../../../issues/features/069-production-after061-runner-DONE/PROPOSAL_COMMIT.md) 与 [专项评审](../../../issues/features/069-production-after061-runner-DONE/RUN-160-ordered-scaling-review.md)。不要求迁移已卡住对象或兼容现网既有协调对象，用户确认现网没有该配置。重启从最新 spec、实际 Pod 和 PodGroup 重新计算，不恢复持久化的阶段计划；真实 Ready、owner/UID、Terminating 占用和预算检查保留。实现和专项执行覆盖单独记录，不能据文档修订把原 RUN-160 FAIL 改为 PASS。
 
 ## 9. 拓扑边界：`groupPolicy` 与 `rolePolicy`
 

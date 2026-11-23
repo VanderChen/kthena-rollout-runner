@@ -30,6 +30,6 @@ RC-04 按已批准的协调 partition 比例校验，同时提交 prefill/decode
 
 `PASS` 要求阶段断言和 watch 审计都通过；夹具未建立、缺少 watch 证据或环境异常为 `INCONCLUSIVE`；已建立场景中的错误版本、健康误删、Ready 预算突破或无法收敛为 `FAIL`。保留每次尝试与失败原因；不能把部分结果相加宣称全套通过。脚本清除自己安装的代理规则并恢复自己暂停的 controller；保留测试 namespace 和证据供检查，不清理其他任务的资源。
 
-边界：RC-04 配置了 maxSkew=50%，但不代替所有顺序、百分比与依赖组合的专项验证；本套件不迁移 84 个历史恢复用例。None、grace=-1、纯 NotReady 和新进程重新起算故障宽限仍遵循 API §6 及各自用例，不能因为恢复删除标记而放松。契约2.13按controller不在的原因区分无标记离线丢失（[API §6.1](specs/modelserving-api-reference.zh-CN.md#controller-absence-scope)）：本套件四例在停机期间不制造无标记丢失，并且以把Deployment缩到0再恢复的方式构造重启，不覆盖升级、主备切换、多副本时主实例被删除或其所在节点故障的空窗，副本数调为0的归类也尚待用户决定；这些情形的专项用例待补，本套件的结果不作为2.13的通过或失败证据。
+边界：RC-04 配置了 maxSkew=50%，但不代替所有顺序、百分比与依赖组合的专项验证；本套件不迁移 84 个历史恢复用例。None、grace=-1、纯 NotReady 和新进程重新起算故障宽限仍遵循 API §6 及各自用例，不能因为恢复删除标记而放松。契约2.13按controller不在的原因区分无标记离线丢失（[API §6.1](specs/modelserving-api-reference.zh-CN.md#controller-absence-scope)）：本套件四例在停机期间不制造无标记丢失，并且以把Deployment缩到0再恢复的方式构造重启，按2.13属完全故障（赦免），带标记的续删仍必须完成；不覆盖多副本且开启选主的升级、主备切换、主实例被删除或其所在节点故障的空窗；这些情形的专项用例待补，本套件的结果不作为2.13的通过或失败证据。
 
 初始2.6的真实执行结果与无效夹具尝试记录于 [052 报告](../../issues/features/052-runner-spec-contract-alignment-IP/restart-convergence-20261008/README.md)。去除成员CM依赖后的2.9执行、controller提交及完整证据记录于 [066报告](../../issues/bugs/066-members-state-redesign-DONE/PROPOSAL_COMMIT.md#18-runner-实施继续2026-10-09)。每次执行的 `provenance.json` 从suite读取契约版本，并记录输入及脚本SHA256。

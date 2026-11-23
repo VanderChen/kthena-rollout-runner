@@ -1,6 +1,6 @@
-# ServingGroupRollingUpdate 组合场景预期行为规范 v2.12
+# ServingGroupRollingUpdate 组合场景预期行为规范 v2.13
 
-版本 2.12 · 2026-11-09 · [English](servinggroup-compound-rollout.en.md)
+版本 2.13 · 2026-11-23 · [English](servinggroup-compound-rollout.en.md)
 
 本文描述**设计预期**；实现符合程度与实际 Kind 验证结果另行记录。正文保留 `ServingGroupRollingUpdate` 的全部 35 个组合场景；共用原则也说明 `RoleRollingUpdate` 的适用范围。[附录 B](#budget-lookup)提供两种模式的预算与行为对照，不代表新增了相同数量的 Role 执行用例。
 
@@ -754,13 +754,15 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 
 **controller重启后的删除续行（2.11）**
 
-用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前标记原选定Pod，正常删除回调不再触发新故障恢复；controller重启后先完成标记的原UID删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation、阶段或私有成员CM；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失仍补缺，新进程grace重新起算，Terminating和预算规则保持。
+用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前标记原选定Pod，正常删除回调不再触发新故障恢复；controller重启后先完成标记的原UID删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation、阶段或私有成员CM；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失自2.13起按controller不在的原因区分处理（见下表及 [API §6.1](modelserving-api-reference.zh-CN.md#controller-absence-scope)），新进程grace重新起算，Terminating和预算规则保持。
 
 | 重启时事实 | 预期处理 |
 | --- | --- |
 | 有当前owner的Role/ServingGroup删除标记 | 恢复仍存在的标记原UID并完成删除；Ready不撤销删除意图 |
 | 原组/实例出现无标记的同名新UID | 保留替代对象，不吸入旧批次；仅处理仍存在的原标记UID |
-| 没有删除标记，仅观察到离线缺员 | 按当前数量和适用历史模板补缺，不凭缺员扩大恢复范围 |
+| 没有删除标记，丢失（定义见API §6.1）发生在controller升级、主备切换、多副本时主实例被删除或其所在节点故障的空窗 | 视同连续运行时的真实Pod删除，按recoveryPolicy范围恢复，首次版本按API §6.1；不等待grace |
+| 没有删除标记，丢失发生在controller完全故障期间或被删除之后 | 允许只按当前数量和适用历史模板补缺，也允许按recoveryPolicy范围恢复；不得超出该策略范围 |
+| 没有删除标记，丢失发生在用户尚未归类的情形（见API §6.1） | 尚未归类；只补缺或按recoveryPolicy范围恢复均符合，不得超出该策略范围 |
 | 原Pod仍Terminating | 等待原UID物理消失再复用名称/容量；不重复取得预算 |
 
 <a id="restart-convergence-cases"></a>
@@ -776,7 +778,7 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 | RC-03 独立Role + RoleRecreate | prefill实例0的剩余标记entry；entry/worker均换UID | 另一Role、预算未恢复时prefill实例1 |
 | RC-04 协调Role + RoleRecreate | 同RC-03，且保持协调/partition兼容 | 同RC-03；不额外获得预算或跳过许可 |
 
-必须直接观察原标记成员DELETE、原范围所有UID被替换、首次历史版本、完整Ready后释放预算、范围外UID保留及新UID不被旧操作再次删除。最终Ready不能替代这些过程证据。后续仍不健康时新恢复判断按当前policy/grace；无标记离线丢失、新进程故障宽限及正常Terminating滚动重启保持独立覆盖。既有2.9“保留范围内健康幸存UID”的结果仅作为历史证据，不能当作2.11通过。
+必须直接观察原标记成员DELETE、原范围所有UID被替换、首次历史版本、完整Ready后释放预算、范围外UID保留及新UID不被旧操作再次删除。最终Ready不能替代这些过程证据。后续仍不健康时新恢复判断按当前policy/grace；新进程故障宽限及正常Terminating滚动重启保持独立覆盖。四例停机期间不制造无标记丢失；无标记离线丢失按2.13（API §6.1）另行覆盖，专项用例待补。既有2.9“保留范围内健康幸存UID”的结果仅作为历史证据，不能当作2.11通过。
 
 执行与证据要求见 [RESTART_CONVERGENCE](../RESTART_CONVERGENCE.md)。
 

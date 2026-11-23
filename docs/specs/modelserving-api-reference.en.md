@@ -1,6 +1,6 @@
 # ModelServing API Reference
 
-Version 2.12 · 2026-11-09 · [简体中文](modelserving-api-reference.zh-CN.md)
+Version 2.13 · 2026-11-23 · [简体中文](modelserving-api-reference.zh-CN.md)
 
 This reference lists field paths, semantics, defaults, accepted values, percentage rounding, validation constraints, and minimal reference YAML.
 
@@ -1027,11 +1027,31 @@ After local v1 recovery, a later ordinary rollout may adopt v2 when budgets, ord
 
 **Deletion-scope markers and controller restart (2.11)**
 
-On 2026-10-16 the user explicitly approved restoring `workload.kthena.io/deletion-scope=Role|ServingGroup`. Mark selected original Pods before DELETE; intentional deletion callbacks do not start new recovery. After restart, finish deleting marked original UIDs before recreating capacity using current counts and applicable history/partition. A healthy marked member still belongs to the deletion; never absorb unmarked replacements or unrelated members. No operation, phase or private member CM is added; cancellation after preparation with no DELETE and a partition change is out of scope. Strip template/plugin markers. Unmarked offline losses still refill, new-process grace restarts, and occupancy/budget rules remain.
+On 2026-10-16 the user explicitly approved restoring `workload.kthena.io/deletion-scope=Role|ServingGroup`. Mark selected original Pods before DELETE; intentional deletion callbacks do not start new recovery. After restart, finish deleting marked original UIDs before recreating capacity using current counts and applicable history/partition. A healthy marked member still belongs to the deletion; never absorb unmarked replacements or unrelated members. No operation, phase or private member CM is added; cancellation after preparation with no DELETE and a partition change is out of scope. Strip template/plugin markers. From 2.13, unmarked offline losses are handled according to why the controller was absent (see “Pods lost while the controller is absent” below); new-process grace restarts, and occupancy/budget rules remain.
 
 The marker commits deletion of that Pod UID. Restore marked intents before count management, missing-member repair or rollout. A Role marker covers that instance; a ServingGroup marker covers original group members. Delayed Role scale-down callbacks cannot broaden this scope. Retry failed marker writes before issuing DELETE for unmarked members. New Pods never inherit the marker. Recovery policy and grace still govern initiation of new fault recovery.
 
 See [SG A.4 and RC-01–04](servinggroup-compound-rollout.en.md#restart-convergence-cases).
+
+<a id="controller-absence-scope"></a>
+
+**Pods lost while the controller is absent (2.13)**
+
+On 2026-11-23 the user clarified that a controller upgrade, a leader switch, and deletion or node failure of the leader among multiple replicas fall within the fault tolerance expected of normal operation and are **not exempt**. For an unmarked Pod lost during such a gap, the successor must act after takeover as if the same actual Pod deletion had been observed in continuous operation: apply the “Actual Pod deletion” column of the behavior table in this section with the latest recoveryPolicy at takeover, without waiting for grace; None still recreates only the missing Pod. Losses during a complete controller failure or after the controller was deleted are **exempt**: refilling from current counts and applicable history is permitted, and so is recovery at the policy scope; both outcomes conform. Recovery must never exceed the configured recoveryPolicy scope, and counts, ordinals and versions still follow the latest spec, applicable history and partition.
+
+| Why the controller was absent | Class | Unmarked losses during the gap |
+| --- | --- | --- |
+| Upgrade: the controller rolls to a new version, including the interval between the old instance exiting and the new one taking over | Not exempt | Recover at the recoveryPolicy scope |
+| Leader switch: with multiple replicas, another already-running instance becomes the active controller | Not exempt | Recover at the recoveryPolicy scope |
+| With multiple replicas, the leader is deleted or its node fails | Not exempt | Recover at the recoveryPolicy scope |
+| Complete failure: no controller instance can work (except the situations not yet classified below) | Exempt | Refill only, or recover at the recoveryPolicy scope |
+| Deletion: after the controller was deleted | Exempt | Refill only, or recover at the recoveryPolicy scope |
+
+This clause applies only where a successor takes over, that is, where a different process becomes the active controller; when the same process resumes after an interruption and the deletion events are delivered afterwards, that is continuous operation and keeps the recoveryPolicy scope. A loss is a Pod that existed and was deleted during the gap (including eviction and cleanup after node loss); a Pod deleted before the gap whose deletion the predecessor neither finished handling nor marked counts as a loss in that gap. A member the predecessor had not yet created is not a loss and is completed as in-flight creation. A member or unit that the latest counts no longer include (surplus after replicas or workerReplicas were lowered) is not recovered and its absence starts no scope recovery; when surviving retained units (excluding temporary surge) already satisfy the latest desired count, ordinal gaps are kept under the SG specification. Members carrying a deletion-scope marker have their deletion completed first under the 2.11 rule above; this is required after every gap and the exemption does not apply to it. Members missing inside that marked scope belong to that deletion and start no new recovery. An original Pod still Terminating at takeover keeps its slot under the existing occupancy rule until it is gone. Unhealthy restarts and Failed Pods are not losses; their grace still restarts in the new process under section 6.2. For the single upgrade from a version without this behavior to one that implements it, losses during that gap may be refilled only.
+
+The user has not yet classified the following situations as exempt or not exempt: a same-version restart, deletion or node failure of a single-replica instance, scaling the controller to zero and back, and an upgrade that does not complete and then leaves no instance able to work for an extended period. Where one of them literally matches a row above, this paragraph prevails, with two exceptions that stay under the table: the replacement of the old instance by a new-version instance during an upgrade is not a “deletion of a single-replica instance” and remains an upgrade; and with multiple replicas (more than one desired replica), a takeover by an already-running instance, including one caused by a same-version rolling restart, remains a leader switch. Until they are classified, refilling and recovery at the policy scope both conform for unmarked losses in them, and the scope ceiling, the count and version rules, marked deletion continuation and the grace rule of this clause still apply; a later classification may require recovery at the policy scope.
+
+This clause states the expectation, not how an implementation identifies the cause or learns that a Pod existed; the SG A.5 and section 6.2 limits on member tables and creation facts are not modified, and how to tell a loss from in-flight creation within those limits awaits a separate decision. An implementation that does not distinguish causes and always recovers at the policy scope conforms. This is an approved expectation, not a claim that current implementations comply.
 
 ### 6.2 `restartGracePeriodSeconds`
 

@@ -1,6 +1,6 @@
 # ServingGroupRollingUpdate compound rollout expectations
 
-Version 2.12 · 2026-11-09 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
+Version 2.13 · 2026-11-23 · [简体中文](servinggroup-compound-rollout.zh-CN.md)
 
 This document defines **design expectations**; implementation compliance and actual Kind results are recorded separately. The main tables retain all 35 `ServingGroupRollingUpdate` scenarios. Shared principles also state their scope for `RoleRollingUpdate`. [Appendix B](#budget-lookup) compares budgets and behavior in both modes; it does not add an equivalent set of executable Role cases.
 
@@ -717,13 +717,15 @@ A local fault repair retains the enclosing rollout unit’s applied template and
 
 **Deletion continuation after controller restart (2.11)**
 
-On 2026-10-16 the user explicitly approved restoring `workload.kthena.io/deletion-scope=Role|ServingGroup`. Mark selected original Pods before DELETE; intentional deletion callbacks do not start new recovery. After restart, finish deleting marked original UIDs before recreating capacity using current counts and applicable history/partition. A healthy marked member still belongs to the deletion; never absorb unmarked replacements or unrelated members. No operation, phase or private member CM is added; cancellation after preparation with no DELETE and a partition change is out of scope. Strip template/plugin markers. Unmarked offline losses still refill, new-process grace restarts, and occupancy/budget rules remain.
+On 2026-10-16 the user explicitly approved restoring `workload.kthena.io/deletion-scope=Role|ServingGroup`. Mark selected original Pods before DELETE; intentional deletion callbacks do not start new recovery. After restart, finish deleting marked original UIDs before recreating capacity using current counts and applicable history/partition. A healthy marked member still belongs to the deletion; never absorb unmarked replacements or unrelated members. No operation, phase or private member CM is added; cancellation after preparation with no DELETE and a partition change is out of scope. Strip template/plugin markers. From 2.13, unmarked offline losses are handled according to why the controller was absent (see the table below and [API section 6.1](modelserving-api-reference.en.md#controller-absence-scope)); new-process grace restarts, and occupancy/budget rules remain.
 
 | Fact at restart | Expected handling |
 | --- | --- |
 | Current-owner Role/ServingGroup deletion markers exist | Restore surviving marked original UIDs and finish deletion; Ready does not cancel the intent |
 | An unmarked same-name replacement exists | Preserve it; finish only remaining marked originals |
-| No marker, only offline missing members | Refill using current counts and applicable history without broadening recovery |
+| No marker; losses (as defined in API section 6.1) occurred during a controller upgrade, a leader switch, or deletion or node failure of the leader among multiple replicas | Treat as an actual Pod deletion seen in continuous operation: recover at the recoveryPolicy scope, with first versions per API section 6.1, without waiting for grace |
+| No marker; losses occurred during a complete controller failure or after the controller was deleted | Refilling from current counts and applicable history is permitted, and so is recovery at the recoveryPolicy scope; never exceed that scope |
+| No marker; losses occurred in a situation the user has not yet classified (see API section 6.1) | Not yet classified; refilling and recovery at the recoveryPolicy scope both conform; never exceed that scope |
 | An original Pod is still Terminating | Wait for physical removal before reusing its name/capacity; no duplicate budget |
 
 <a id="restart-convergence-cases"></a>
@@ -739,7 +741,7 @@ Establish fully Ready A, submit B with partition=2, and trigger a real Failed Po
 | RC-03: independent Role + RoleRecreate | Remaining marked prefill-0 entry; replace entry and worker | Other Role and prefill-1 while budget is occupied |
 | RC-04: coordinated Role + RoleRecreate | Same as RC-03, retaining coordination and partition compatibility | Same as RC-03; no extra allowance or skipping |
 
-Direct observations must prove original marked-member DELETEs, replacement of every original in scope, first historical versions, complete Ready before budget release, out-of-scope UID retention and no old-operation deletion of fresh UIDs. Final Ready alone is insufficient. New fault recovery still uses current policy/grace. Unmarked offline losses, new-process grace and rolling-Terminating restarts retain independent coverage. Prior 2.9 results retaining healthy in-scope survivor UIDs remain historical evidence, not 2.11 conformance.
+Direct observations must prove original marked-member DELETEs, replacement of every original in scope, first historical versions, complete Ready before budget release, out-of-scope UID retention and no old-operation deletion of fresh UIDs. Final Ready alone is insufficient. New fault recovery still uses current policy/grace. New-process grace and rolling-Terminating restarts retain independent coverage. The four cases create no unmarked loss while stopped; unmarked offline losses follow 2.13 (API section 6.1) and need separate coverage, which is pending. Prior 2.9 results retaining healthy in-scope survivor UIDs remain historical evidence, not 2.11 conformance.
 
 See [RESTART_CONVERGENCE](../RESTART_CONVERGENCE.md) for execution and evidence requirements.
 

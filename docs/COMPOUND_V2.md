@@ -42,4 +42,4 @@ kubectl create -f "/tmp/rollout-$RUN_ID.json"
 
 **2.4 恢复交叉边界：** SG 内仅恢复一个 Role/Pod 时保留所属 SG 已应用模板，完整 SG 重建才按当前 partition 选择版本；先恢复旧版后正常滚动可以发生。该规则及 Role 对应关系见 API §6.1；当前 recovery 首次版本/重复创建判定尚待专项迁移，本页既有执行结果不是 2.4 完整覆盖证明。
 
-**2.6 重启收敛边界：** controller 持续运行时，RoleRecreate/ServingGroupRecreate 仍以启动操作时捕获的有限旧 UID 集合完成所选范围；同名新 UID 不属于该操作。controller 重启会丢弃该进程内计划，不重放重启前的整批删除事务。随后按现存 Pod、最新配置、已应用模板、partition、预算和协调规则收敛：可补齐中断留下的缺失成员并保留健康幸存成员，后续真实故障再按当前 recoveryPolicy/grace 判断。Terminating 和其他实际不可用容量继续占用预算，重启不提供额外删除额度。此规则取代 2.5 的旧记录暂停边界；RUN-436/RUN-439 与 058 专项证据分别覆盖 runner 重启流程和局部 SG 恢复中断。
+**2.6 重启收敛边界：** controller 持续运行时，RoleRecreate/ServingGroupRecreate 仍以启动操作时捕获的有限旧 UID 集合完成所选范围；同名新 UID 不属于该操作。controller 重启会丢弃该进程内计划，不重放重启前的整批删除事务。随后按现存 Pod、最新配置、已应用模板、partition、预算和协调规则收敛：可补齐中断留下的缺失成员并保留健康幸存成员，后续真实故障再按当前 recoveryPolicy/grace 判断。Terminating 和其他实际不可用容量继续占用预算，重启不提供额外删除额度。此规则取代 2.5 的旧记录暂停边界；RUN-436/RUN-439 与 058 专项证据分别覆盖 runner 重启流程和局部 SG 恢复中断。本段是2.6时点的记录；现行规则见 [SG A.4](specs/servinggroup-compound-rollout.zh-CN.md#legacy-deletion-records)：2.11的标记续删已取代已标记删除范围内“保留健康幸存成员”的部分，2.13按controller不在的原因区分无标记离线丢失的恢复范围。

@@ -1631,7 +1631,8 @@
       "approval": [
         "controller不在时丢了pod，这个有一个非赦免场景，即controller升级场景，赦免的是完全故障或者删除后的修改，升级过程、主备切换、多副本删除主（节点故障）等过程，这些都算在正常运行的容灾范围内",
         "你可以改动runner，runner也是我们维护的范围。另外，完全故障也恢复当然可行，我只是指出必须要覆盖的场景，避免过于复杂的设计。第一次升级缺口接受，grace计时可以赦免，因为grace只是影响时间，恢复会直接影响pod真实生命周期",
-        "真实部署都是多副本且开启选主，单副本或者手动调0，按照故障处理"
+        "真实部署都是多副本且开启选主，单副本或者手动调0，按照故障处理",
+        "单副本部署下的升级和重启，也按照故障处理。"
       ],
       "proposal": "issues/features/009-runner-contract-offline-loss-scope-IP/PROPOSAL_COMMIT.md",
       "supersedes": "The cause-independent parts of 2.6 (healthy survivors remain), 2.9 (refill after missed offline deletion events) and 2.11 (unmarked offline losses still refill). The 2.9 new-process grace restart and the 2.11 marked deletion continuation are retained.",
@@ -1645,7 +1646,7 @@
       "after": "For a controller running multiple replicas with leader election, an unmarked Pod lost during an upgrade, a leader switch, or deletion or node failure of the leader is handled by the successor as an actual Pod deletion seen in continuous operation and recovered at the recoveryPolicy scope without grace. Losses during a complete controller failure or after controller deletion may be refilled or recovered at that scope; controller absence in a single-replica deployment and a controller manually scaled to zero are handled as a complete failure. Situations the user did not mention conform with either outcome. Recovery never exceeds the policy scope. The single upgrade to the first implementing version may refill only. Counts, ordinals and versions follow the latest spec, applicable history and partition. New-process grace restart, marked deletion continuation, Terminating occupancy, budgets, UID/owner fencing and refill-only None are retained. No member table is added and cause detection is not prescribed.",
       "pendingDecisions": [
         "How a successor learns that a Pod existed; whether the 2.9 limits on member tables and creation facts (SG A.5, API 6.2) must be relaxed (task 008 clause C1)",
-        "User confirmation of wording that extends existing clauses instead of quoting the approval: the latest recoveryPolicy at takeover; recovery never beyond the policy scope, with counts, ordinals and versions from the latest spec; the definition of a loss (a Pod that existed and was deleted in the gap, or before it when the predecessor neither finished handling the deletion nor left a marker, including eviction and node-loss cleanup; in-flight members and members or units the latest counts no longer include excluded); missing members inside a marked scope belonging to that deletion; the row descriptions in the classification table; the three non-exempt situations applying only to multiple replicas with leader election; reading “multiple replicas” as more than one desired replica; reading “按照故障处理” as the exempt complete-failure class; treating a single-replica upgrade or restart as a failure along with single-replica deletion and node failure; a same-version rolling restart or a restart of the leader process counting as a leader switch whichever process acquires the lease; any gap in which no instance is able to take over counting as a complete failure whatever its cause, while the leader-election interval with instances still running does not; situations the user did not mention, such as multiple replicas without leader election, conforming with either outcome; the clause applying only when a different process becomes the active controller; reading “删除后的修改” as losses after the controller was deleted",
+        "User confirmation of wording that extends existing clauses instead of quoting the approval: the latest recoveryPolicy at takeover; recovery never beyond the policy scope, with counts, ordinals and versions from the latest spec; the definition of a loss (a Pod that existed and was deleted in the gap, or before it when the predecessor neither finished handling the deletion nor left a marker, including eviction and node-loss cleanup; in-flight members and members or units the latest counts no longer include excluded); missing members inside a marked scope belonging to that deletion; the row descriptions in the classification table; the three non-exempt situations applying only to multiple replicas with leader election; reading “multiple replicas” as more than one desired replica; reading “按照故障处理” as the exempt complete-failure class; a same-version rolling restart or a restart of the leader process counting as a leader switch whichever process acquires the lease; any gap in which no instance is able to take over counting as a complete failure whatever its cause, while the leader-election interval with instances still running does not; situations the user did not mention, such as multiple replicas without leader election, conforming with either outcome; the clause applying only when a different process becomes the active controller; reading “删除后的修改” as losses after the controller was deleted",
         "Whether an exempt outcome between refill-only and the full policy scope conforms",
         "Handling of a loss in a unit that was never completed (task 008 clause C3); not changed by 2.13",
         "Whether a deletion the running controller never observed (a lost notification) follows the same scope rule; not addressed by 2.13"
@@ -1661,7 +1662,8 @@
       ],
       "coverage": "Contract synchronization only. Controller, runner cases/generators/verdicts and original artifacts unchanged. No new Go or Kind execution. Current upstream and deployed implementations refill only in the non-exempt gaps and do not conform to 2.13 (static reading, not executed); dedicated cases, implementation and Kind results are recorded separately.",
       "commits": [
-        "3dfe8f1de3599b5f7d1fd6b743e4651ceb8089b1"
+        "3dfe8f1de3599b5f7d1fd6b743e4651ceb8089b1",
+        "0d73a7b76fec06e2bafdcf2954bf03dd905dd3df"
       ],
       "documents": [
         {
@@ -1671,8 +1673,8 @@
             "bytes": 26684
           },
           "after": {
-            "sha256": "a4d655114d4a5a63bb0822dfc2e74ef1ae4a3b7e086726b15acf2242b76c4bf1",
-            "bytes": 33735
+            "sha256": "4f95070fc5b981d28a24b9a80dea9f69454ea05a21890d687331192f2c8d06cc",
+            "bytes": 33914
           }
         },
         {

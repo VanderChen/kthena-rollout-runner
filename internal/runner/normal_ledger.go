@@ -98,6 +98,7 @@ type NormalLedger struct {
 	Violations             []string               `json:"violations"`
 	ScaleUIDs              map[string]bool        `json:"scaleUIDs"`
 	RoleScaleIntents       map[string]string      `json:"roleScaleIntentPodUIDs,omitempty"`
+	PendingScale           *pendingScale          `json:"pendingScaleSelection,omitempty"`
 	ScaleGroups            map[int]bool           `json:"scaleGroups"`
 	Ceiling                map[string]int         `json:"ceiling"`
 	Armed                  bool                   `json:"armed"`
@@ -425,13 +426,18 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 			unchanged = sameRole(old.Roles[u.Role], next.Roles[u.Role])
 		}
 		d, _, _, _ := l.scopeBudget(u)
-		active := 0
+		active, occupied := 0, 0
 		for _, other := range before {
-			if other.Scope == u.Scope && other.Active {
-				active++
+			if other.Scope == u.Scope {
+				occupied++
+				if other.Active {
+					active++
+				}
 			}
 		}
-		temporaryTarget := u.Ordinal >= d && (active > d || l.CanonicalEndpoints) && l.unitTarget(u)
+		// A Terminating unit still occupies its slot: marked surge beside it is
+		// temporary although the active count has already fallen to D.
+		temporaryTarget := u.Ordinal >= d && (active > d || l.CanonicalEndpoints || occupied > d && l.markedSurge(u)) && l.unitTarget(u)
 		if l.CompoundV2 {
 			temporaryTarget = u.Ordinal >= d && !l.CompoundFormal[u.Ordinal] && l.unitTarget(u)
 		}
@@ -638,6 +644,21 @@ func (l *NormalLedger) unitDeletionPending(u NormalUnit) bool {
 		}
 	}
 	return false
+}
+
+// markedSurge identifies temporary capacity by its declared identity: every
+// Pod of the unit carries the surge mark of the rollout level.
+func (l *NormalLedger) markedSurge(u NormalUnit) bool {
+	mark := "serving-group"
+	if l.Model.Mode == "Role" {
+		mark = "role"
+	}
+	for _, pod := range u.Pods {
+		if pod.Annotations[AnnotationSurge] != mark {
+			return false
+		}
+	}
+	return len(u.Pods) > 0
 }
 
 func (l *NormalLedger) temporaryRoleSurge(u NormalUnit) bool {
@@ -902,12 +923,38 @@ func (l *NormalLedger) rememberReady(units map[string]NormalUnit) {
 	}
 }
 
+// pendingScale is the previous request's finite Role scale selection. The
+// ledger switches to the next request before that request is sent, and until
+// it is sent the controller can only know the previous one: a PodGroup minimum
+// reduction published in between still confirms the previous scale-down.
+type pendingScale struct {
+	UIDs  map[string]bool       `json:"uids"`
+	Roles map[string]RoleLayout `json:"roles"`
+}
+
+// TransitionBeforeSend is Transition for a request that is sent afterwards;
+// RequestSent must be called immediately before it leaves.
+func (l *NormalLedger) TransitionBeforeSend(spec map[string]interface{}, phase string, e ScenarioExpectation, objects Objects) error {
+	pending := &pendingScale{UIDs: l.ScaleUIDs, Roles: l.Model.Roles}
+	if err := l.Transition(spec, phase, e, objects); err != nil {
+		return err
+	}
+	l.PendingScale = pending
+	return nil
+}
+
+func (l *NormalLedger) RequestSent() { l.PendingScale = nil }
+
 // A published PodGroup minimum reduction confirms that the controller has
 // accepted this group's Role scale-down. Its finite, already selected Pod UIDs
 // may finish deletion after an immediate replicas restore. Preserve only that
 // selection, not a group-wide exemption or permissions for future Pod UIDs.
 func (l *NormalLedger) roleScaleBefore(kind, event string, o *unstructured.Unstructured, objects Objects) {
-	if kind != "podgroups" || event != "MODIFIED" || o.GetDeletionTimestamp() != nil || !objectOwned(o, l.Owner) || len(l.ScaleUIDs) == 0 {
+	scaleUIDs, roles := l.ScaleUIDs, l.Model.Roles
+	if l.PendingScale != nil {
+		scaleUIDs, roles = l.PendingScale.UIDs, l.PendingScale.Roles
+	}
+	if kind != "podgroups" || event != "MODIFIED" || o.GetDeletionTimestamp() != nil || !objectOwned(o, l.Owner) || len(scaleUIDs) == 0 {
 		return
 	}
 	previous := objects["podgroups"][string(o.GetUID())]
@@ -946,12 +993,12 @@ func (l *NormalLedger) roleScaleBefore(kind, event string, o *unstructured.Unstr
 	oldPolicies, newPolicies := policies(previous), policies(o)
 	for role, reduced := range newPolicies {
 		old, existed := oldPolicies[role]
-		desired, known := l.Model.Roles[role]
+		desired, known := roles[role]
 		if !existed || !known || old.count <= reduced.count || reduced.count != int64(desired.R) || old.size != reduced.size || reduced.size != int64(desired.W+1) {
 			continue
 		}
 		for uid, pod := range objects["pods"] {
-			if !l.ScaleUIDs[uid] || !objectOwned(pod, l.Owner) || pod.GetLabels()[LabelGroup] != o.GetName() || pod.GetLabels()[LabelRole] != role {
+			if !scaleUIDs[uid] || !objectOwned(pod, l.Owner) || pod.GetLabels()[LabelGroup] != o.GetName() || pod.GetLabels()[LabelRole] != role {
 				continue
 			}
 			if l.RoleScaleIntents == nil {

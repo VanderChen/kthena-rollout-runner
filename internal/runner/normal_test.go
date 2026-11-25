@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -693,6 +695,161 @@ func TestNormalIndividuallyAcceptedGroupScaleIntentsSurviveImmediateRestore(t *t
 			// The batch contained SG2/SG1 only, never the retained SG0.
 			l.Before("podgroups", "DELETED", pg(0), objects)
 			requireNormalViolation(t, l, "BUDGET_VIOLATION")
+		})
+	}
+}
+
+// A step that keeps the spec may start while an old group is still Terminating
+// (controller restart during the first old deletion). The Terminating group
+// still occupies its slot, so the marked surge group beside it stays temporary
+// and is retired at the end; an unmarked target outside the range is protected.
+func TestNormalMarkedSurgeStaysTemporaryWhileOldGroupTerminates(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		marked bool
+	}{
+		{name: "marked surge group", marked: true},
+		{name: "unmarked target outside the range"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			l, objects := normalFixture(t, "RUN-177")
+			// Suites outside the normal flow (controller-restart) do not treat
+			// every target outside the range as temporary.
+			l.CanonicalEndpoints = false
+			steps := normalCase(t, "RUN-177").Scenario.Steps
+			if err := l.Transition(steps[0].Spec, "rollout", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			l.RevisionLayouts["fixture-B"] = l.Model
+			instances := l.Model.Roles["frontend"].R
+			create := func(group int, surge bool) {
+				for n := 0; n < instances; n++ {
+					p := normalTestPod("Role", "frontend", n, "B", true, "entry")
+					labels := p.GetLabels()
+					labels[LabelGroup] = fmt.Sprintf("model-%d", group)
+					p.SetLabels(labels)
+					p.SetName(fmt.Sprintf("%d-%s-B", group, p.GetName()))
+					p.SetUID(types.UID(p.GetName()))
+					if surge {
+						p.SetAnnotations(map[string]string{AnnotationSurge: "serving-group"})
+					}
+					objects["pods"][string(p.GetUID())] = p
+					l.Released[string(p.GetUID())] = true
+				}
+			}
+			remove := func(group int) {
+				for n := 0; n < instances; n++ {
+					deleteNormal(l, objects, "frontend", group, n)
+				}
+			}
+			gone := func() {
+				for uid, pod := range objects["pods"] {
+					if pod.GetDeletionTimestamp() != nil {
+						delete(objects["pods"], uid)
+					}
+				}
+			}
+			create(3, test.marked)
+			remove(2)
+			if err := l.error(); err != nil {
+				t.Fatal(err)
+			}
+			if err := l.Transition(l.Model.Spec, "converge", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			for group := 2; group >= 0; group-- {
+				if group != 2 {
+					remove(group)
+				}
+				gone()
+				create(group, false)
+			}
+			if err := l.error(); err != nil {
+				t.Fatal(err)
+			}
+			remove(3)
+			if !test.marked {
+				requireNormalViolation(t, l, "PROTECTED_REPLACED")
+				return
+			}
+			if err := l.error(); err != nil {
+				t.Fatal("retiring the marked surge group after the rollout: ", err)
+			}
+		})
+	}
+}
+
+// The ledger switches to the restore before the restore is sent. A reduction
+// the controller publishes in between belongs to the scale-down; one published
+// after the request left is a new action under the restored budget.
+func TestNormalRoleScaleIntentPublishedBeforeRestoreIsSent(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		hold, sent bool
+		violation  bool
+	}{
+		{name: "published before the restore is sent", hold: true},
+		{name: "published after the restore is sent", hold: true, sent: true, violation: true},
+		{name: "ledger switched without a pending request", violation: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			l, objects := normalFixture(t, "RUN-167")
+			steps := normalCase(t, "RUN-167").Scenario.Steps
+			policy := func(count int64) []interface{} {
+				return []interface{}{map[string]interface{}{
+					"name": "frontend", "minSubGroups": count, "subGroupSize": int64(1),
+					"labelSelector":  map[string]interface{}{"matchLabels": map[string]interface{}{LabelRole: "frontend"}},
+					"matchLabelKeys": []interface{}{LabelRoleID},
+				}}
+			}
+			pg := &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{"minMember": int64(3), "subGroupPolicy": policy(3)}}}
+			pg.SetName("model-1")
+			pg.SetUID("role-scale-pg")
+			pg.SetOwnerReferences([]metav1.OwnerReference{{UID: "owner"}})
+			objects["podgroups"][string(pg.GetUID())] = pg
+			if err := l.Transition(steps[1].Spec, "shrink", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			deleteNormal(l, objects, "frontend", 0, 2)
+			deleteNormal(l, objects, "frontend", 0, 1)
+			restore := l.Transition
+			if test.hold {
+				restore = l.TransitionBeforeSend
+			}
+			if err := restore(steps[2].Spec, "restore", ScenarioExpectation{}, objects); err != nil {
+				t.Fatal(err)
+			}
+			if test.sent {
+				l.RequestSent()
+			}
+			changed := pg.DeepCopy()
+			_ = unstructured.SetNestedField(changed.Object, int64(1), "spec", "minMember")
+			_ = unstructured.SetNestedSlice(changed.Object, policy(1), "spec", "subGroupPolicy")
+			l.Before("podgroups", "MODIFIED", changed, objects)
+			objects["podgroups"][string(changed.GetUID())] = changed
+			l.RequestSent()
+			deleteNormal(l, objects, "frontend", 1, 2)
+			if test.violation {
+				requireNormalViolation(t, l, "BUDGET_VIOLATION")
+				return
+			}
+			if l.error() != nil {
+				t.Fatal("reduction published before the restore was sent is not a prior intent: ", l.error())
+			}
+			// The selection stays finite: only the two members chosen by the
+			// scale-down of this group, never the retained ordinal.
+			var ordinals []int
+			for uid := range l.RoleScaleIntents {
+				pod := objects["pods"][uid]
+				if pod == nil || pod.GetLabels()[LabelGroup] != "model-1" {
+					t.Fatalf("intent outside the published group: %s", uid)
+				}
+				ordinals = append(ordinals, ordinal(pod.GetLabels()[LabelRoleID]))
+			}
+			sort.Ints(ordinals)
+			if !reflect.DeepEqual(ordinals, []int{1, 2}) {
+				t.Fatalf("intent ordinals = %v, want [1 2]", ordinals)
+			}
 		})
 	}
 }

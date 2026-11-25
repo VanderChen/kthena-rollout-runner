@@ -513,7 +513,16 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 				return err
 			}
 		}
-		if err = e.locked(func() error { return e.l.Transition(mapValue(next.Object, "spec"), p.Name, p.Expect, e.o.objects) }); err != nil {
+		requestSent := func() error { return nil }
+		if p.RequireLiveTerminating {
+			requestSent = func() error { return e.locked(func() error { e.l.RequestSent(); return nil }) }
+		}
+		if err = e.locked(func() error {
+			if p.RequireLiveTerminating {
+				return e.l.TransitionBeforeSend(mapValue(next.Object, "spec"), p.Name, p.Expect, e.o.objects)
+			}
+			return e.l.Transition(mapValue(next.Object, "spec"), p.Name, p.Expect, e.o.objects)
+		}); err != nil {
 			return err
 		}
 		interleave := e.c.Scenario.Source["executionProfile"] == "AUTO_READY_INTERLEAVE" && e.phase == 2
@@ -539,9 +548,11 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 					}
 				}
 				if interleave {
-					return e.liveOverlap(ctx, originalModel, attemptPrefix+"-trigger-before")
+					if err := e.liveOverlap(ctx, originalModel, attemptPrefix+"-trigger-before"); err != nil {
+						return err
+					}
 				}
-				return nil
+				return requestSent()
 			}
 			write, writeErr := updateScenario(ctx, api, current, next, e.dir, prefix, beforeAttempt)
 			if writeErr != nil {
@@ -579,6 +590,9 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 				return err
 			}
 			b, _ := json.Marshal(p.Patch)
+			if err = requestSent(); err != nil {
+				return err
+			}
 			requestAt = time.Now().UTC()
 			next, err = api.Patch(ctx, "model", types.MergePatchType, b, metav1.PatchOptions{})
 			receivedAt = time.Now().UTC()

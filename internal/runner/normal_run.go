@@ -23,6 +23,8 @@ type normalExecution struct {
 	partialScaleRule          string
 	partialScalePhase         int
 	compoundSnapshots         map[string]map[int]map[string]bool
+	groupSnapshots            map[string]map[string]groupSnapshot
+	processChange             string
 	preparingCompletionSource bool
 	completionStatusProbe     bool
 	completionStatusProbes    int
@@ -135,7 +137,7 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 		res.Error = err.Error()
 		return
 	}
-	e := &normalExecution{compoundSnapshots: map[string]map[int]map[string]bool{}, pinned: map[string]types.UID{}, tableVersion: "1.0", r: r, c: c, o: o, namespace: res.Namespace, dir: dir, res: &res}
+	e := &normalExecution{groupSnapshots: map[string]map[string]groupSnapshot{}, compoundSnapshots: map[string]map[int]map[string]bool{}, pinned: map[string]types.UID{}, tableVersion: "1.0", r: r, c: c, o: o, namespace: res.Namespace, dir: dir, res: &res}
 	defer e.finalizeRecoveryEvidence()
 	defer func() {
 		if err := e.releasePartialScaleBoundary(); err != nil {
@@ -385,6 +387,9 @@ func (e *normalExecution) execute(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = e.rememberGroupSnapshot("baseline"); err != nil {
+		return err
+	}
 	if s.Fixture == "sparse-history-A" || s.Fixture == "sparse-boundary-A" {
 		if err = e.prepareSparseHistoryFixture(ctx); err != nil {
 			return fmt.Errorf("INCONCLUSIVE: sparse fixture: %w", err)
@@ -471,6 +476,16 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 		if err := e.recoverPod(ctx, p, prefix); err != nil {
 			return err
 		}
+	case "delete-serving-group":
+		if err := e.deleteServingGroup(ctx, p, prefix); err != nil {
+			return err
+		}
+	case "create-foreign-group":
+		if err := e.createForeignGroup(ctx, p, prefix); err != nil {
+			return err
+		}
+	case "fault-member":
+		return e.faultMember(ctx, p, prefix)
 	case "update", "merge-patch":
 		if err := e.installPartialScaleBoundary(ctx, p); err != nil {
 			return err
@@ -657,6 +672,9 @@ func (e *normalExecution) finishStep(ctx context.Context, p ScenarioStep, prefix
 			return err
 		}
 	}
+	if err := e.rememberGroupSnapshot(p.Name); err != nil {
+		return err
+	}
 	return e.snapshot(prefix)
 }
 func sameEffectiveModel(a, b NormalModel) bool {
@@ -745,6 +763,9 @@ func (e *normalExecution) wait(ctx context.Context, p ScenarioStep) error {
 				done, reason = e.compoundFacts(p.Expect.Compound)
 			} else {
 				done, reason = e.settled(p.Expect)
+			}
+			if done {
+				done, reason = e.groupObjectFacts(p.Expect)
 			}
 			lastReason = reason
 			if !done && p.Release != "none" && time.Now().After(releaseAfter) {

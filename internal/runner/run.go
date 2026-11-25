@@ -193,7 +193,9 @@ func Run(ctx context.Context, opt Options) (runErr error) {
 		}
 		fmt.Printf("CASE %s START run=%s\n", c.ID, opt.RunID)
 		var result Result
-		if c.Scenario != nil {
+		if c.Scenario != nil && c.Scenario.Requires == requiresGroupObjects && !r.groupObjects {
+			result = Result{ID: c.ID, Status: "NOT_RUN", Error: "the tested build has no ServingGroup objects; this case exists only for builds that have them"}
+		} else if c.Scenario != nil {
 			result = r.runNormalCase(ctx, c)
 		} else {
 			result = r.runCase(ctx, c)

@@ -20,6 +20,10 @@ const ProductionCommit = "538b2825c06bc1e8c5392d18f18f84faee9fca95"
 const RolloutContractCommit = "cad19d0fce097e2a5f481938727e9f4e4c42175c"
 
 type Scenario struct {
+	// Requires names a property of the tested build without which the case
+	// cannot be set up. "servingGroupObjects": every ServingGroup is an object.
+	// A build that lacks it yields NOT_RUN, never a verdict.
+	Requires    string                 `json:"requires,omitempty"`
 	Baseline    *ScenarioStep          `json:"baseline,omitempty"`
 	Fixture     string                 `json:"fixture,omitempty"`
 	DesignID    string                 `json:"designID,omitempty"`
@@ -29,6 +33,9 @@ type Scenario struct {
 	Steps       []ScenarioStep         `json:"steps"`
 }
 type ScenarioStep struct {
+	GroupDelete            *GroupDeleteAction     `json:"groupDelete,omitempty"`
+	ProcessChange          string                 `json:"processChange,omitempty"`
+	ForeignGroup           *int                   `json:"foreignGroup,omitempty"`
 	DeletionCosts          map[string]int         `json:"deletionCosts,omitempty"`
 	HistoryFault           string                 `json:"historyFault,omitempty"`
 	ContainerRestart       *PodFaultAction        `json:"containerRestart,omitempty"`
@@ -139,7 +146,12 @@ func (c Case) validateScenario() error {
 	historyObject := (n >= 523 && n <= 532 && n != 524 && n != 529) && c.Format == "rollout-runner/v3"
 	historyRead := (n == 524 || n == 529) && c.Format == "rollout-runner/v3"
 	historyGC := n == 535 && c.Format == "rollout-runner/v3"
-	if err != nil || (!normal && !recovery && !restart && !midRollout && !blocking && !compound && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || (!compound && c.Baseline != ProductionCommit && !(recovery && c.Baseline == RolloutContractCommit)) || (compound && len(c.Baseline) != 40) {
+	// Cases that exist only for a build whose ServingGroups are objects.
+	groupObjects := n >= 653 && n <= 670 && c.Format == "rollout-runner/v3"
+	if groupObjects != (c.Scenario.Requires == requiresGroupObjects) || c.Scenario.Requires != "" && c.Scenario.Requires != requiresGroupObjects {
+		return fmt.Errorf("ServingGroup object cases, and only they, must declare requires: %s", requiresGroupObjects)
+	}
+	if err != nil || (!groupObjects && !normal && !recovery && !restart && !midRollout && !blocking && !compound && !graceRestart && !controllerRestart && !apiRetry && !lostDeletion && !pluginRetry && !leaderSwitch && !eviction && !initialSync && !deletionReplay && !historyCreate && !historyGC && !historyRead && !historyObject && !historyCollision && !numericBoundary && !rejection && !sparseBoundary && !equalCollision && !dependencyBoundary && !completionBoundary && !identityBoundary) || c.ID != fmt.Sprintf("%s%03d", prefix, n) || (!compound && c.Baseline != ProductionCommit && !(recovery && c.Baseline == RolloutContractCommit)) || (compound && len(c.Baseline) != 40) {
 		return fmt.Errorf("invalid normal case identity/format/baseline")
 	}
 	if compound {
@@ -221,7 +233,29 @@ func (c Case) validateScenario() error {
 		if p.HistoryFault != "" && p.Action != "history-object-recovery" {
 			return fmt.Errorf("historical object fixture attached to unrelated action")
 		}
-		if p.ContainerRestart != nil && p.Action != "restart-container" && p.Action != "restart-container-grace" {
+		if !groupObjects && (len(p.Expect.ServingGroups) != 0 || len(p.Expect.ModelServingConditions) != 0 || p.Expect.TwoStepGroupRecovery) {
+			return fmt.Errorf("ServingGroup object expectations require a ServingGroup object case")
+		}
+		for _, want := range p.Expect.ServingGroups {
+			if want.Name == "" || ordinal(want.Name) < 0 {
+				return fmt.Errorf("ServingGroup expectation needs a group name with an ordinal")
+			}
+			for _, step := range []string{want.UIDSameAs, want.UIDDiffersFrom, want.PodUIDsSameAs, want.PodUIDsDisjointFrom, want.PodNamesSameAs} {
+				if step != "" && !seenStepNames[step] || step == p.Name {
+					return fmt.Errorf("ServingGroup expectation of step %s references unknown earlier snapshot %q", p.Name, step)
+				}
+			}
+		}
+		if p.GroupDelete != nil && p.Action != "delete-serving-group" || p.ForeignGroup != nil && p.Action != "create-foreign-group" {
+			return fmt.Errorf("ServingGroup object fixture attached to unrelated action")
+		}
+		if p.Expect.TwoStepGroupRecovery && p.Action != "fault-member" {
+			return fmt.Errorf("two-step recovery order needs the fault-member action")
+		}
+		if p.ProcessChange != "" && p.Action != "fault-member-across-process" {
+			return fmt.Errorf("process change attached to unrelated action")
+		}
+		if p.ContainerRestart != nil && p.Action != "restart-container" && p.Action != "restart-container-grace" && p.Action != "fault-member" && p.Action != "fault-member-across-process" {
 			return fmt.Errorf("container restart attached to unrelated action")
 		}
 		if p.PodFault != nil && p.Action != "recover-pod" {
@@ -303,7 +337,7 @@ func (c Case) validateScenario() error {
 				return err
 			}
 		case "hold-initial-sync":
-			if !initialSync || p.Release != "one" || p.StableSeconds < 30 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
+			if !(initialSync || groupObjects && n == 662) || p.Release != "one" || p.StableSeconds < 30 || p.Expect.NoReplacement || p.Expect.NoNewRevision {
 				return fmt.Errorf("initial-sync fault requires automatic B convergence after bounded hold")
 			}
 			if _, err := readModel(p.Spec); err != nil {
@@ -329,7 +363,7 @@ func (c Case) validateScenario() error {
 				return fmt.Errorf("invalid plugin cleanup retry action")
 			}
 		case "retry-api-error":
-			if !apiRetry || len(p.Spec) != 0 || p.Release != "one" || p.Expect.NoReplacement {
+			if !(apiRetry || groupObjects && n >= 663 && n <= 665) || len(p.Spec) != 0 || p.Release != "one" || p.Expect.NoReplacement {
 				return fmt.Errorf("invalid API retry action")
 			}
 		case "resume-after-grace":
@@ -384,6 +418,28 @@ func (c Case) validateScenario() error {
 		case "merge-patch":
 			if len(p.Patch) == 0 {
 				return fmt.Errorf("empty patch")
+			}
+		case "delete-serving-group":
+			d := p.GroupDelete
+			if !groupObjects || d == nil || d.Group < 0 || d.Propagation != "Foreground" && d.Propagation != "Background" && d.Propagation != "Orphan" || len(p.Spec) != 0 {
+				return fmt.Errorf("invalid ServingGroup deletion action")
+			}
+		case "create-foreign-group":
+			if !groupObjects || p.ForeignGroup == nil || *p.ForeignGroup < 0 || len(p.Spec) != 0 {
+				return fmt.Errorf("invalid foreign ServingGroup action")
+			}
+		case "fault-member":
+			f := p.ContainerRestart
+			if !groupObjects || f == nil || f.Role == "" || f.Member != "entry" && f.Member != "worker" || len(p.Spec) != 0 || p.Release == "none" {
+				return fmt.Errorf("invalid faulty member action")
+			}
+		case "fault-member-across-process":
+			f := p.ContainerRestart
+			if !groupObjects || f == nil || f.Role == "" || f.Member != "entry" && f.Member != "worker" || len(p.Spec) != 0 || p.Release == "none" || p.ProcessChange != "restart-controller" && p.ProcessChange != "terminate-leader" {
+				return fmt.Errorf("invalid grace measurement across a controller process change")
+			}
+			if intValue(mapValue(s.InitialSpec, "template"), "restartGracePeriodSeconds", 0) < 60 {
+				return fmt.Errorf("grace measurement across a process change needs a finite grace of at least 60 seconds")
 			}
 		case "observe", "restart-controller", "pin", "unpin", "configmap", "restore-status", "block-resources", "restore-resources":
 		default:

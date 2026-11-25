@@ -169,6 +169,9 @@ func (e *normalExecution) settled(expect ScenarioExpectation) (bool, string) {
 			}
 		}
 	}
+	if ok, reason := l.groupObjectsSettled(obj, len(groups)); !ok {
+		return false, reason
+	}
 	if len(obj["podgroups"]) != len(groups) {
 		return false, "PodGroup cleanup/count"
 	}

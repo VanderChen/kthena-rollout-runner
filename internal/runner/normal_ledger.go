@@ -458,6 +458,7 @@ func (l *NormalLedger) Transition(spec map[string]interface{}, phase string, e S
 	return nil
 }
 func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	l.groupObjectBefore(kind, event, o, objects)
 	if !l.Armed {
 		return
 	}
@@ -802,6 +803,8 @@ func (l *NormalLedger) unitTarget(u NormalUnit) bool {
 	return true
 }
 func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, objects Objects) {
+	l.groupObjectAfter(kind, event, o)
+	l.groupPodAfter(kind, event, o, objects)
 	l.compoundAfter(kind, event, o, objects)
 	if oldOwner, ok := l.ForeignResidueUIDs[string(o.GetUID())]; ok && oldOwner != l.Owner && objectOwned(o, l.Owner) {
 		l.fail("FOREIGN_OWNER_ADOPTED: " + kind + "/" + o.GetName())

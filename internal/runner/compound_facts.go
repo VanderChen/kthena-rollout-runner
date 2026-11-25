@@ -135,7 +135,7 @@ func (e *normalExecution) compoundFacts(expect *CompoundExpectation) (bool, stri
 	if expect.Blocked && !compoundInProgress(e.current, e.o.objects["modelservings"]) {
 		return false, "blocked rollout was reported complete"
 	}
-	return true, ""
+	return l.surgeMarksSettled(e.o.objects)
 }
 
 func sameUIDSet(a, b map[string]bool) bool {

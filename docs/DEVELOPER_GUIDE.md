@@ -13,6 +13,10 @@ internal/runner/normal_spec.go   阶段场景校验与预算解析
 internal/runner/normal_run.go    阶段动作、停点与结果
 internal/runner/normal_ledger.go 过程账本和违规锁存
 internal/runner/observer.go      连续 List/Watch 原始记录
+internal/runner/ownership.go     对象模型：owner 链、整组信号、随模型变化的夹具资源
+internal/runner/group_stream.go  ServingGroup 观察流的精简与汇总
+internal/runner/group_invariants.go ServingGroup 对象的过程断言（surge 标记、同名重建、实例记录）
+internal/runner/group_expect.go  用例声明的 expect.servingGroups 事实与两步恢复次序
 internal/runner/run.go           预检查、逐例执行、结果和清理
 ```
 
@@ -24,7 +28,7 @@ internal/runner/run.go           预检查、逐例执行、结果和清理
 2. 选择合适 suite 和未使用 ID。优先复制同格式、同执行 profile 的邻近 case。`rollout-runner/v1` 使用 `input/update/expect/process`；`v2`、`v3`、`v4` 使用 `scenario.initialSpec` 与逐步 `steps[]`；拒绝类还必须校验实际 API 拒绝和旧状态保持。若 suite 有 `scripts/generate-*.py`，修改生成器/来源后重新生成，不能只手改生成结果。
 3. 每个 `steps[]` 写清实际 `action`、请求 `spec` 或 `patch`、`until` 条件、`release`、稳定窗口与 `expect`。对在途/故障源，要求实际 UID、状态、请求或代理命中；未建立源应是 INCONCLUSIVE，不能算 PASS。需要新的过程不变量时，在 `internal/runner/` 添加校验，且让违例锁存到最终结果。
 4. 核对 `baseline` 是被测 controller 镜像对应的源码 commit。`scenario.source`、`designID` 和 `suite.json` 记录可追溯来源，但执行依据仍是 YAML 可执行字段。保留原始请求中省略、null、空对象的区别；不要把 controller 的实现算法复制成预期 oracle。
-5. 增加针对关键允许/禁止轨迹的定向测试，至少验证新增约束能拒绝错误行为。然后运行：
+5. 增加针对关键允许/禁止轨迹的定向测试，至少验证新增约束能拒绝错误行为。被测版本的 ServingGroup 是否为对象由预检查识别（`Runner.groupObjects`、`NormalLedger.GroupObjects`）；新的夹具或断言若依赖对象归属、整组删除的起点或 controller 的请求种类，必须对两种对象模型都成立，按 `ownership.go` 的 helper 取值而不是写死 PodGroup 或 owner UID。只对 ServingGroup 为对象的版本有意义的用例放在 `cases/servinggroup-objects/` 并声明 `scenario.requires: servingGroupObjects`。然后运行：
 
 ```sh
 go test ./internal/runner/... -run '<相关测试名>'

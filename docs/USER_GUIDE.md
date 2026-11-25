@@ -99,6 +99,8 @@ kubectl -n rollout-runner get "pod/$POD_NAME" -o json > "artifacts/$RUN_ID/runne
 python3 scripts/report_attempt.py --attempt "artifacts/$RUN_ID"
 ```
 
+runner 在预检查时按集群里是否有 `servinggroups.workload.serving.volcano.sh` CRD 识别被测版本的对象模型（ServingGroup 是否为对象），同一批用例在两种版本上都能执行，没有需要记住的开关；`cases/servinggroup-objects/` 只适用于 ServingGroup 为对象的版本，在其他版本上逐例记为 `NOT_RUN`。
+
 最后一条命令只读本地 JSON，**不连接 Kubernetes，也不调用 AI**。它总会先写 `failure-report.json` 与 `failure-report.md`；全通过且 Job/Pod 证据一致时退出 0，否则退出 1。输入无法解析时退出 2。打开 `failure-report.md` 先看整体结论，再看每例唯一的“结果状态”、原因和 `result.json` 链接：
 
 | 结果状态 | 如何理解 |
@@ -120,9 +122,10 @@ python3 scripts/report_attempt.py --attempt "artifacts/$RUN_ID"
 | `result.json` | runner 最终状态、错误、违规代码、清理错误 |
 | `case.yaml` | 这次实际执行的输入与预期 |
 | `checkpoint-*.json` | 每阶段真实预算、Ready 与停点 |
-| `observations.jsonl` | 按顺序保存的 Pod/PodGroup/ModelServing/Revision List/Watch |
+| `observations.jsonl` | 按顺序保存的 Pod/PodGroup/ModelServing/Revision List/Watch；被测版本的 ServingGroup 是对象时另含 ServingGroup |
+| `servinggroups.json` | 仅 ServingGroup 为对象的版本：每个 ServingGroup 事件的精简记录（条件、Role 实例记录、deletionTimestamp、surge 标记）；`result.json` 的 `servingGroups` 是按对象汇总的生命周期 |
 | `before*.yaml`、`after*.yaml`、请求/响应文件 | 实际提交给 API 的配置与回执 |
-| 根目录 `environment.json` | controller 镜像、runner 构建、case SHA 与集群身份 |
+| 根目录 `environment.json` | controller 镜像、runner 构建、case SHA 与集群身份；`objectModel.servingGroupObjects` 记录预检查识别到的对象模型 |
 | 根目录 `execution-plan.json` | 连接集群前写出的选中用例和输入 SHA；预检查失败时也能列出缺失结果 |
 | 根目录 `run-error.json` | runner 退出的顶层错误；预检查失败时报告直接显示原因 |
 

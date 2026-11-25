@@ -63,7 +63,7 @@
       },
       "initial": "A全Ready",
       "action": "更新f为B，在旧实例删除中终止并由Deployment重启同镜像controller",
-      "expect": "重启后完成deletion-scope标记的原UID删除，再按实际Pod、最新配置、历史模板、partition与当前预算重新收敛；不重复取得删除额度、不吸纳同名新UID或范围外成员",
+      "expect": "重启后完成deletion-scope标记的原UID删除（契约2.14 C4：ServingGroup为对象的版本不标记Pod，已提交的范围是终止中的ServingGroup，Role模式是实例记录为Draining的Role实例），再按实际Pod、最新配置、历史模板、partition与当前预算重新收敛；不重复取得删除额度、不吸纳同名新UID或范围外成员",
       "refs": [
         "L15"
       ],
@@ -178,7 +178,7 @@
       },
       "initial": "A全Ready",
       "action": "更新f为B，在旧实例删除中终止并由Deployment重启同镜像controller",
-      "expect": "重启后完成deletion-scope标记的原UID删除，再按实际Pod、最新配置、历史模板、partition与当前预算重新收敛；不重复取得删除额度、不吸纳同名新UID或范围外成员",
+      "expect": "重启后完成deletion-scope标记的原UID删除（契约2.14 C4：ServingGroup为对象的版本不标记Pod，已提交的范围是终止中的ServingGroup，Role模式是实例记录为Draining的Role实例），再按实际Pod、最新配置、历史模板、partition与当前预算重新收敛；不重复取得删除额度、不吸纳同名新UID或范围外成员",
       "refs": [
         "L15"
       ],
@@ -235,10 +235,10 @@
   ],
   "inputs": {
     "RUN-435": "4b08f832db14b01792e0fa424eaecf7592653f337e8c7ebfca5c8f6ae0688c83",
-    "RUN-436": "5686239ea3ec7c993558bb12283536164a86be5e425c429956978d0a3a8b57f6",
+    "RUN-436": "aeca03c7027947b76d9a4bb33113819575c49dc3242fd22ae7ba563ad7108790",
     "RUN-437": "a39169c2803787f1fcab8a3f77f6e93b3c0c22c77059496635ca76fbe4da96b9",
     "RUN-438": "c2fd877fc7ab9ca6ed0cad5b6e9235c9c1d7677eaa87f92a0121a00a2010ccc4",
-    "RUN-439": "3e5b5479acb88e59ac45803fb0d492b8e5cfa163954aeeca2537d20f2187a7bc",
+    "RUN-439": "35eec54d622f72dc11cf9fe3e70158fe54aab641579c2cea20bd7ba170199b54",
     "RUN-440": "490a5126e189798ddc826e5d12fa983e7e794191c156db04d7368ab107d1b747"
   }
 }

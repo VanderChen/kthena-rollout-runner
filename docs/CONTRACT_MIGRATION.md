@@ -98,3 +98,26 @@ RC执行器同时补齐有界resourceVersion冲突重试，以及RC-04按既有A
 2026-11-23，任务009按用户口径修订契约：多副本且开启选主的controller在升级、主备切换、主实例被删除或其所在节点故障的空窗不赦免，其间无标记丢失按recoveryPolicy范围恢复；完全故障期间和controller被删除之后的丢失允许只补缺，也允许按范围恢复；单副本部署下controller不在、副本数被手动调为0按完全故障处理。上文2.9记录的“任务058离线整项Role旧范围预期已由用户替换为补缺”自2.13起不再适用于不赦免的空窗；赦免的情形仍可只补缺。grace重新起算、deletion-scope续删和RC-01～04不变。条文见 [API §6.1](specs/modelserving-api-reference.zh-CN.md#controller-absence-scope)。
 
 本轮仅更新文档，未修改case/generator/verdict和产品实现，没有新的Kind结果。按对用例、执行器和脚本的静态阅读（未执行），现有可执行用例都不在controller空窗内丢失多Pod单元的部分成员：controller-restart/RUN-435～440、leader-switch/RUN-441～442、initial-sync/RUN-450、451、453、454、normal/RUN-153～159的workerReplicas为0，runner不在空窗内从外部删除Pod，空窗内只可能有controller此前自己发起的滚动删除落地（RUN-153、157～159因既有准入冲突目前不可执行）；recovery/RUN-305～388、protected-recovery/RUN-304和deletion-replay/RUN-449、452暂停的是controller对API的访问，进程没有更换，删除事件随后补发，属于连续运行，前两组已按recoveryPolicy范围断言，后一组同时删除entry和worker；history-sparse、boundary-sparse、boundary-completion共66例在准备阶段先从外部删除整个单Pod单元并调低数量，再更换controller进程，history-create的收尾步骤、history-source的准备步骤终止controller时不删除Pod；RC-01～04停机期间没有无标记丢失；recovery-contract的Pod删除都在controller运行时进行。因此没有用例因2.13改变结论，也没有用例覆盖2.13。待补专项：升级、主备切换、多副本删主、主所在节点故障四种不赦免空窗，以及完全故障、被删除两种赦免空窗（两种结果均可接受，范围外UID变化仍判错；介于两者之间的范围契约没有单独规定，专项用例落地前要先定判法）；须构造确定的空窗，并直接观察范围内UID换代与范围外UID保留。runner现有动作的归类：terminate-leader（要求两副本并显式开启选主，强删租约持有者）是多副本删主，不赦免；terminate-controller、hold-initial-sync（要求恰好一个controller Pod）和RC执行器的副本数调为0，按完全故障处理（赦免，两种结果均可接受）；restart-controller和recovery-contract执行器的rollout restart不检查副本数和选主，在单副本夹具上按完全故障，在多副本且开启选主的夹具上是主备切换。不赦免的专项用例须使用多副本且开启选主的夹具，升级只用滚动升级（空窗里始终另有实例能够接管）；现有用例里只有terminate-leader的两例是这种夹具。
+
+## 2.14 ServingGroup 对象：建成记录、提交形式与已声明的出入
+
+2026-11-25，任务010按用户批准修订契约（C1、C3、C4、C12，另声明三处有界出入），条文见 [API §6.1](specs/modelserving-api-reference.zh-CN.md#deletion-scope-commit)、[API §6.2](specs/modelserving-api-reference.zh-CN.md#62-restartgraceperiodseconds) 与 [SG A.6](specs/servinggroup-compound-rollout.zh-CN.md#declared-deviations)，修订记录见 [specs/README](specs/README.md)。上文2.9记录的“删除私有成员ConfigMap……五类成员表不迁移”与2.11的Pod删除标记，自2.14起对ServingGroup为对象的实现分别改为“允许ServingGroup对象上的逐Role实例记录”和“范围记在ServingGroup对象上”；ServingGroup不是对象的实现仍按原形式。
+
+runner 同步迁移，被测版本的对象模型在预检查时由 `servinggroups` CRD 是否存在识别并写入 `environment.json` 的 `objectModel`，不需要也不提供开关：
+
+| 项 | ServingGroup 不是对象 | ServingGroup 是对象 |
+| --- | --- | --- |
+| 归属 | Pod、PodGroup、Service 的 owner 直接是 ModelServing | 沿 owner 链经 ServingGroup 的 UID 解析到 ModelServing；同名重建的 ServingGroup 是另一个 UID |
+| 整组破坏的起点 | PodGroup 被删除 | ServingGroup 带 deletionTimestamp；此后 PodGroup、Pod 由垃圾回收删除，先后不作为证据 |
+| 故障代理按 owner 选对象 | 直接 owner 的 UID | 代理从 controller 流量中学到每个 ServingGroup 的 owner；没见过的 ServingGroup 记为证据错误，不静默放过 |
+| “暂停 controller”与稀疏夹具的写屏障 | 9 类请求 | 另加 `servinggroups` 与 `servinggroups/status` |
+| “扩容到一半”的夹具（RUN-628、633、635、637） | 拒绝下一个序号 PodGroup 的 POST | 拒绝下一个序号 ServingGroup 的 POST |
+| api-retry RUN-456 的删除故障 | 旧 Pod 的 DELETE | 该 Pod 所在 ServingGroup 的 DELETE（RUN-460 的 Role 滚动仍是 Pod 的 DELETE） |
+| RUN-436/439 与 RC-01～04 的切点 | Pod 上的 deletion-scope 标记 | SG 模式：组在终止中（RC-01：组为 Failed 且已清空故障成员，被拒绝的是 ServingGroup 的 DELETE）；Role 模式：实例记录为 Draining |
+| controller 完成初始同步的日志 | `initial sync has been done` | `Starting the ModelServing controller` |
+| 同序号新旧对象并存 | 新 PodGroup 早于旧 Pod 消失时计为两个物理组 | 仍这样计数，另加过程断言 `GROUP_OBJECT_OVERLAP`：新对象的 Pod 出现时旧对象的 Pod 仍在即违约 |
+| 观察流 | Pod、ModelServing、PodGroup、ControllerRevision | 另加 ServingGroup，逐例输出 `servinggroups.json`，结果里带 `servingGroups` 摘要 |
+
+ServingGroup 为对象时另有逐事件的过程断言（`internal/runner/group_invariants.go`）：surge 标记创建时即有、不事后添加；正式范围内的组不以 surge 创建；转正不改 spec、只在序号进入正式范围后发生、不重建 Pod；实例记录的代际号不回退、新对象不沿用旧记录。稳定检查点另要求每组一个存活对象、正式范围内的组已转正、Pod 上的副本与对象一致。
+
+新增 `cases/servinggroup-objects/` RUN-653～665（设计表 NT1、NT2、NT4 的三种删除方式、NT6、NT9、NT18、NT19、NT45；RUN-663～665 是 api-retry 一类注入在 ServingGroup 上的三种：POST、`status` 的写、直读的 LIST 各失败一次），用例声明 `requires: servingGroupObjects`，在 ServingGroup 不是对象的版本上记为 NOT_RUN。RUN-660、661、662 会终止并重建 controller 进程，须单独执行；RUN-661 需要两副本并开启选主；RUN-662 挂住的是 ServingGroup informer 的初始 LIST（initial-sync 的 RUN-451、454 在这类版本上已是“组的 informer 同步了、Pod 的没同步”）。NT3 由 RC-01 在形式（b）下覆盖；NT10、NT11 由上述过程断言在 `servinggroup-compound-v2` 的 RUN-627、648、650、621 上覆盖。RUN-436/439 的说明同步为两种提交形式。没有修改任何既有用例的可执行预期；`boundary-sparse` 八例与 SG-P11 的相反预期仍待裁决。真实执行结果与失败归类单独记录于任务010的证据目录。

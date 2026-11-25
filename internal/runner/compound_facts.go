@@ -10,10 +10,11 @@ import (
 )
 
 // physicalGroups keeps terminating objects in the active count. A group remains
-// active until its last owned Pod and PodGroup have disappeared from the Watch.
+// active until its last owned Pod and PodGroup have disappeared from the Watch,
+// and, when ServingGroups are objects, until that object has disappeared too.
 func (l *NormalLedger) physicalGroups(objects Objects) map[int]bool {
 	groups := map[int]bool{}
-	for _, kind := range []string{"pods", "podgroups"} {
+	for _, kind := range []string{"pods", "podgroups", SGGVR.Resource} {
 		for _, o := range objects[kind] {
 			if !objectOwned(o, l.Owner) {
 				continue

@@ -18,12 +18,35 @@ import (
 	"kthena.local/rollout-runner/internal/faultproxy"
 )
 
-func apiRetryRule(id, namespace, owner string, generation int64, caseID string, old *corev1.Pod) (faultproxy.Rule, error) {
+// apiRetryRule selects the one controller request that fails once. groupObjects
+// is the object model of the tested build: there a ServingGroup rollout deletes
+// the ServingGroup object and the garbage collector removes its Pods without
+// passing the proxy, so the failing deletion is the DELETE of that object.
+func apiRetryRule(id, namespace, owner string, generation int64, caseID string, old *corev1.Pod, groupObjects bool) (faultproxy.Rule, error) {
 	n, err := strconv.Atoi(strings.TrimPrefix(caseID, "RUN-"))
-	if err != nil || n < 455 || n > 462 || generation < 2 {
+	groupRequest := n >= 663 && n <= 665
+	if err != nil || (n < 455 || n > 462) && !groupRequest || generation < 2 {
 		return faultproxy.Rule{}, fmt.Errorf("invalid API retry identity or accepted B generation")
 	}
 	rule := faultproxy.Rule{ID: id, Namespace: namespace, Mode: "error", StatusCode: 503, Count: 1, DurationSeconds: 480}
+	if groupRequest {
+		// The requests only a controller with ServingGroup objects sends: it
+		// creates the group object, reports the group in its status, and reads
+		// the groups directly before a round that writes.
+		if !groupObjects {
+			return faultproxy.Rule{}, fmt.Errorf("ServingGroup API fault requires a build with ServingGroup objects")
+		}
+		rule.Resource = SGGVR.Resource
+		switch n {
+		case 663:
+			rule.Methods, rule.OwnerUID = []string{"POST"}, owner
+		case 664:
+			rule.Subresource, rule.Methods, rule.OwnerUID = "status", []string{"PUT"}, owner
+		case 665:
+			rule.Methods, rule.CollectionOnly = []string{"GET"}, true
+		}
+		return rule, nil
+	}
 	switch (n - 455) % 4 {
 	case 0:
 		rule.Resource, rule.Methods, rule.OwnerUID = "pods", []string{"POST"}, owner
@@ -34,6 +57,12 @@ func apiRetryRule(id, namespace, owner string, generation int64, caseID string, 
 			return faultproxy.Rule{}, fmt.Errorf("delete API fault requires the captured healthy old Pod UID")
 		}
 		rule.Resource, rule.Methods, rule.Name, rule.UIDs = "pods", []string{"DELETE"}, old.Name, []string{string(old.UID)}
+		if groupObjects && n <= 458 {
+			if old.Labels[LabelGroup] == "" {
+				return faultproxy.Rule{}, fmt.Errorf("delete API fault requires the ServingGroup of the captured old Pod")
+			}
+			rule.Resource, rule.Name, rule.UIDs = SGGVR.Resource, old.Labels[LabelGroup], nil
+		}
 	case 2:
 		rule.Resource, rule.Subresource, rule.Name = "modelservings", "status", "model"
 		rule.Methods, rule.OwnerUID, rule.Generation = []string{"PUT"}, owner, generation
@@ -104,7 +133,7 @@ func (e *normalExecution) retryAPIError(ctx context.Context, p ScenarioStep, pre
 			return err
 		}
 	}
-	rule, err := apiRetryRule(id, e.namespace, e.l.Owner, ms.GetGeneration(), e.c.ID, old)
+	rule, err := apiRetryRule(id, e.namespace, e.l.Owner, ms.GetGeneration(), e.c.ID, old, e.r.groupObjects)
 	if err != nil {
 		return err
 	}

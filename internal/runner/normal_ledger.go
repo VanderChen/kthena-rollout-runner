@@ -474,10 +474,10 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 			l.fail("ROLLOUT_BLOCK_VIOLATION: healthy old Pod deleted during fault: " + name)
 		}
 	}
-	if kind == "podgroups" && (event == "DELETED" || o.GetDeletionTimestamp() != nil) {
+	if l.groupSignal(kind) && (event == "DELETED" || o.GetDeletionTimestamp() != nil) {
 		for uid, pod := range objects["pods"] {
 			if _, ok := l.BlockedOld[uid]; ok && pod.GetLabels()[LabelGroup] == o.GetName() {
-				l.fail("ROLLOUT_BLOCK_VIOLATION: healthy old PodGroup deleted during fault: " + o.GetName())
+				l.fail("ROLLOUT_BLOCK_VIOLATION: healthy old " + l.groupNoun() + " deleted during fault: " + o.GetName())
 			}
 		}
 	}
@@ -667,7 +667,7 @@ func (l *NormalLedger) oldCandidatePrecedes(candidate, selected NormalUnit) bool
 // a finite capacity reduction, then choose from the observed healthy/cost/order
 // ranking at the destructive event, rather than freezing a request-time UID.
 func (l *NormalLedger) dynamicScaleBefore(kind, event string, o *unstructured.Unstructured, objects Objects) {
-	if l.Profile != "auto" || (kind != "pods" && kind != "podgroups") || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) {
+	if l.Profile != "auto" || (kind != "pods" && !l.groupSignal(kind)) || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) {
 		return
 	}
 	if l.Committed[string(o.GetUID())] {
@@ -962,8 +962,11 @@ func (l *NormalLedger) roleScaleBefore(kind, event string, o *unstructured.Unstr
 // PodGroup deletion is an independent destructive signal. Cross-resource watch
 // ordering can lag Pod readiness, so this check uses an optimistic upper bound
 // from explicit releases. The Pod stream additionally checks actual Ready.
+// When ServingGroups are objects, the deletionTimestamp of the ServingGroup is
+// that signal: the garbage collector then removes PodGroup and Pods in no
+// guaranteed order, so the PodGroup no longer says when destruction began.
 func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstructured, objects Objects) {
-	if kind != "podgroups" || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) || l.PGCommitted[string(o.GetUID())] {
+	if !l.groupSignal(kind) || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) || l.PGCommitted[string(o.GetUID())] {
 		return
 	}
 	l.PGCommitted[string(o.GetUID())] = true
@@ -992,7 +995,7 @@ func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstru
 		return
 	}
 	if l.Model.Mode == "Role" {
-		l.fail("UNEXPECTED_PODGROUP_REPLACED: " + o.GetName())
+		l.fail("UNEXPECTED_" + l.groupCode() + "_REPLACED: " + o.GetName())
 		return
 	}
 	units := l.units(objects["pods"])
@@ -1024,11 +1027,11 @@ func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstru
 		}
 	}
 	if optimistic(u) && ready-1 < max(l.Model.N-l.Model.U, 0) {
-		l.fail("BUDGET_VIOLATION: PodGroup deletion exceeds released capacity: " + o.GetName())
+		l.fail("BUDGET_VIOLATION: " + l.groupNoun() + " deletion exceeds released capacity: " + o.GetName())
 	}
 	for _, p := range u.Pods {
 		if _, protected := l.Protected[string(p.UID)]; protected {
-			l.fail("PROTECTED_PODGROUP_REPLACED: " + o.GetName())
+			l.fail("PROTECTED_" + l.groupCode() + "_REPLACED: " + o.GetName())
 		}
 		l.PGPods[string(p.UID)] = true
 		l.PGPhase[string(p.UID)] = l.Phase

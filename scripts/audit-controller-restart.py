@@ -14,6 +14,13 @@ loader = importlib.util.spec_from_file_location('midrollout_audit', ROOT/'script
 m = importlib.util.module_from_spec(loader); loader.loader.exec_module(m)
 
 
+SYNC_MARKERS = ('initial sync has been done', 'Starting the ModelServing controller')  # either build; see internal/runner/ownership.go
+
+
+def synced(text):
+    return any(marker in text for marker in SYNC_MARKERS)
+
+
 def audit_case(p, deployment):
     result = m.read(p/'result.json'); case = m.yaml(p/'case.yaml'); owner = m.yaml(p/'before-server.yaml')['metadata']['uid']
     assert case['id'] == result['id'] == case['scenario']['source']['id'] and case['baseline'] == '538b2825c06bc1e8c5392d18f18f84faee9fca95'
@@ -37,7 +44,7 @@ def audit_case(p, deployment):
     afterdep = m.yaml(p/(prefix+'-controller-deployment.yaml'))
     assert afterdep['metadata']['uid'] == deployment['metadata']['uid'] and afterdep['spec'] == deployment['spec']
     lines = (p/(prefix+'-new-controller.log')).read_text().splitlines()
-    synced = next(line for line in lines if 'initial sync has been done' in line)
+    synced = next(line for line in lines if synced(line))
     synced_at = synced.split(' ', 1)[0]; assert m.ts(synced_at) > m.ts(call['sent'])
     checkpoints = [m.read(x) for x in p.glob('checkpoint-*.json')]
     baseline = m.mine(m.yaml(p/'baseline-resources.yaml'), 'pods', owner)

@@ -15,6 +15,13 @@ m = importlib.util.module_from_spec(loader);loader.loader.exec_module(m)
 DIGEST = 'sha256:7c6ed6c78b37d7afaf104381351554ad75aed56c64d0aca2ec941ce652756265'
 
 
+SYNC_MARKERS = ('initial sync has been done', 'Starting the ModelServing controller')  # either build; see internal/runner/ownership.go
+
+
+def synced(text):
+    return any(marker in text for marker in SYNC_MARKERS)
+
+
 def controller(p):
     assert m.ready(p) and p['status']['containerStatuses'][0]['ready'] and p['status']['containerStatuses'][0]['imageID'] == DIGEST
     assert [a for a in p['spec']['containers'][0]['args'] if a.startswith('--leader-elect')] == ['--leader-elect=true']
@@ -61,7 +68,7 @@ def audit_case(p, env):
     dep = m.yaml(p/'step-02-deployment-before.yaml'); newdep = m.yaml(p/'step-02-deployment-after.yaml')
     assert dep['spec']['replicas'] == 2 and dep['spec'] == newdep['spec'] == env['controller']['spec'] and dep['metadata']['uid'] == newdep['metadata']['uid']
     logs = (p/'step-02-new-leader.log').read_text().splitlines()
-    synced = next(line for line in logs if 'initial sync has been done' in line and m.ts(line.split(' ',1)[0]) > m.ts(call['sent']))
+    synced = next(line for line in logs if synced(line) and m.ts(line.split(' ',1)[0]) > m.ts(call['sent']))
     rows = [json.loads(line) for line in (p/'observations.jsonl').read_text().splitlines()]
     assert [r['sequence'] for r in rows] == list(range(1,len(rows)+1)) and not any(r['event'] == 'GAP' for r in rows)
     cp = next(m.read(x) for x in p.glob('checkpoint-*.json') if m.read(x)['phase'] == case['scenario']['steps'][-1]['name'])

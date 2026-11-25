@@ -27,7 +27,7 @@ func (l *NormalLedger) compoundBudget(objects Objects) compoundBudget {
 			b.V++
 		}
 	}
-	for _, group := range objects["podgroups"] {
+	for _, group := range objects[l.groupKind()] {
 		if !objectOwned(group, l.Owner) {
 			continue
 		}
@@ -78,9 +78,10 @@ func compoundHasOriginalPod(u NormalUnit, key string) bool {
 }
 
 // compoundBefore evaluates the first accepted deletion signal for a ServingGroup.
-// A PodGroup and its Pods can report that signal in either Watch order.
+// A PodGroup (or the ServingGroup object, see podGroupBefore) and its Pods can
+// report that signal in either Watch order.
 func (l *NormalLedger) compoundBefore(kind, event string, o *unstructured.Unstructured, objects Objects) {
-	if !l.CompoundV2 || !l.Armed || l.Model.Mode != "SG" || (kind != "pods" && kind != "podgroups") || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) {
+	if !l.CompoundV2 || !l.Armed || l.Model.Mode != "SG" || (kind != "pods" && !l.groupSignal(kind)) || (event != "DELETED" && o.GetDeletionTimestamp() == nil) || !objectOwned(o, l.Owner) {
 		return
 	}
 	// The first destructive signal reserves every original Pod UID. As
@@ -178,7 +179,7 @@ func (l *NormalLedger) compoundTarget(u NormalUnit) bool {
 }
 
 func (l *NormalLedger) compoundAfter(kind, event string, o *unstructured.Unstructured, objects Objects) {
-	if !l.CompoundV2 || l.Model.Mode != "SG" || (kind != "pods" && kind != "podgroups") || !objectOwned(o, l.Owner) {
+	if !l.CompoundV2 || l.Model.Mode != "SG" || (kind != "pods" && !l.groupSignal(kind)) || !objectOwned(o, l.Owner) {
 		return
 	}
 	name := o.GetName()
@@ -186,7 +187,7 @@ func (l *NormalLedger) compoundAfter(kind, event string, o *unstructured.Unstruc
 		name = o.GetLabels()[LabelGroup]
 	}
 	groupOrdinal := ordinal(name)
-	if kind == "podgroups" && event == "ADDED" && l.Armed && groupOrdinal >= l.Model.P {
+	if l.groupSignal(kind) && event == "ADDED" && l.Armed && groupOrdinal >= l.Model.P {
 		l.CompoundPGVersion[string(o.GetUID())] = l.Model.Roles["frontend"].Entry
 	}
 	if event == "LIST" || event == "ADDED" {

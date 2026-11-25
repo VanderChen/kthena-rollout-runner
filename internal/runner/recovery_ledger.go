@@ -21,6 +21,7 @@ type RecoveryRecord struct {
 	ProtectedNames map[string]bool   `json:"protectedRecoveryNames"`
 	Replacements   map[string]string `json:"replacementUIDsByName"`
 	PodGroups      map[string]string `json:"recoverablePodGroupUIDs"`
+	Groups         map[string]string `json:"recoverableServingGroupUIDs,omitempty"`
 	OrderUnits     map[string]bool   `json:"recoveringOrderUnits"`
 	OrderComplete  bool              `json:"orderRecoveryComplete"`
 }
@@ -58,10 +59,21 @@ func (l *NormalLedger) armRecovery(scope PodFaultScope, objects Objects) error {
 					r.PodGroups[pgUID] = pg.GetName()
 				}
 			}
+			for groupUID, group := range objects[SGGVR.Resource] {
+				if l.GroupObjects && objectOwned(group, l.Owner) && group.GetNamespace() == scope.Namespace && group.GetName() == pod.Labels[LabelGroup] && group.GetDeletionTimestamp() == nil {
+					if r.Groups == nil {
+						r.Groups = map[string]string{}
+					}
+					r.Groups[groupUID] = group.GetName()
+				}
+			}
 		}
 	}
 	if scope.Recovery == "ServingGroupRecreate" && len(r.PodGroups) != 1 {
 		return fmt.Errorf("full SG recovery requires its exact existing PodGroup UID")
+	}
+	if scope.Recovery == "ServingGroupRecreate" && l.GroupObjects && len(r.Groups) != 1 {
+		return fmt.Errorf("full SG recovery requires its exact existing ServingGroup UID")
 	}
 	// Only old protected identities inside this exact recovery scope can go.
 	// All other protection, capacity, ordering and plugin checks remain armed.
@@ -135,9 +147,15 @@ func (l *NormalLedger) recoveryBefore(kind, event string, object *unstructured.U
 	if event != "DELETED" && object.GetDeletionTimestamp() == nil {
 		return false
 	}
-	if kind == "podgroups" && objectOwned(object, l.Owner) {
+	// The captured ServingGroup object and its PodGroup both belong to this
+	// recovery; either deletion commits the same finite set of old Pod UIDs.
+	if (kind == "podgroups" || kind == SGGVR.Resource) && objectOwned(object, l.Owner) {
 		for _, r := range l.Recoveries {
-			if r.Scope.Namespace == object.GetNamespace() && r.PodGroups[string(object.GetUID())] == object.GetName() && object.GetName() != "" {
+			captured := r.PodGroups
+			if kind == SGGVR.Resource {
+				captured = r.Groups
+			}
+			if r.Scope.Namespace == object.GetNamespace() && captured[string(object.GetUID())] == object.GetName() && object.GetName() != "" {
 				l.PGCommitted[string(object.GetUID())] = true
 				// The permission remains bound to old Pod UIDs, even if PG and Pod
 				// streams deliver their destructive events in different orders.

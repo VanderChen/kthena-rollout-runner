@@ -140,7 +140,7 @@ func (r *Runner) preflightRecovery(ctx context.Context) error {
 }
 
 func (e *normalExecution) recoveryPause(ctx context.Context, prefix string) ([]string, error) {
-	resources := []struct{ resource, subresource string }{{"modelservings", ""}, {"modelservings", "status"}, {"pods", ""}, {"pods", "status"}, {"controllerrevisions", ""}, {"services", ""}, {"configmaps", ""}, {"podgroups", ""}, {"podgroups", "status"}}
+	resources := controllerResources(e.r.groupObjects)
 	var ids []string
 	for i, resource := range resources {
 		id := fmt.Sprintf("%s-%s-%02d-%d", e.r.opt.RunID, strings.ToLower(e.c.ID), e.phase, i)

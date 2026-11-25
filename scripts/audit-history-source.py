@@ -14,6 +14,13 @@ loader=importlib.util.spec_from_file_location('source_mid',ROOT/'scripts/audit-m
 m=importlib.util.module_from_spec(loader);loader.loader.exec_module(m)
 
 
+SYNC_MARKERS = ('initial sync has been done', 'Starting the ModelServing controller')  # either build; see internal/runner/ownership.go
+
+
+def synced(text):
+    return any(marker in text for marker in SYNC_MARKERS)
+
+
 def verify_source(p,rows,owner):
     case=m.yaml(p/'case.yaml')
     assert case['id'] in ['RUN-'+str(n) for n in (528,529,530,531,532)]
@@ -55,7 +62,7 @@ def verify_source(p,rows,owner):
     deployment=m.yaml(prep/'controller-controller-deployment.yaml')
     assert deployment['metadata']['uid']==connected['metadata']['uid'] and deployment['spec']==connected['spec']
     assert after['status']['containerStatuses'][0]['restartCount']==0
-    assert 'initial sync has been done' in (prep/'controller-new-controller.log').read_text()
+    assert synced((prep/'controller-new-controller.log').read_text())
     assert m.ts(receipt['received'])<m.ts(boundary['at'])
     cleanup=m.read(prep/'preparation-cleanup.json') if (prep/'preparation-cleanup.json').exists() else []
     groups={tuple(o['metadata']['labels'][k] for k in (m.G,m.R,m.I)) for uid,o in original.items() if uid in old.values()}

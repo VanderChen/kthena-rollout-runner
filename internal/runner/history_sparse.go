@@ -65,7 +65,7 @@ func sparseSourcePods(pods []corev1.Pod, owner string, expected map[string]types
 // A new controller therefore starts from the actual sparse R=3 snapshot without
 // replaying a previous R=5 scale-down decision after the barrier is released.
 func (e *normalExecution) sparseMutationBarrier(ctx context.Context) ([]string, error) {
-	resources := []struct{ resource, subresource string }{{"modelservings", ""}, {"modelservings", "status"}, {"pods", ""}, {"pods", "status"}, {"controllerrevisions", ""}, {"services", ""}, {"configmaps", ""}, {"podgroups", ""}, {"podgroups", "status"}}
+	resources := controllerResources(e.r.groupObjects)
 	var ids []string
 	for i, resource := range resources {
 		id := fmt.Sprintf("%s-%s-sparse-%d", e.r.opt.RunID, strings.ToLower(e.c.ID), i)

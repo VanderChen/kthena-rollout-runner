@@ -24,7 +24,7 @@ func TestAPIFaultMapsActualCollectionAndStatusGeneration(t *testing.T) {
 		if err := convertPod(makePod("SG", "frontend", 2, "A", true, "true"), &old); err != nil {
 			t.Fatal(err)
 		}
-		rule, err := apiRetryRule("fault", "test", "owner", 2, c.ID, &old)
+		rule, err := apiRetryRule("fault", "test", "owner", 2, c.ID, &old, false)
 		if err != nil || rule.Count != 1 || rule.StatusCode != 503 || rule.DurationSeconds > 900 {
 			t.Fatal("unbounded API failure", rule, err)
 		}
@@ -37,7 +37,7 @@ func TestAPIFaultMapsActualCollectionAndStatusGeneration(t *testing.T) {
 			if rule.CollectionOnly || rule.Methods[0] != "DELETE" || rule.Name != old.Name || rule.OwnerUID != "" || len(rule.UIDs) != 1 || rule.UIDs[0] != string(old.UID) {
 				t.Fatal("actual native DELETE must bind the captured UID")
 			}
-			if _, err := apiRetryRule("fault", "test", "owner", 2, c.ID, nil); err == nil {
+			if _, err := apiRetryRule("fault", "test", "owner", 2, c.ID, nil, false); err == nil {
 				t.Fatal("unguarded deletion fault accepted")
 			}
 		case 2:

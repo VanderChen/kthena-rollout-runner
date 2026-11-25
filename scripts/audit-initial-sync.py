@@ -13,6 +13,13 @@ loader = importlib.util.spec_from_file_location('mid_audit', ROOT/'scripts/audit
 m = importlib.util.module_from_spec(loader); loader.loader.exec_module(m)
 
 
+SYNC_MARKERS = ('initial sync has been done', 'Starting the ModelServing controller')  # either build; see internal/runner/ownership.go
+
+
+def synced(text):
+    return any(marker in text for marker in SYNC_MARKERS)
+
+
 def audit_case(p, trace):
     result = m.read(p/'result.json'); case = m.yaml(p/'case.yaml'); owner = m.yaml(p/'before-server.yaml')['metadata']['uid']
     assert result['id'] in ('RUN-450', 'RUN-451', 'RUN-453', 'RUN-454') and result['status'] == 'PASS'
@@ -57,8 +64,8 @@ def audit_case(p, trace):
     admission = m.read(p/'step-01-admission-warmup.json'); assert admission[-1]['accepted'] and admission[-1]['requestGeneration'] == admission[-1]['responseGeneration'] == 1
     assert admission[-1]['dryRun'] == 'All' and admission[-1]['responseUID'] == owner
     unsyncedlog = (p/'step-01-controller-unsynced.log').read_text(); syncedlog = (p/'step-01-controller-synced.log').read_text()
-    assert 'initial sync has been done' not in unsyncedlog
-    synced = [line for line in syncedlog.splitlines() if 'initial sync has been done' in line]; assert len(synced) == 1 and m.ts(synced[0].split(' ', 1)[0]) >= m.ts(release['sent'])
+    assert not synced(unsyncedlog)
+    synced = [line for line in syncedlog.splitlines() if synced(line)]; assert len(synced) == 1 and m.ts(synced[0].split(' ', 1)[0]) >= m.ts(release['sent'])
     def preserved(state):
         pods = m.mine(state, 'pods', owner); revisions = m.mine(state, 'controllerrevisions', owner)
         assert set(pods) == set(basepods) and all(m.ready(o) and m.version(o) == 'A' for o in pods.values())

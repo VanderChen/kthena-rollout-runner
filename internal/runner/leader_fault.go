@@ -193,7 +193,7 @@ func (e *normalExecution) terminateLeader(ctx context.Context, prefix string) (r
 				for _, line := range strings.Split(string(logs), "\n") {
 					stamp, _, _ := strings.Cut(line, " ")
 					at, parseErr := time.Parse(time.RFC3339Nano, stamp)
-					if parseErr == nil && at.After(sent) && strings.Contains(line, "initial sync has been done") {
+					if parseErr == nil && at.After(sent) && controllerSynced(line) {
 						synced = true
 					}
 				}

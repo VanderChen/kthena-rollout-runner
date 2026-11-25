@@ -39,6 +39,12 @@ func partialScaleBoundary(step ScenarioStep) (int, bool) {
 	}
 	return n, true
 }
+func partialScaleResource(groupObjects bool) string {
+	if groupObjects {
+		return SGGVR.Resource
+	}
+	return PGGVR.Resource
+}
 func needsPartialScaleBoundary(c Case) bool {
 	if c.Format != "rollout-runner/compound-v2" || c.Scenario == nil {
 		return false
@@ -58,7 +64,10 @@ func (e *normalExecution) installPartialScaleBoundary(ctx context.Context, p Sce
 	id := fmt.Sprintf("%s-%s-scale-boundary-%d", e.r.opt.RunID, strings.ToLower(e.c.ID), e.phase)
 	// Return a retryable error, rather than forwarding an old held POST after
 	// the next spec. The controller must recompute creation from that new spec.
-	rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: "podgroups", Name: fmt.Sprintf("model-%d", ordinal), Methods: []string{"POST"}, Mode: "error", StatusCode: 503, Count: -1, DurationSeconds: 300}
+	// The first object of a new group is its PodGroup, or the ServingGroup
+	// itself when groups are objects: rejecting only the PodGroup there would
+	// leave an existing, empty group object behind the source state.
+	rule := faultproxy.Rule{ID: id, Namespace: e.namespace, Resource: partialScaleResource(e.r.groupObjects), Name: fmt.Sprintf("model-%d", ordinal), Methods: []string{"POST"}, Mode: "error", StatusCode: 503, Count: -1, DurationSeconds: 300}
 	e.partialScaleRule = id
 	e.partialScalePhase = e.phase
 	var installed faultproxy.RuleStatus

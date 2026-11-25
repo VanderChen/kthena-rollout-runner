@@ -24,6 +24,11 @@ func initialSyncResource(id string) (string, error) {
 		return "modelservings", nil
 	case "RUN-451", "RUN-454":
 		return "pods", nil
+	case "RUN-662":
+		// Only a build with ServingGroup objects has this informer. Holding
+		// the Pod informer (RUN-451/454) there already is the state "groups
+		// synced, Pods not"; this case is the opposite one.
+		return SGGVR.Resource, nil
 	default:
 		return "", fmt.Errorf("initial-sync fault is not declared for %s", id)
 	}
@@ -169,7 +174,7 @@ func (e *normalExecution) holdInitialSync(ctx context.Context, p ScenarioStep, p
 	if err = os.WriteFile(filepath.Join(e.dir, prefix+"-controller-unsynced.log"), logs, 0644); err != nil {
 		return err
 	}
-	if strings.Contains(string(logs), "initial sync has been done") {
+	if controllerSynced(string(logs)) {
 		return fmt.Errorf("INCONCLUSIVE: initial-sync completed before fault release")
 	}
 	if err = e.snapshot(prefix + "-unsynced"); err != nil {
@@ -201,7 +206,7 @@ func (e *normalExecution) holdInitialSync(ctx context.Context, p ScenarioStep, p
 	if err = os.WriteFile(filepath.Join(e.dir, prefix+"-controller-synced.log"), logs, 0644); err != nil {
 		return err
 	}
-	if !strings.Contains(string(logs), "initial sync has been done") {
+	if !controllerSynced(string(logs)) {
 		return fmt.Errorf("INCONCLUSIVE: replacement initial-sync completion not witnessed")
 	}
 	after, err := e.r.kube.AppsV1().Deployments(dep.Namespace).Get(ctx, dep.Name, metav1.GetOptions{})

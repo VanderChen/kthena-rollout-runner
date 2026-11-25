@@ -253,11 +253,17 @@ func (e *normalExecution) liveTerminating(ctx context.Context, name string, prev
 		return nil, fmt.Errorf("TRIGGER_MISSED: exact terminating UID absent in %s", name)
 	}
 	if fence {
-		groups, err := e.r.dynamic.Resource(PGGVR).Namespace(e.namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("INCONCLUSIVE PodGroup deletion fence: %w", err)
+		// The group-level object is the PodGroup, or the ServingGroup itself
+		// when the tested build keeps ServingGroups as objects.
+		groupGVR := PGGVR
+		if e.l.GroupObjects {
+			groupGVR = SGGVR
 		}
-		if err = saveYAML(filepath.Join(e.dir, name+"-podgroups.yaml"), groups); err != nil {
+		groups, err := e.r.dynamic.Resource(groupGVR).Namespace(e.namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("INCONCLUSIVE %s deletion fence: %w", e.l.groupNoun(), err)
+		}
+		if err = saveYAML(filepath.Join(e.dir, name+"-"+groupGVR.Resource+".yaml"), groups); err != nil {
 			return nil, err
 		}
 		live := map[string]bool{}
@@ -270,9 +276,9 @@ func (e *normalExecution) liveTerminating(ctx context.Context, name string, prev
 		// next scale request, even when that Pod's Watch event is still queued.
 		// Commit it under the previous budget without replacing the Watch cache.
 		if err = e.locked(func() error {
-			for uid, g := range e.o.objects["podgroups"] {
+			for uid, g := range e.o.objects[groupGVR.Resource] {
 				if !live[uid] && objectOwned(g, e.l.Owner) {
-					e.l.Before("podgroups", "DELETED", g, e.o.objects)
+					e.l.Before(groupGVR.Resource, "DELETED", g, e.o.objects)
 				}
 			}
 			for _, p := range pods.Items {

@@ -46,6 +46,9 @@ type Ledger struct {
 	Owner         string
 	Baseline      map[string]Unit
 	ProtectedUIDs map[string]string
+	// GroupKind is the stream whose baseline objects stand for whole groups:
+	// "podgroups", or "servinggroups" when ServingGroups are objects.
+	GroupKind     string
 	BaselinePG    map[string]string
 	PodUnit       map[string]string
 	Started       map[string]bool
@@ -86,13 +89,11 @@ func podReady(p *corev1.Pod) bool {
 	}
 	return false
 }
+
+// owned reports whether the ModelServing uid owns the Pod, directly or through
+// the ServingGroup object that controls it.
 func owned(p *corev1.Pod, uid string) bool {
-	for _, r := range p.OwnerReferences {
-		if string(r.UID) == uid {
-			return true
-		}
-	}
-	return false
+	return ownerMatches(p.Namespace, p.OwnerReferences, uid)
 }
 func (l *Ledger) units(objects map[string]*unstructured.Unstructured) map[string]Unit {
 	groups := map[string]Unit{}
@@ -148,7 +149,7 @@ func (l *Ledger) expectedPods() int {
 	return n
 }
 func NewLedger(c Case, owner string, pods, pgs map[string]*unstructured.Unstructured) (*Ledger, error) {
-	l := &Ledger{Case: c, Owner: owner, Baseline: map[string]Unit{}, ProtectedUIDs: map[string]string{}, BaselinePG: map[string]string{}, PodUnit: map[string]string{}, Started: map[string]bool{}, PGStarted: map[string]bool{}, Released: map[string]bool{}}
+	l := &Ledger{Case: c, Owner: owner, GroupKind: PGGVR.Resource, Baseline: map[string]Unit{}, ProtectedUIDs: map[string]string{}, BaselinePG: map[string]string{}, PodUnit: map[string]string{}, Started: map[string]bool{}, PGStarted: map[string]bool{}, Released: map[string]bool{}}
 	l.ReleasedUnits = map[string]bool{}
 	l.Baseline = l.units(pods)
 	if err := l.canonicalOrdinals(pods); err != nil {
@@ -206,20 +207,24 @@ func (l *Ledger) Observe(kind, event string, o *unstructured.Unstructured, pods 
 			}
 		}
 	}
-	if kind == "podgroups" && deleting && l.BaselinePG[o.GetName()] == string(o.GetUID()) {
+	if kind == l.GroupKind && deleting && l.BaselinePG[o.GetName()] == string(o.GetUID()) {
+		code, noun := "PODGROUP", "PodGroup"
+		if l.GroupKind == SGGVR.Resource {
+			code, noun = "SERVINGGROUP", "ServingGroup"
+		}
 		if l.Case.Expect.Mode == "SG" {
 			l.PGStarted[o.GetName()] = true
 			if u, ok := l.Baseline[o.GetName()]; ok && u.Ordinal < l.Case.Expect.P {
-				l.fail("PROTECTED_PODGROUP_REPLACED: " + o.GetName())
+				l.fail("PROTECTED_" + code + "_REPLACED: " + o.GetName())
 			}
 			// Cross-resource Ready notifications can lag PG deletion. This bound uses
 			// only the maximum capacity explicitly released by our workload driver.
 			// Precise Ready-before-delete accounting is performed on the Pod stream.
 			if len(l.PGStarted) > l.Case.Expect.U+len(l.ReleasedUnits) {
-				l.fail("BUDGET_VIOLATION: PodGroup starts exceed even released-capacity ceiling")
+				l.fail("BUDGET_VIOLATION: " + noun + " starts exceed even released-capacity ceiling")
 			}
 		} else {
-			l.fail("UNEXPECTED_PODGROUP_REPLACED: " + o.GetName())
+			l.fail("UNEXPECTED_" + code + "_REPLACED: " + o.GetName())
 		}
 	}
 	l.Check(pods)

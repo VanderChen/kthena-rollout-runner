@@ -199,10 +199,15 @@ func (o *Observer) accept(kind, event string, u *unstructured.Unstructured) {
 func (o *Observer) Arm(c Case, uid string) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	l, err := NewLedger(c, uid, o.objects["pods"], o.objects["podgroups"])
+	kind := PGGVR.Resource
+	if o.groups {
+		kind = SGGVR.Resource
+	}
+	l, err := NewLedger(c, uid, o.objects["pods"], o.objects[kind])
 	if err != nil {
 		return err
 	}
+	l.GroupKind = kind
 	o.ledger = l
 	return nil
 }

@@ -5,6 +5,15 @@
 
 Uses the existing runner fault proxy. Observation/admission bypass the proxy.
 No controller deployment, RBAC, credentials or cluster is installed by this script.
+
+The cut point follows the object model of the tested build, detected from the
+servinggroups CRD (contract 2.14, clause C4). Without ServingGroup objects the
+healthy survivor carries the deletion-scope annotation and its DELETE is
+rejected. With ServingGroup objects no Pod is marked: for ServingGroupRecreate
+the group is Failed and Drained and the rejected request is the DELETE of the
+ServingGroup (its healthy members are deleted by the garbage collector, which
+does not pass the proxy); for RoleRecreate the Role instance record is Draining
+and the rejected request is still the DELETE of the surviving Pod.
 """
 import argparse
 import hashlib
@@ -40,14 +49,53 @@ def uidmap(pods):
     return {p['metadata']['name']: p['metadata']['uid'] for p in pods}
 
 
-def partial_recovery_established(pods, initial, failed, survivor, delete_hits):
-    """Prove a partial recovery from live objects and a rejected DELETE."""
+SYNC_MARKERS = ('initial sync has been done', 'Starting the ModelServing controller')
+SERVING_GROUP_CRD = 'servinggroups.workload.serving.volcano.sh'
+
+
+def synced(logs):
+    """A controller logs one of these only after its informer caches are filled."""
+    return any(marker in logs for marker in SYNC_MARKERS)
+
+
+def condition_true(obj, kind):
+    return any(c.get('type') == kind and c.get('status') == 'True'
+               for c in (obj or {}).get('status', {}).get('conditions', []))
+
+
+def group_cut_established(group, policy, role='prefill', index=0):
+    """The committed scope of a build with ServingGroup objects (clause C4).
+
+    ServingGroupRecreate: the group is Failed and Drained and is not yet being
+    deleted (its DELETE is the rejected request). RoleRecreate: the record of
+    the Role instance is Draining; a group-level failure would be a wider scope.
+    """
+    if not group or group.get('metadata', {}).get('deletionTimestamp'):
+        return False
+    if policy == 'ServingGroupRecreate':
+        return condition_true(group, 'Failed') and condition_true(group, 'Drained')
+    return (not condition_true(group, 'Failed') and any(
+        i.get('role') == role and i.get('index', 0) == index and i.get('phase') == 'Draining'
+        for i in group.get('status', {}).get('roleInstances', [])))
+
+
+def partial_recovery_established(pods, initial, failed, survivor, delete_hits, group=None, policy=None):
+    """Prove a partial recovery from live objects and a rejected DELETE.
+
+    group is the ServingGroup of ordinal 0 when the tested build keeps
+    ServingGroups as objects, None otherwise. Exactly one kind of evidence
+    applies to a build; the other one is never accepted in its place.
+    """
     current = {p['metadata']['name']: p for p in pods}
     healthy = current.get(survivor)
-    return (initial[failed] not in uidmap(pods).values() and delete_hits > 0
+    if not (initial[failed] not in uidmap(pods).values() and delete_hits > 0
             and healthy is not None and healthy['metadata']['uid'] == initial[survivor]
-            and ready(healthy)
-            and healthy['metadata'].get('annotations', {}).get('workload.kthena.io/deletion-scope') in ('Role', 'ServingGroup'))
+            and ready(healthy)):
+        return False
+    marked = healthy['metadata'].get('annotations', {}).get('workload.kthena.io/deletion-scope') in ('Role', 'ServingGroup')
+    if group is None:
+        return marked
+    return not marked and group_cut_established(group, policy)
 
 
 def assert_retained(pods, expected):
@@ -177,6 +225,7 @@ class Execution:
         self.out.mkdir()
         self.k = ['kubectl', '--kubeconfig', args.kubeconfig, '--request-timeout=20s']
         self.rules = set()
+        self.groups = False
         self.phase = 'prepare'
         self.watch = None
         self.stopped = False
@@ -220,9 +269,9 @@ class Execution:
             raw = response.read()
             return json.loads(raw) if raw else None
 
-    def block(self, method, name):
+    def block(self, method, name, resource='pods'):
         rid = self.ns + '-' + method.lower()
-        rule = {'id': rid, 'namespace': self.ns, 'resource': 'pods', 'name': name,
+        rule = {'id': rid, 'namespace': self.ns, 'resource': resource, 'name': name,
                 'mode': 'error', 'methods': [method], 'statusCode': 503,
                 'count': -1, 'durationSeconds': 600}
         self.save('rule-' + method, self.control('POST', '/v1/rules', rule))
@@ -276,10 +325,26 @@ class Execution:
             self.call('-n', self.args.controller_namespace, 'rollout', 'status',
                       'deployment/' + self.args.controller_deployment, '--timeout=90s')
 
+    def group_objects(self):
+        """Whether the tested build keeps ServingGroups as objects (never an option)."""
+        proc = subprocess.run(self.k + ['get', 'crd', SERVING_GROUP_CRD, '-o', 'name'],
+                              text=True, capture_output=True, timeout=60)
+        if proc.returncode and 'NotFound' not in proc.stderr:
+            raise Inconclusive(proc.stderr)
+        return proc.returncode == 0
+
+    def group(self, name='current-0'):
+        proc = subprocess.run(self.k + ['-n', self.ns, 'get', 'servinggroups', name, '-o', 'json'],
+                              text=True, capture_output=True, timeout=60)
+        return json.loads(proc.stdout) if proc.returncode == 0 else {}
+
     def snapshot(self, stage):
-        self.save(stage, {'at': time.time(), 'pods': self.pods(),
+        state = {'at': time.time(), 'pods': self.pods(),
             'modelserving': self.get('modelserving', 'current'),
-            'configmaps': self.get('configmaps'), 'proxy': self.control('GET', '/v1/state')})
+            'configmaps': self.get('configmaps'), 'proxy': self.control('GET', '/v1/state')}
+        if self.groups:
+            state['servinggroups'] = self.get('servinggroups')
+        self.save(stage, state)
 
     def start_watch(self):
         self.watch = subprocess.Popen(self.k + ['--request-timeout=0', '-n', self.ns, 'get', 'pods',
@@ -319,6 +384,8 @@ class Execution:
         old_controller = controllers[0]['metadata']['uid']
         self.save('controller-pod-before', controllers[0])
         self.control('GET', '/v1/state')
+        self.groups = self.group_objects()
+        self.save('object-model', {'servingGroupObjects': self.groups})
         self.call('create', 'namespace', self.ns)
         obj = workload(c, self.ns)
         self.save('initial-input', obj)
@@ -341,13 +408,19 @@ class Execution:
         self.phase = 'desired-b-protected'
         self.update(2, target=True)
         self.observe_retained(initial, 3)
-        deletion = self.block('DELETE', survivor)
+        if self.groups and c['policy'] == 'ServingGroupRecreate':
+            # The healthy members of a failed group are deleted by the garbage
+            # collector; the controller's own request is the group DELETE.
+            deletion = self.block('DELETE', 'current-0', resource='servinggroups')
+        else:
+            deletion = self.block('DELETE', survivor)
         creation = self.block('POST', failed)
         self.phase = 'partial-recovery'
         self.call('-n', self.ns, 'exec', failed, '--', 'touch', '/tmp/fail')
         def partial():
             ps = self.pods()
-            return ps if partial_recovery_established(ps, initial, failed, survivor, self.hits(deletion)) else None
+            group = self.group() if self.groups else None
+            return ps if partial_recovery_established(ps, initial, failed, survivor, self.hits(deletion), group, c['policy']) else None
         self.poll('established partial recovery', partial, fixture=True)
         self.snapshot('partial-recovery')
         self.scale(0)
@@ -360,7 +433,7 @@ class Execution:
             if len(ps) != 1 or ps[0]['metadata']['uid'] == old_controller or not ready(ps[0]):
                 return False
             logs = self.call('-n', a.controller_namespace, 'logs', ps[0]['metadata']['name'])
-            return (ps[0], logs) if 'initial sync has been done' in logs else False
+            return (ps[0], logs) if synced(logs) else False
         controller, logs = self.poll('replacement initialSync', initialized, fixture=True)
         self.save('controller-pod-after', controller)
         (self.out / 'controller-after.log').write_text(logs)

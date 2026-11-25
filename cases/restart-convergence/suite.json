@@ -40,7 +40,7 @@
   ],
   "assertions": [
     "A full Ready baseline precedes desired B with partition=2",
-    "Actual failed UID is gone; surviving original has deletion-scope and rejected DELETE before restart; no private member CM is required",
+    "Actual failed UID is gone; the deletion scope is committed and the DELETE that continues it was rejected before restart; no private member CM is required. Without ServingGroup objects: the surviving original has deletion-scope and its DELETE was rejected. With ServingGroup objects (contract 2.14, clause C4; detected from the servinggroups CRD): RC-01 has the group Failed and Drained and the DELETE of the ServingGroup was rejected, RC-02..04 have the Role instance record Draining and the DELETE of the surviving original was rejected; a deletion-scope marker on a Pod does not establish the cut point there",
     "Restart changes controller UID without changing image or template, and completes initialSync",
     "partition 2->1 while stopped; finish marked original scope after restart; preserve all out-of-scope UIDs while POST is blocked, without extra budget",
     "Coordinated Roles submit compatible partitions together (prefill/decode both 2->1->0); only prefill changes template, decode stays A",

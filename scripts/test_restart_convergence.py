@@ -103,6 +103,52 @@ class RestartVerdictTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(r.partial_recovery_established(pods, initial, 'decode', 'prefill', hits))
 
+    def group(self, failed=True, drained=True, phase='Established', deleting=False):
+        conditions = [{'type': 'Failed', 'status': 'True' if failed else 'False'},
+                      {'type': 'Drained', 'status': 'True' if drained else 'False'}]
+        meta = {'name': 'current-0', 'uid': 'g'}
+        if deleting:
+            meta['deletionTimestamp'] = 'now'
+        return {'metadata': meta, 'status': {'conditions': conditions, 'roleInstances': [
+            {'role': 'prefill', 'index': 0, 'phase': phase}, {'role': 'decode', 'phase': 'Established'}]}}
+
+    def test_group_object_cut_point_replaces_the_pod_marker(self):
+        initial = {'prefill': 'p', 'decode': 'old'}
+        survivor = [pod('prefill', 'p')]
+        self.assertTrue(r.partial_recovery_established(survivor, initial, 'decode', 'prefill', 1, self.group(), 'ServingGroupRecreate'))
+        draining = self.group(failed=False, drained=False, phase='Draining')
+        self.assertTrue(r.partial_recovery_established(survivor, initial, 'decode', 'prefill', 1, draining, 'RoleRecreate'))
+
+    def test_group_object_cut_point_rejects_unestablished_boundaries(self):
+        initial = {'prefill': 'p', 'decode': 'old'}
+        marked = pod('prefill', 'p')
+        marked['metadata']['annotations'] = {'workload.kthena.io/deletion-scope': 'ServingGroup'}
+        draining = self.group(failed=False, drained=False, phase='Draining')
+        for name, pods, hits, group, policy in [
+            ('failed-not-drained', [pod('prefill', 'p')], 1, self.group(drained=False), 'ServingGroupRecreate'),
+            ('drained-not-failed', [pod('prefill', 'p')], 1, self.group(failed=False), 'ServingGroupRecreate'),
+            ('group-delete-accepted', [pod('prefill', 'p')], 1, self.group(deleting=True), 'ServingGroupRecreate'),
+            ('group-delete-never-rejected', [pod('prefill', 'p')], 0, self.group(), 'ServingGroupRecreate'),
+            ('group-absent', [pod('prefill', 'p')], 1, {}, 'ServingGroupRecreate'),
+            ('pod-marker-on-group-object-build', [marked], 1, self.group(), 'ServingGroupRecreate'),
+            ('role-record-still-established', [pod('prefill', 'p')], 1, self.group(failed=False, drained=False), 'RoleRecreate'),
+            ('role-policy-widened-to-group', [pod('prefill', 'p')], 1, self.group(phase='Draining'), 'RoleRecreate'),
+            ('role-record-of-another-instance', [pod('prefill', 'p')], 1,
+             {'metadata': {'name': 'current-0'}, 'status': {'roleInstances': [{'role': 'prefill', 'index': 1, 'phase': 'Draining'}]}}, 'RoleRecreate'),
+            ('failed-uid-still-present', [pod('prefill', 'p'), pod('decode', 'old', ready=False)], 1, draining, 'RoleRecreate'),
+        ]:
+            with self.subTest(name=name):
+                self.assertFalse(r.partial_recovery_established(pods, initial, 'decode', 'prefill', hits, group, policy))
+
+    def test_pod_marker_is_still_required_without_group_objects(self):
+        initial = {'prefill': 'p', 'decode': 'old'}
+        self.assertFalse(r.partial_recovery_established([pod('prefill', 'p')], initial, 'decode', 'prefill', 1))
+
+    def test_sync_marker_of_either_build(self):
+        self.assertTrue(r.synced('I1125 initial sync has been done'))
+        self.assertTrue(r.synced('I1125 run.go:124] "Starting the ModelServing controller" workers=5'))
+        self.assertFalse(r.synced('I1125 leaderelection.go:258] "Attempting to acquire leader lease..."'))
+
     def test_rejects_replacing_out_of_scope_member(self):
         self.pods[0]['metadata']['uid'] = 'replayed'
         with self.assertRaisesRegex(AssertionError, 'unexpected replacement'):

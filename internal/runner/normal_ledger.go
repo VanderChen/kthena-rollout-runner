@@ -819,7 +819,7 @@ func (l *NormalLedger) After(kind, event string, o *unstructured.Unstructured, o
 		l.RevisionData[uid] = string(data)
 		if expected, injected := l.HistoryFixtureData[uid]; !injected || expected != string(data) {
 			spec := cloneMap(l.Model.Spec)
-			spec["template"] = map[string]interface{}{"roles": mapValue(o.Object, "data")["data"]}
+			spec["template"] = map[string]interface{}{"roles": revisionRoles(o.Object)}
 			if m, err := readModel(spec); err == nil {
 				known := false
 				for _, h := range l.History {
@@ -1135,4 +1135,14 @@ func (l *NormalLedger) isSourceAboveDesired(unit NormalUnit) bool {
 		}
 	}
 	return false
+}
+
+// revisionRoles reads roles from production ControllerRevision data (data.data)
+// or from the release-1.1 layout (data.spec.template.roles).
+func revisionRoles(obj map[string]interface{}) interface{} {
+	data := mapValue(obj, "data")
+	if roles, ok := data["data"]; ok {
+		return roles
+	}
+	return mapValue(mapValue(data, "spec"), "template")["roles"]
 }

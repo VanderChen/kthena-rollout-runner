@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -471,4 +472,45 @@ func TestPartialTargetCannotBypassReadinessControl(t *testing.T) {
 	// means the driver can no longer enforce the intended hold barrier.
 	event(l, p, "ADDED", makePod("Role", "frontend", 2, "B", true, "entry"))
 	hasViolation(t, l, "CONTROL_VIOLATION")
+}
+
+func TestOmitPluginsStripsManifestAndScenarioSpecs(t *testing.T) {
+	c := Case{Input: struct {
+		Spec map[string]interface{} `json:"spec"`
+	}{Spec: map[string]interface{}{"replicas": 1, "template": map[string]interface{}{"roles": []interface{}{map[string]interface{}{"name": "frontend", "replicas": 1, "workerReplicas": 0}}}}}}
+	c.Scenario = &Scenario{InitialSpec: map[string]interface{}{"plugins": []interface{}{map[string]interface{}{"name": "headless-service"}, map[string]interface{}{"name": "ranktable"}}}, Steps: []ScenarioStep{{Spec: map[string]interface{}{"plugins": []interface{}{map[string]interface{}{"name": "ranktable"}}}}, {Patch: map[string]interface{}{"spec": map[string]interface{}{"plugins": []interface{}{map[string]interface{}{"name": "ranktable"}}}}}}}
+	c.OmitPlugins([]string{"ranktable"})
+	m, err := c.Manifest("test", "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, specs := range [][]interface{}{listValue(m.Object["spec"].(map[string]interface{}), "plugins"), listValue(c.Scenario.InitialSpec, "plugins"), listValue(c.Scenario.Steps[0].Spec, "plugins"), listValue(mapValue(c.Scenario.Steps[1].Patch, "spec"), "plugins")} {
+		for _, p := range specs {
+			if textValue(p.(map[string]interface{}), "name") == "ranktable" {
+				t.Fatalf("ranktable not omitted: %v", specs)
+			}
+		}
+	}
+	if len(listValue(c.Scenario.InitialSpec, "plugins")) != 1 {
+		t.Fatal("unrelated plugin removed")
+	}
+	c.OmitPlugins([]string{"*"})
+	if m, _ = c.Manifest("test", "A"); len(listValue(m.Object["spec"].(map[string]interface{}), "plugins")) != 0 || len(listValue(c.Scenario.InitialSpec, "plugins")) != 0 {
+		t.Fatal("wildcard did not omit all plugins")
+	}
+}
+
+func TestRevisionRolesAcceptsBothLayouts(t *testing.T) {
+	roles := []interface{}{map[string]interface{}{"name": "frontend"}}
+	for _, obj := range []map[string]interface{}{
+		{"data": map[string]interface{}{"data": roles}},
+		{"data": map[string]interface{}{"spec": map[string]interface{}{"template": map[string]interface{}{"roles": roles}}}},
+	} {
+		if got := revisionRoles(obj); !reflect.DeepEqual(got, roles) {
+			t.Fatalf("revisionRoles(%v) = %v", obj, got)
+		}
+	}
+	if got := revisionRoles(map[string]interface{}{"data": map[string]interface{}{}}); got != nil {
+		t.Fatalf("missing roles = %v", got)
+	}
 }

@@ -20,10 +20,12 @@ const Baseline = "e2578d01859bb98d9a85846bafbfb2c771a6f117"
 
 type Case struct {
 	Scenario *Scenario `json:"scenario,omitempty"`
-	Format   string    `json:"format"`
-	ID       string    `json:"id"`
-	Baseline string    `json:"baseline"`
-	Input    struct {
+	// omitPlugins removes named plugins for controllers that do not register them.
+	omitPlugins map[string]bool
+	Format      string `json:"format"`
+	ID          string `json:"id"`
+	Baseline    string `json:"baseline"`
+	Input       struct {
 		Spec map[string]interface{} `json:"spec"`
 	} `json:"input"`
 	Update struct {
@@ -253,6 +255,7 @@ func (c Case) Manifest(ns string, version string) (*unstructured.Unstructured, e
 		map[string]interface{}{"name": "headless-service", "type": "BuiltIn"},
 		map[string]interface{}{"name": "ranktable", "type": "BuiltIn", "config": map[string]interface{}{"template": "production020-ranktable-template"}},
 	}
+	filterPlugins(spec, c.omitPlugins)
 	tmpl, ok := spec["template"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("missing template")
@@ -313,4 +316,43 @@ func saveYAML(path string, v interface{}) error {
 		return e
 	}
 	return os.WriteFile(path, b, 0644)
+}
+
+func filterPlugins(spec map[string]interface{}, omit map[string]bool) {
+	raw, ok := spec["plugins"].([]interface{})
+	if !ok || len(omit) == 0 {
+		return
+	}
+	kept := []interface{}{}
+	for _, p := range raw {
+		if m, ok := p.(map[string]interface{}); ok && (omit["*"] || omit[textValue(m, "name")]) {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	spec["plugins"] = kept
+}
+
+// OmitPlugins strips the named plugins from every spec the case submits.
+func (c *Case) OmitPlugins(names []string) {
+	if len(names) == 0 {
+		return
+	}
+	c.omitPlugins = map[string]bool{}
+	for _, n := range names {
+		c.omitPlugins[n] = true
+	}
+	filterPlugins(c.Input.Spec, c.omitPlugins)
+	if c.Scenario == nil {
+		return
+	}
+	filterPlugins(c.Scenario.InitialSpec, c.omitPlugins)
+	if c.Scenario.Baseline != nil {
+		filterPlugins(c.Scenario.Baseline.Spec, c.omitPlugins)
+		filterPlugins(mapValue(c.Scenario.Baseline.Patch, "spec"), c.omitPlugins)
+	}
+	for i := range c.Scenario.Steps {
+		filterPlugins(c.Scenario.Steps[i].Spec, c.omitPlugins)
+		filterPlugins(mapValue(c.Scenario.Steps[i].Patch, "spec"), c.omitPlugins)
+	}
 }

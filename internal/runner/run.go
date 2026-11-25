@@ -35,6 +35,7 @@ type Options struct {
 	FaultProxyControl, FaultProxyAPI, FaultProxyTokenFile       string
 	CaseDir, OutDir, Kubeconfig, RunID, Select, ControllerImage string
 	ControllerCommit                                            string
+	OmitPlugins                                                 []string
 	Hold                                                        time.Duration
 	Timeout                                                     time.Duration
 }
@@ -76,6 +77,9 @@ func Run(ctx context.Context, opt Options) (runErr error) {
 	cases, err := LoadCases(opt.CaseDir)
 	if err != nil {
 		return err
+	}
+	for i := range cases {
+		cases[i].OmitPlugins(opt.OmitPlugins)
 	}
 	if opt.RunID == "" {
 		opt.RunID = time.Now().UTC().Format("20060102-150405")
@@ -134,7 +138,7 @@ func Run(ctx context.Context, opt Options) (runErr error) {
 	}
 	if err = writeJSON(filepath.Join(root, "execution-plan.json"), map[string]interface{}{
 		"runID": opt.RunID, "controllerCommit": baseline, "selectedIDs": selectedIDs,
-		"caseSHA256": inputs,
+		"caseSHA256": inputs, "omitPlugins": opt.OmitPlugins,
 	}); err != nil {
 		return err
 	}
@@ -166,6 +170,9 @@ func Run(ctx context.Context, opt Options) (runErr error) {
 		return err
 	}
 	for _, c := range cases {
+		if len(selected) > 0 && !selected[c.ID] {
+			continue
+		}
 		if c.Format == "rollout-runner/v3" || c.Format == "rollout-runner/v4" || needsPartialScaleBoundary(c) {
 			if err = r.preflightRecovery(ctx); err != nil {
 				return err

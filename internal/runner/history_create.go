@@ -136,7 +136,7 @@ func (e *normalExecution) verifyHistoryReferences(ctx context.Context) (result e
 		// Every live Pod referencing this history must carry the historical
 		// template version, including terminating and surge instances.
 		spec := cloneMap(e.l.Model.Spec)
-		spec["template"] = map[string]interface{}{"roles": mapValue(u.Object, "data")["data"]}
+		spec["template"] = map[string]interface{}{"roles": revisionRoles(u.Object)}
 		model, err := readModel(spec)
 		if err != nil {
 			return e.historyFailure("INVALID_HISTORY: " + name)

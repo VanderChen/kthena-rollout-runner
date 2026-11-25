@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -29,7 +30,11 @@ func main() {
 	flag.StringVar(&o.ControllerCommit, "controller-commit", "", "tested controller source commit; recorded separately from catalogue baseline")
 	flag.DurationVar(&o.Hold, "hold", 0, "override each case hold window; 0 keeps its declared duration")
 	flag.DurationVar(&o.Timeout, "phase-timeout", 180*time.Second, "bounded wait for each expected transition")
+	omitPlugins := flag.String("omit-plugins", "", "comma-separated plugin names stripped from case specs (for controllers lacking them); * strips all")
 	flag.Parse()
+	if *omitPlugins != "" {
+		o.OmitPlugins = strings.Split(*omitPlugins, ",")
+	}
 	if o.Hold < 0 {
 		fmt.Fprintln(os.Stderr, "hold cannot be negative")
 		os.Exit(2)

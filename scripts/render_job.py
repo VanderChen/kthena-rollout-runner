@@ -46,6 +46,8 @@ def build_job(args):
                  f"--phase-timeout={args.phase_timeout_seconds}s"]
     if args.select:
         arguments.append(f"--select={args.select}")
+    if args.omit_plugins:
+        arguments.append(f"--omit-plugins={args.omit_plugins}")
     volumes = [{"name": "results", "persistentVolumeClaim": {"claimName": args.results_pvc}}]
     mounts = [{"name": "results", "mountPath": "/artifacts"}]
     if all(proxy):
@@ -73,6 +75,7 @@ def parser():
     p.add_argument("--controller-image", required=True, help="exact deployed controller image")
     p.add_argument("--controller-commit", required=True, help="source commit used to build controller image")
     p.add_argument("--case-dir", required=True, help="one directory below cases/, such as normal")
+    p.add_argument("--omit-plugins", default="", help="comma-separated plugin names stripped from case specs")
     p.add_argument("--select", default="", help="comma-separated case IDs; empty selects entire directory")
     p.add_argument("--run-id", required=True, help="unique attempt ID, at most 30 DNS characters")
     p.add_argument("--job-name", default="", help="defaults to rollout-<run-id>")

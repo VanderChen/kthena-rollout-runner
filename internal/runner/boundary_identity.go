@@ -165,6 +165,7 @@ func (e *normalExecution) identityBoundary(ctx context.Context, p ScenarioStep, 
 		if err != nil {
 			return err
 		}
+		fresh.GroupObjects = e.l.GroupObjects
 		fresh.ForeignResidueUIDs = forbidden
 		for _, kind := range []string{"controllerrevisions", "pods"} {
 			for _, o := range e.o.objects[kind] {
@@ -318,12 +319,7 @@ func identityCapacity(ms map[string]interface{}, pods []corev1.Pod, newOwner, ol
 }
 
 func identityOwned(object metav1.Object, owner string) bool {
-	for _, ref := range object.GetOwnerReferences() {
-		if string(ref.UID) == owner {
-			return true
-		}
-	}
-	return false
+	return ownerMatches(object.GetNamespace(), object.GetOwnerReferences(), owner)
 }
 
 func identityHistoryEvidence(ms map[string]interface{}, oldName string) error {

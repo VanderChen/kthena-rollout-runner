@@ -373,6 +373,7 @@ func completionSourceLedger(model NormalModel, prior *NormalLedger) (*NormalLedg
 	if err != nil {
 		return nil, err
 	}
+	fresh.GroupObjects = prior.GroupObjects
 	// The source resets Pod commitments, not the real A/B template history.
 	// Old current A must remain readable for the subsequent status boundary.
 	fresh.History = append([]NormalModel{}, prior.History...)

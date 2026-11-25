@@ -55,6 +55,11 @@ type ScopeMetric struct {
 	Ready       int    `json:"ready"`
 }
 type NormalLedger struct {
+	// GroupObjects selects the ServingGroup object, instead of its PodGroup,
+	// as the group-level evidence of the tested build (detected at preflight).
+	GroupObjects           bool                   `json:"servingGroupObjects,omitempty"`
+	CreatedGroups          map[string]bool        `json:"createdServingGroupUIDs,omitempty"`
+	PromotedGroups         map[string]bool        `json:"promotedServingGroupUIDs,omitempty"`
 	CompoundV2             bool                   `json:"compoundV2,omitempty"`
 	CompoundFormal         map[int]bool           `json:"compoundFormalOrdinals,omitempty"`
 	CompoundStarted        map[string]bool        `json:"compoundStarted,omitempty"`

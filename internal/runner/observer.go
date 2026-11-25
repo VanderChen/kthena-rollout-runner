@@ -46,20 +46,27 @@ type Observer struct {
 	err     error
 	ledger  *Ledger
 	normal  *NormalLedger
+	groups  bool
 }
 
 func NewObserver(ctx context.Context, client dynamic.Interface, ns, dir string) (*Observer, error) {
-	return newObserver(ctx, client, ns, dir, false)
+	return newObserver(ctx, client, ns, dir, false, false)
 }
 
-func newObserver(ctx context.Context, client dynamic.Interface, ns, dir string, plugins bool) (*Observer, error) {
+// newObserver journals one List/Watch stream per resource. groups adds the
+// ServingGroup stream of a build whose ServingGroups are objects; it is listed
+// first so that the owner of every listed Pod is already known.
+func newObserver(ctx context.Context, client dynamic.Interface, ns, dir string, plugins, groups bool) (*Observer, error) {
 	f, err := os.Create(filepath.Join(dir, "observations.jsonl"))
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	o := &Observer{cancel: cancel, objects: map[string]map[string]*unstructured.Unstructured{}, journal: f, encoder: json.NewEncoder(f)}
+	o := &Observer{cancel: cancel, objects: map[string]map[string]*unstructured.Unstructured{}, journal: f, encoder: json.NewEncoder(f), groups: groups}
 	resources := []schema.GroupVersionResource{PodGVR, MSGVR, PGGVR, CRGVR}
+	if groups {
+		resources = append([]schema.GroupVersionResource{SGGVR}, resources...)
+	}
 	if plugins {
 		resources = append(resources, schema.GroupVersionResource{Version: "v1", Resource: "services"}, schema.GroupVersionResource{Version: "v1", Resource: "configmaps"})
 	}
@@ -150,6 +157,15 @@ func (o *Observer) broken(kind string, err error) {
 	}
 }
 func (o *Observer) accept(kind, event string, u *unstructured.Unstructured) {
+	// Learn the ModelServing behind a ServingGroup before any ledger sees an
+	// object that the group owns; the two streams share no order.
+	if kind == SGGVR.Resource {
+		groupOwners.record(u)
+	} else {
+		for _, ref := range u.GetOwnerReferences() {
+			groupOwners.resolve(u.GetNamespace(), ref)
+		}
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.seq++

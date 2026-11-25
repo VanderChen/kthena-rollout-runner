@@ -430,12 +430,7 @@ func targetFacts(units []NormalUnit, target ScenarioTarget) (bool, string) {
 	return true, ""
 }
 func objectOwned(o *unstructured.Unstructured, uid string) bool {
-	for _, r := range o.GetOwnerReferences() {
-		if string(r.UID) == uid {
-			return true
-		}
-	}
-	return false
+	return ownerMatches(o.GetNamespace(), o.GetOwnerReferences(), uid)
 }
 func (e *normalExecution) pluginFacts(groups map[int]map[string][]NormalUnit) (bool, string) {
 	enabled := map[string]bool{}

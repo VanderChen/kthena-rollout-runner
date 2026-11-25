@@ -399,6 +399,7 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 		if err != nil {
 			return err
 		}
+		fresh.GroupObjects = e.l.GroupObjects
 		for uid, o := range e.o.objects["pods"] {
 			if objectOwned(o, e.l.Owner) {
 				if !e.l.Released[uid] || retained[o.GetName()] != o.GetUID() {
@@ -437,10 +438,5 @@ func (e *normalExecution) prepareSparseHistoryFixture(ctx context.Context) (resu
 }
 
 func ownedConfigMap(cm *corev1.ConfigMap, owner string) bool {
-	for _, ref := range cm.OwnerReferences {
-		if string(ref.UID) == owner {
-			return true
-		}
-	}
-	return false
+	return ownerMatches(cm.Namespace, cm.OwnerReferences, owner)
 }

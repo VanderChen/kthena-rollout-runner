@@ -130,7 +130,7 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 			res.Error += "; cleanup: " + err.Error()
 		}
 	}()
-	o, err := newObserver(ctx, r.dynamic, res.Namespace, dir, true)
+	o, err := newObserver(ctx, r.dynamic, res.Namespace, dir, true, r.groupObjects)
 	if err != nil {
 		res.Error = err.Error()
 		return
@@ -349,6 +349,7 @@ func (e *normalExecution) execute(ctx context.Context) error {
 		return err
 	}
 	e.l = l
+	l.GroupObjects = e.r.groupObjects
 	l.CanonicalEndpoints = e.c.normalFlow()
 	// Account for any readiness event that arrived between Create and arming.
 	if err = e.locked(func() error {

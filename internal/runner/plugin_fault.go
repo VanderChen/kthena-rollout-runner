@@ -33,7 +33,7 @@ func pluginRetryRule(id, caseID, namespace, owner string, old *corev1.Pod, cm *c
 		if cm == nil || cm.UID == "" || cm.Namespace != namespace || cm.DeletionTimestamp != nil {
 			return faultproxy.Rule{}, fmt.Errorf("ranktable cleanup requires actual owned ConfigMap UID")
 		}
-		if ref := metav1.GetControllerOf(cm); ref == nil || string(ref.UID) != owner {
+		if ref := metav1.GetControllerOf(cm); ref == nil || !ownerMatches(cm.Namespace, []metav1.OwnerReference{*ref}, owner) {
 			return faultproxy.Rule{}, fmt.Errorf("ranktable controller owner UID does not match")
 		}
 		for _, key := range []string{LabelGroup, LabelRole, LabelRoleID} {

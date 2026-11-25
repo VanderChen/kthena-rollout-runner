@@ -71,6 +71,9 @@ type Runner struct {
 	kube    kubernetes.Interface
 	dynamic dynamic.Interface
 	root    string
+	// groupObjects is detected at preflight: the tested build keeps every
+	// ServingGroup as an object that owns its Pods, PodGroup and Services.
+	groupObjects bool
 }
 
 func Run(ctx context.Context, opt Options) (runErr error) {
@@ -267,6 +270,23 @@ func (r *Runner) preflight(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// The object model is a fact of the tested build, not an option: the same
+	// case runs before and after the ServingGroup resource is introduced.
+	groupCRD, err := r.dynamic.Resource(crdGVR).Get(ctx, servingGroupCRD, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	r.groupObjects = err == nil
+	objectModel := map[string]interface{}{"servingGroupObjects": r.groupObjects}
+	if r.groupObjects {
+		objectModel["servingGroupCRDUID"] = groupCRD.GetUID()
+		objectModel["controllerPodTemplateLabels"] = deployment.Spec.Template.Labels
+		groupOwners.setLookup(func(namespace, name string) (*unstructured.Unstructured, error) {
+			lookupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			return r.dynamic.Resource(SGGVR).Namespace(namespace).Get(lookupCtx, name, metav1.GetOptions{})
+		})
+	}
 	deps, err := r.kube.AppsV1().Deployments("volcano-system").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -313,7 +333,7 @@ func (r *Runner) preflight(ctx context.Context) error {
 		provenance["runnerPod"] = pod
 	}
 	return writeJSON(filepath.Join(r.root, "environment.json"), map[string]interface{}{
-		"baseline": r.testedCommit(), "kubernetes": version, "nodes": nodes.Items, "controller": deployment, "controllerPods": controllerPods.Items, "volcano": deps.Items, "modelServingCRD": crd.Object, "options": r.opt, "runner": provenance,
+		"baseline": r.testedCommit(), "kubernetes": version, "nodes": nodes.Items, "controller": deployment, "controllerPods": controllerPods.Items, "volcano": deps.Items, "modelServingCRD": crd.Object, "objectModel": objectModel, "options": r.opt, "runner": provenance,
 	})
 }
 func (r *Runner) runCase(ctx context.Context, c Case) (res Result) {
@@ -383,7 +403,7 @@ func (r *Runner) runCase(ctx context.Context, c Case) (res Result) {
 			res.CleanupError = err.Error()
 		}
 	}()
-	obs, err := NewObserver(ctx, r.dynamic, res.Namespace, dir)
+	obs, err := newObserver(ctx, r.dynamic, res.Namespace, dir, false, r.groupObjects)
 	if err != nil {
 		res.Error = err.Error()
 		return
@@ -731,13 +751,7 @@ func finalFacts(l *Ledger, obj map[string]map[string]*unstructured.Unstructured,
 				return false
 			}
 		}
-		ownerOK := false
-		for _, ref := range pg.GetOwnerReferences() {
-			if string(ref.UID) == l.Owner {
-				ownerOK = true
-			}
-		}
-		if !ownerOK {
+		if !objectOwned(pg, l.Owner) {
 			return false
 		}
 		pgNames[pg.GetName()] = true

@@ -1791,7 +1791,22 @@
         "Not covered by an executable case: C12 after commit, C3 for an instance that is not yet established, upgrade takeover (NT14, NT15, NT17)."
       ],
       "coverage": "Contract and runner changed together in task 010. Runner: owner-chain identification, ServingGroup observation stream, object-model dependent fixtures and RC cut point, process invariants for the surge mark, same-name recreation and the instance record, new suite servinggroup-objects. Unit tests cover every new assertion with a rejected counter-example. Kind results for the build under test and the classification of failures are recorded in issues/features/010-modelserving-servinggroup-cr-impl-IP/evidence/runner-adaptation/REPORT.md; a wording revision is not conformance evidence.",
-      "commits": [],
+      "commits": [
+        "68e00f9b02bc68a9a1ab9e2819cac8f399880bb7",
+        "38ae8550f75f3782915e9f3602f81cab5cf3bdfc",
+        "a30cf08e3b39cfc75aee78d58a623c401b692fdd",
+        "f91b145c4ba97ff4215bc3563b04cbada5983901",
+        "b868c89d77560bb9822956c78fe43b14d9a08601",
+        "e014f740f492ef44d9be1e5f3114567e9bcd836c",
+        "b04213ba6e6cf6c10651ba298f1325e1cc1802ee",
+        "4508eaee1f41b8836fb1d8d4cdb91c3ef33bf26a",
+        "5eb6b58562a6b95d81a6fc5d3f93d8a7ec6b861e",
+        "3c6dd4a461f53ddfad11e6f4864f6afc2a077e7e",
+        "b72c5679261ab628f200c5354c0265edddfc96c6",
+        "cbcf29a56e541e4c09da227f53f91113e05ed4b4",
+        "cc1a9b5e05afed3145573e8519dea3b781e5f79a",
+        "26eff4f743f0cf99a4be5f8d3381146f3bdcd706"
+      ],
       "documents": [
         {
           "path": "docs/specs/README.md",

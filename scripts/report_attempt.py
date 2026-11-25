@@ -52,6 +52,36 @@ def case_reason(result):
     return "; ".join(parts)
 
 
+def serving_groups(result):
+    """Summarize the ServingGroup objects a case observed (builds that have them).
+
+    One entry per group name, in first-seen order: how many objects carried the
+    name, and for each object whether it was a surge, was promoted, was deleted
+    (and in the foreground) and which Failed/Drained conditions it showed.
+    """
+    objects = result.get("servingGroups")
+    if not isinstance(objects, list) or not objects:
+        return None
+    names = {}
+    for item in objects:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+            return None
+        facts = []
+        if item.get("surgeEver"):
+            facts.append("surge")
+        if item.get("promotedSequence"):
+            facts.append("promoted")
+        for value in item.get("conditionHistory") or []:
+            if value.startswith(("Failed=True", "Drained=True")):
+                facts.append(value)
+        if item.get("deletedSequence"):
+            facts.append("deleted(foreground)" if item.get("foregroundDeletion") else "deleted")
+        elif item.get("deletionRequestedSequence"):
+            facts.append("terminating")
+        names.setdefault(item["name"], []).append(" ".join(facts) or "live")
+    return {"objects": len(objects), "recreatedNames": sorted(n for n, v in names.items() if len(v) > 1), "byName": names}
+
+
 def job_evidence(attempt, environment, complete, all_pass, issues, inputs):
     job_path, pod_path = attempt / "job.json", attempt / "runner-pod.json"
     if not job_path.exists() and not pod_path.exists():
@@ -206,9 +236,13 @@ def build_report(attempt):
         if status in {"MISSING_RESULT", "EVIDENCE_CONFLICT"}:
             issues.append(f"{case_id}: {reason}")
         codes = sorted(set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}(?=:)", reason)))
-        cases.append({"id": case_id, "status": status, "runnerStatus": source_status,
-                      "failureCodes": codes, "reason": reason,
-                      "evidence": f"{case_id}/result.json" if path.is_file() else None})
+        row = {"id": case_id, "status": status, "runnerStatus": source_status,
+               "failureCodes": codes, "reason": reason,
+               "evidence": f"{case_id}/result.json" if path.is_file() else None}
+        groups = serving_groups(records[0]) if len(records) == 1 else None
+        if groups:
+            row["servingGroups"] = groups
+        cases.append(row)
     counts = dict(sorted(collections.Counter(row["status"] for row in cases).items()))
     complete = summary is not None and len(by_id) == len(expected) and not any(
         row["status"] in {"MISSING_RESULT", "EVIDENCE_CONFLICT", "NOT_RUN"} for row in cases)
@@ -246,6 +280,15 @@ def markdown(report, attempt, out):
             target = os.path.relpath(attempt / row["evidence"], out)
             link = f"[result.json]({target})"
         lines.append(f"| {row['id']} | {cell(row['status'])} | {cell(', '.join(row['failureCodes']))} | {cell(row['reason'])} | {link} |")
+    observed = [row for row in report["cases"] if row.get("servingGroups")]
+    if observed:
+        lines.extend(["", "## ServingGroup 对象", "",
+                      "被测版本的 ServingGroup 是对象。每例列出各组名下先后出现的对象（同名重建为多个，以 → 分隔）；逐事件记录见该例的 `servinggroups.json`。", "",
+                      "| 用例 | 对象数 | 同名重建 | 各组名下的对象 |", "| --- | --- | --- | --- |"])
+        for row in observed:
+            groups = row["servingGroups"]
+            detail = "; ".join(f"{name}: " + " → ".join(values) for name, values in groups["byName"].items())
+            lines.append(f"| {row['id']} | {groups['objects']} | {cell(', '.join(groups['recreatedNames']))} | {cell(detail)} |")
     if report["issues"]:
         lines.extend(["", "## 证据问题", ""])
         lines.extend("- " + issue for issue in report["issues"])

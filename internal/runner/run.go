@@ -56,6 +56,9 @@ type Result struct {
 	Violations      []string      `json:"violations,omitempty"`
 	Checkpoints     int           `json:"checkpoints"`
 	Releases        int           `json:"releases"`
+	// ServingGroups summarizes every ServingGroup object seen during the case
+	// (absent for a build without ServingGroup objects).
+	ServingGroups []GroupObject `json:"servingGroups,omitempty"`
 }
 type Summary struct {
 	RunID     string   `json:"runID"`
@@ -412,6 +415,10 @@ func (r *Runner) runCase(ctx context.Context, c Case) (res Result) {
 		if err := obs.Snapshot(filepath.Join(dir, "final-resources.yaml")); err != nil {
 			res.Status = "ERROR"
 			res.Error += "; snapshot: " + err.Error()
+		}
+		if err := obs.saveGroupStream(dir, &res); err != nil {
+			res.Status = "ERROR"
+			res.Error += "; ServingGroup stream: " + err.Error()
 		}
 		var observationErr error
 		res.Metrics, res.Sequence, res.Violations, observationErr = obs.Finalize()

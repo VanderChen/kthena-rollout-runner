@@ -56,6 +56,42 @@ class AttemptReportTest(unittest.TestCase):
         self.assertIn("| 用例 | 结果状态 |", (self.root / "failure-report.md").read_text())
         self.assertIn("| RUN-001 | PASS |", (self.root / "failure-report.md").read_text())
 
+    def test_serving_group_objects_are_reported_only_when_observed(self):
+        self.results("PASS", "PASS")
+        self.job(0, "Complete")
+        self.assertEqual(report_attempt.main(["--attempt", str(self.root)]), 0)
+        report = json.loads((self.root / "failure-report.json").read_text())
+        self.assertTrue(all("servingGroups" not in row for row in report["cases"]))
+        self.assertNotIn("ServingGroup 对象", (self.root / "failure-report.md").read_text())
+
+        groups = [{"name": "model-0", "uid": "a", "conditionHistory": ["Ready=True/AllInstancesReady", "Failed=True/MemberFaulty", "Drained=True/FaultyMembersGone"],
+                   "deletionRequestedSequence": 7, "foregroundDeletion": True, "deletedSequence": 9},
+                  {"name": "model-0", "uid": "b"},
+                  {"name": "model-3", "uid": "c", "surgeEver": True, "promotedSequence": 12},
+                  {"name": "model-4", "uid": "d", "surgeEver": True, "deletionRequestedSequence": 20}]
+        rows = [{"id": "RUN-001", "status": "PASS", "servingGroups": groups}, {"id": "RUN-002", "status": "PASS"}]
+        for row in rows:
+            self.write(f"{row['id']}/result.json", row)
+        self.write("summary.json", {"runID": "attempt", "kthenaBaseline": "commit", "selected": 2, "passed": 2, "results": rows})
+        self.assertEqual(report_attempt.main(["--attempt", str(self.root)]), 0)
+        report = json.loads((self.root / "failure-report.json").read_text())
+        observed = report["cases"][0]["servingGroups"]
+        self.assertEqual(observed["objects"], 4)
+        self.assertEqual(observed["recreatedNames"], ["model-0"])
+        self.assertEqual(observed["byName"]["model-0"], ["Failed=True/MemberFaulty Drained=True/FaultyMembersGone deleted(foreground)", "live"])
+        self.assertEqual(observed["byName"]["model-3"], ["surge promoted"])
+        self.assertEqual(observed["byName"]["model-4"], ["surge terminating"])
+        self.assertNotIn("servingGroups", report["cases"][1])
+        markdown = (self.root / "failure-report.md").read_text()
+        self.assertIn("## ServingGroup 对象", markdown)
+        self.assertIn("| RUN-001 | 4 | model-0 | model-0: Failed=True/MemberFaulty Drained=True/FaultyMembersGone deleted(foreground) → live; model-3: surge promoted; model-4: surge terminating |", markdown)
+        self.assertNotIn("| RUN-002 | 0 |", markdown)
+
+    def test_malformed_serving_group_summary_is_not_reported(self):
+        self.assertIsNone(report_attempt.serving_groups({"servingGroups": [{"uid": "nameless"}]}))
+        self.assertIsNone(report_attempt.serving_groups({"servingGroups": "model-0"}))
+        self.assertIsNone(report_attempt.serving_groups({}))
+
     def test_product_failure_keeps_reason(self):
         self.results("PASS", "FAIL")
         self.job(1, "Failed")

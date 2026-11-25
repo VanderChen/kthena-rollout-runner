@@ -47,6 +47,8 @@ type Observer struct {
 	ledger  *Ledger
 	normal  *NormalLedger
 	groups  bool
+	// groupStream reduces the ServingGroup stream; nil without that stream.
+	groupStream *GroupStream
 }
 
 func NewObserver(ctx context.Context, client dynamic.Interface, ns, dir string) (*Observer, error) {
@@ -63,6 +65,9 @@ func newObserver(ctx context.Context, client dynamic.Interface, ns, dir string, 
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	o := &Observer{cancel: cancel, objects: map[string]map[string]*unstructured.Unstructured{}, journal: f, encoder: json.NewEncoder(f), groups: groups}
+	if groups {
+		o.groupStream = newGroupStream()
+	}
 	resources := []schema.GroupVersionResource{PodGVR, MSGVR, PGGVR, CRGVR}
 	if groups {
 		resources = append([]schema.GroupVersionResource{SGGVR}, resources...)
@@ -169,8 +174,12 @@ func (o *Observer) accept(kind, event string, u *unstructured.Unstructured) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.seq++
-	if err := o.encoder.Encode(Observation{Sequence: o.seq, Received: time.Now().UTC(), Kind: kind, Event: event, Object: u}); err != nil {
+	received := time.Now().UTC()
+	if err := o.encoder.Encode(Observation{Sequence: o.seq, Received: received, Kind: kind, Event: event, Object: u}); err != nil {
 		o.err = err
+	}
+	if kind == SGGVR.Resource {
+		o.groupStream.observe(o.seq, received, event, u)
 	}
 	if o.normal != nil {
 		o.normal.Before(kind, event, u, o.objects)

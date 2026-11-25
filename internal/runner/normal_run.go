@@ -153,6 +153,13 @@ func (r *Runner) runNormalAttempt(ctx context.Context, c Case, attempt int) (res
 			res.Error += "; " + err.Error()
 			res.Status = "ERROR"
 		}
+		if o.groupStream != nil {
+			res.ServingGroups = o.groupStream.Summary()
+			if err := writeJSON(filepath.Join(dir, "servinggroups.json"), o.groupStream); err != nil {
+				res.Error += "; " + err.Error()
+				res.Status = "ERROR"
+			}
+		}
 		if o.normal != nil {
 			res.NormalStarts = append([]NormalStart{}, o.normal.Starts...)
 			res.NormalMetrics = o.normal.Metrics(o.objects["pods"])

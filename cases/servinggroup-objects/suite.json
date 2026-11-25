@@ -1,0 +1,425 @@
+{
+  "format": "rollout-runner/suite-v1",
+  "controllerCommit": "538b2825c06bc1e8c5392d18f18f84faee9fca95",
+  "contractVersion": "2.14",
+  "requires": "servingGroupObjects",
+  "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+  "developmentScope": "RUN-653..665; ServingGroup objects: same-name recreation, user deletion, occupied ordinal, surge mark, finite grace across a controller process change, unsynced ServingGroup informer, one failing ServingGroup create/status write/direct read",
+  "relatedCoverage": {
+    "NT3": "cases/restart-convergence RC-01 (scripts/run-restart-convergence.py selects the ServingGroup DELETE cut point)",
+    "NT10": "process invariants SURGE_PROMOTION_* and the settled surge-mark check on servinggroup-compound-v2 RUN-627 (SG-C03), RUN-648 (SG-P08), RUN-650 (SG-P10)",
+    "NT11": "process invariant SURGE_PROMOTED_OUTSIDE_RANGE on servinggroup-compound-v2 RUN-621 (SG-S04)"
+  },
+  "cases": [
+    {
+      "id": "RUN-653",
+      "designID": "NT1",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready",
+      "action": "滚动替换的同名重建：N=3、U=1、S=0，A→B，钉住组2的Pod使其不消失",
+      "expect": "ServingGroup model-2带deletionTimestamp且仍在；其间没有第二个model-2对象，也没有model-2的新Pod。放开后旧对象消失，新对象UID不同，Pod名字与原来相同",
+      "mustReject": "旧Pod还在时新对象已经建出来；新对象沿用了旧的账本"
+    },
+    {
+      "id": "RUN-654",
+      "designID": "NT2",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 2,
+        "plugins": "omitted",
+        "recovery": "ServingGroupRecreate",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready",
+      "action": "整组恢复的两步删除：ServingGroupRecreate、grace=0，组0的entry容器异常重启且不Ready，同组worker健康",
+      "expect": "先只有故障成员被删；它消失之前健康成员没有deletionTimestamp；之后组进入终止中，健康成员被删；全部消失之后在同一个序号上重建，版本按序号和partition；组1不动",
+      "mustReject": "故障成员没停就删了其余成员；重建落到别的序号；重建用错版本"
+    },
+    {
+      "id": "RUN-655",
+      "designID": "NT4",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready",
+      "action": "用户以Foreground方式删除ServingGroup model-1（N=3，每组entry+worker）",
+      "expect": "同名的ServingGroup对象回来（新UID）；旧Pod全部消失之前没有该组的新Pod；其余组不动",
+      "mustReject": "新旧两批Pod并存；其余组被替换"
+    },
+    {
+      "id": "RUN-656",
+      "designID": "NT4",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready",
+      "action": "用户以Background方式删除ServingGroup model-1（N=3，每组entry+worker）",
+      "expect": "同名的ServingGroup对象回来（新UID）；旧Pod全部消失之前没有该组的新Pod；其余组不动",
+      "mustReject": "新旧两批Pod并存；其余组被替换"
+    },
+    {
+      "id": "RUN-657",
+      "designID": "NT4",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready",
+      "action": "用户以Orphan方式删除ServingGroup model-1（N=3，每组entry+worker）",
+      "expect": "ServingGroup对象回来（新UID），成员Pod的UID不变并被收养，版本取Pod的revision标签",
+      "mustReject": "orphan的Pod被删，或者一直没人管"
+    },
+    {
+      "id": "RUN-658",
+      "designID": "NT6",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        }
+      },
+      "initial": "A全Ready",
+      "action": "有人占了名字：事先建一个不属于该ModelServing的ServingGroup model-3，再把replicas从3扩到4",
+      "expect": "不收为己有，不删它；这个序号建不出来，也不换别的序号顶替；RolloutBlocked的reason是OrdinalOccupied；外来对象被删除之后补上序号3",
+      "mustReject": "把别人的对象当成自己的；静默地少一个组"
+    },
+    {
+      "id": "RUN-659",
+      "designID": "NT9",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "A全Ready",
+      "action": "surge标记的生命周期：N=3、U=0、S=1，A→B走到完成",
+      "expect": "model-3的ServingGroup创建时就带注解，它的Pod带同名同值的副本；序号0–2的组和它们的Pod从来不带；结束时没有带注解的ServingGroup",
+      "mustReject": "标记是后加的；正式的组带过标记；结束时还有带标记的组；对象和Pod上的不同步"
+    },
+    {
+      "id": "RUN-660",
+      "designID": "NT18",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 2,
+        "plugins": "omitted",
+        "recovery": "RoleRecreate",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        },
+        "restartGracePeriodSeconds": 60
+      },
+      "initial": "A全Ready",
+      "action": "重启故障的grace跨进程重新计：RoleRecreate、grace=60。t=0令组0的entry容器重启且不Ready；t=20重启controller（同镜像，Deployment重建Pod）；开启选主时新进程约需一个租约期接管，须在t=60之前看到故障",
+      "expect": "新进程从它完成初始同步起重新计满60秒：范围（entry和worker）在新进程同步后约60秒被重建，此前UID不变；不在t≈60重建",
+      "mustReject": "新进程一看到就重建；在t≈60重建（把起点带过了进程）；一直不重建",
+      "environment": "单个controller副本；本例会终止并重建controller进程，不能与其他用例并行"
+    },
+    {
+      "id": "RUN-661",
+      "designID": "NT19",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 2,
+        "plugins": "omitted",
+        "recovery": "RoleRecreate",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 1
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 0,
+          "u": 1
+        },
+        "restartGracePeriodSeconds": 60
+      },
+      "initial": "A全Ready",
+      "action": "重启故障的grace跨进程重新计：RoleRecreate、grace=60。t=0令组0的entry容器重启且不Ready；t=20删除leader，由另一个副本接管（两副本、开启选主）；开启选主时新进程约需一个租约期接管，须在t=60之前看到故障",
+      "expect": "新进程从它完成初始同步起重新计满60秒：范围（entry和worker）在新进程同步后约60秒被重建，此前UID不变；不在t≈60重建",
+      "mustReject": "新进程一看到就重建；在t≈60重建（把起点带过了进程）；一直不重建",
+      "environment": "两个controller副本并显式 --leader-elect=true"
+    },
+    {
+      "id": "RUN-662",
+      "designID": "NT45",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "A全Ready",
+      "action": "ServingGroup的informer没同步：终止controller，挂住新进程对servinggroups的初始LIST，期间提交B，再放开",
+      "expect": "挂住期间不把“没有组”当事实：A的组和Pod保持原UID，不新建组；放开之后按预算滚到B，正式组各替换一次、surge只建一个并被回收",
+      "mustReject": "多建组；把撞名字当错误长时间退避；挂住期间删除或重建健康的组",
+      "environment": "单个controller副本；本例会终止并重建controller进程，不能与其他用例并行"
+    },
+    {
+      "id": "RUN-663",
+      "designID": "8.6#10",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交B并停在surge未就绪；令controller对ServingGroup的创建（POST）失败一次（503），随后恢复",
+      "expect": "错误不视为空对象集或成功完成；重试幂等：surge组只建一个并被回收，正式组各替换一次；原健康容量不被无预算清空；恢复后自动全B",
+      "mustReject": "失败之后重复创建或重复删除ServingGroup；把读失败当成没有组；停住不再推进"
+    },
+    {
+      "id": "RUN-664",
+      "designID": "8.6#10",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交B并停在surge未就绪；令controller对ServingGroup的status写入（PUT status）失败一次（503），随后恢复",
+      "expect": "错误不视为空对象集或成功完成；重试幂等：surge组只建一个并被回收，正式组各替换一次；原健康容量不被无预算清空；恢复后自动全B",
+      "mustReject": "失败之后重复创建或重复删除ServingGroup；把读失败当成没有组；停住不再推进"
+    },
+    {
+      "id": "RUN-665",
+      "designID": "8.6#10",
+      "group": "ServingGroup对象",
+      "kind": "运行",
+      "contract": "2.14",
+      "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7",
+      "config": {
+        "coordination": "omitted",
+        "mode": "SG",
+        "n": 3,
+        "plugins": "omitted",
+        "recovery": "omitted",
+        "roles": {
+          "f": {
+            "r": 1,
+            "w": 0
+          }
+        },
+        "top": {
+          "p": 0,
+          "s": 1,
+          "u": 0
+        }
+      },
+      "initial": "A全Ready",
+      "action": "提交B并停在surge未就绪；令controller对ServingGroup的直读（命名空间内的LIST）失败一次（503），随后恢复",
+      "expect": "错误不视为空对象集或成功完成；重试幂等：surge组只建一个并被回收，正式组各替换一次；原健康容量不被无预算清空；恢复后自动全B",
+      "mustReject": "失败之后重复创建或重复删除ServingGroup；把读失败当成没有组；停住不再推进"
+    }
+  ],
+  "inputs": {
+    "RUN-653": "8f09778f6f9bfbf1ba27ba6fdc2969f3f7bb4f80ec88b39bea87ed814461c50d",
+    "RUN-654": "fa4df4f2e00914879d9cce309811ed845a03d64b6ef83d6b41779a956a3d637e",
+    "RUN-655": "d278769fef66ef5670657b9f6f2136138aebc5bdbceb76a31facfbfca1ba04ff",
+    "RUN-656": "104576edf18c772e15df2109b8f1673745be6ba4f5ebd99db165c10cf3e17cd0",
+    "RUN-657": "ef76accf99775212929556013eb819f3b3c92e0774897fc3fced2535d5241c20",
+    "RUN-658": "859bedb5a68fc0e163ccdebf7a1e64d2575a4f993f6dd3b9cf727b427fe26339",
+    "RUN-659": "cf3ee75102fce11efd7d341db690b96bfbe54a479474a87d24d861ec6f46c822",
+    "RUN-660": "ba4f488e7ac757813429794526e148877e912109493c747122f491686be17801",
+    "RUN-661": "e4c9a1e5a35f43c4c617cb96c397d7f1afd06ae2f9141ab5bffc629741041bba",
+    "RUN-662": "5bf5eb1857f0929c24c2e1b0f5a265afccc686e84dc8945996c99f5c2dece633",
+    "RUN-663": "d79673b64d55a7dbbf957e8da5351a6dffef514b626fff51fbfceebd55acba44",
+    "RUN-664": "1e42cdd6302c822030c68117aafe9b4921b0a747da5d7abd27c055509c46f4f7",
+    "RUN-665": "04a2d9d8bf19e4af81a82a026b4c0820807a92308ef925e643f95e1c3ff5f167"
+  }
+}

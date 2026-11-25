@@ -1,0 +1,246 @@
+"format": "rollout-runner/v3"
+"id": "RUN-658"
+"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"scenario":
+  "requires": "servingGroupObjects"
+  "source":
+    "id": "RUN-658"
+    "designID": "NT6"
+    "group": "ServingGroup对象"
+    "kind": "运行"
+    "contract": "2.14"
+    "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7"
+    "config":
+      "coordination": "omitted"
+      "mode": "SG"
+      "n": 3
+      "plugins": "omitted"
+      "recovery": "omitted"
+      "roles":
+        "f":
+          "r": 1
+          "w": 0
+      "top":
+        "p": 0
+        "s": 0
+        "u": 1
+    "initial": "A全Ready"
+    "action": "有人占了名字：事先建一个不属于该ModelServing的ServingGroup model-3，再把replicas从3扩到4"
+    "expect": "不收为己有，不删它；这个序号建不出来，也不换别的序号顶替；RolloutBlocked的reason是OrdinalOccupied；外来对象被删除之后补上序号3"
+    "mustReject": "把别人的对象当成自己的；静默地少一个组"
+  "profile": "controlled"
+  "initialSpec":
+    "template":
+      "roles":
+        -
+          "name": "frontend"
+          "replicas": 1
+          "workerReplicas": 0
+          "entryTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "sleep 3600"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+    "replicas": 3
+    "schedulerName": "volcano"
+    "rolloutStrategy":
+      "type": "ServingGroupRollingUpdate"
+      "rollingUpdateConfiguration":
+        "partition": 0
+        "maxSurge": 0
+        "maxUnavailable": 1
+  "steps":
+    -
+      "name": "foreign-object-takes-the-name-model-3"
+      "action": "create-foreign-group"
+      "until": "settled"
+      "release": "none"
+      "holdSeconds": 0
+      "stableSeconds": 10
+      "expect":
+        "noReplacement": true
+        "noNewRevision": true
+        "servingGroups":
+          -
+            "name": "model-3"
+            "objects": 1
+            "exists": true
+            "owned": false
+            "pods": 0
+      "foreignGroup": 3
+      "timeoutSeconds": 420
+    -
+      "name": "scale-out-to-4-while-ordinal-3-is-occupied"
+      "action": "update"
+      "until": "conditions"
+      "release": "one"
+      "holdSeconds": 30
+      "stableSeconds": 0
+      "expect":
+        "noNewRevision": true
+        "servingGroups":
+          -
+            "name": "model-3"
+            "objects": 1
+            "exists": true
+            "owned": false
+            "pods": 0
+            "uidSameAs": "foreign-object-takes-the-name-model-3"
+          -
+            "name": "model-4"
+            "objects": 0
+            "exists": false
+            "pods": 0
+          -
+            "name": "model-0"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+          -
+            "name": "model-1"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+          -
+            "name": "model-2"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+        "modelServingConditions":
+          "RolloutBlocked": "True/OrdinalOccupied"
+      "spec":
+        "template":
+          "roles":
+            -
+              "name": "frontend"
+              "replicas": 1
+              "workerReplicas": 0
+              "entryTemplate":
+                "metadata":
+                  "annotations":
+                    "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                "spec":
+                  "terminationGracePeriodSeconds": 1
+                  "containers":
+                    -
+                      "name": "workload"
+                      "image": "busybox:1.36"
+                      "imagePullPolicy": "IfNotPresent"
+                      "command":
+                        - "sh"
+                        - "-c"
+                        - "sleep 3600"
+                      "env":
+                        -
+                          "name": "ROLLOUT_VERSION"
+                          "value": "A"
+                      "readinessProbe":
+                        "exec":
+                          "command":
+                            - "test"
+                            - "-f"
+                            - "/tmp/ready"
+                        "periodSeconds": 1
+                        "failureThreshold": 1
+                      "resources":
+                        "requests":
+                          "cpu": "5m"
+                          "memory": "4Mi"
+        "replicas": 4
+        "schedulerName": "volcano"
+        "rolloutStrategy":
+          "type": "ServingGroupRollingUpdate"
+          "rollingUpdateConfiguration":
+            "partition": 0
+            "maxSurge": 0
+            "maxUnavailable": 1
+      "conditions":
+        -
+          "kind": "unit"
+          "version": "A"
+          "ready": true
+          "count": 3
+      "timeoutSeconds": 420
+    -
+      "name": "foreign-object-removed-and-ordinal-3-is-filled"
+      "action": "delete-serving-group"
+      "until": "settled"
+      "release": "one"
+      "holdSeconds": 0
+      "stableSeconds": 30
+      "expect":
+        "noNewRevision": true
+        "targets":
+          -
+            "scope": "SG"
+            "versions":
+              "A": 4
+        "servingGroups":
+          -
+            "name": "model-3"
+            "objects": 2
+            "exists": true
+            "owned": true
+            "terminating": false
+            "uidDiffersFrom": "foreign-object-takes-the-name-model-3"
+          -
+            "name": "model-4"
+            "objects": 0
+            "exists": false
+          -
+            "name": "model-0"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+          -
+            "name": "model-1"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+          -
+            "name": "model-2"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+      "groupDelete":
+        "group": 3
+        "propagation": "Background"
+      "timeoutSeconds": 420

@@ -1,0 +1,157 @@
+"format": "rollout-runner/v3"
+"id": "RUN-660"
+"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"scenario":
+  "requires": "servingGroupObjects"
+  "source":
+    "id": "RUN-660"
+    "designID": "NT18"
+    "group": "ServingGroup对象"
+    "kind": "运行"
+    "contract": "2.14"
+    "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7"
+    "config":
+      "coordination": "omitted"
+      "mode": "SG"
+      "n": 2
+      "plugins": "omitted"
+      "recovery": "RoleRecreate"
+      "roles":
+        "f":
+          "r": 1
+          "w": 1
+      "top":
+        "p": 0
+        "s": 0
+        "u": 1
+      "restartGracePeriodSeconds": 60
+    "initial": "A全Ready"
+    "action": "重启故障的grace跨进程重新计：RoleRecreate、grace=60。t=0令组0的entry容器重启且不Ready；t=20重启controller（同镜像，Deployment重建Pod）；开启选主时新进程约需一个租约期接管，须在t=60之前看到故障"
+    "expect": "新进程从它完成初始同步起重新计满60秒：范围（entry和worker）在新进程同步后约60秒被重建，此前UID不变；不在t≈60重建"
+    "mustReject": "新进程一看到就重建；在t≈60重建（把起点带过了进程）；一直不重建"
+    "environment": "单个controller副本；本例会终止并重建controller进程，不能与其他用例并行"
+  "profile": "controlled"
+  "initialSpec":
+    "template":
+      "roles":
+        -
+          "name": "frontend"
+          "replicas": 1
+          "workerReplicas": 1
+          "entryTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "trap 'exit 42' USR1; while :; do sleep 1 & wait $!; done"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+              "restartPolicy": "Always"
+          "workerTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-worker\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "trap 'exit 42' USR1; while :; do sleep 1 & wait $!; done"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+              "restartPolicy": "Always"
+      "restartGracePeriodSeconds": 60
+    "replicas": 2
+    "schedulerName": "volcano"
+    "recoveryPolicy": "RoleRecreate"
+    "rolloutStrategy":
+      "type": "ServingGroupRollingUpdate"
+      "rollingUpdateConfiguration":
+        "partition": 0
+        "maxSurge": 0
+        "maxUnavailable": 1
+  "steps":
+    -
+      "name": "entry-restarts-and-the-controller-process-changes-inside-the-grace"
+      "action": "fault-member-across-process"
+      "until": "settled"
+      "release": "one"
+      "holdSeconds": 0
+      "stableSeconds": 30
+      "expect":
+        "noNewRevision": true
+        "targets":
+          -
+            "scope": "SG"
+            "versions":
+              "A": 2
+        "servingGroups":
+          -
+            "name": "model-0"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+            "seen":
+              - "frontend/0:Draining(0)"
+              - "frontend/0:Established(1)"
+            "neverSeen":
+              - "Failed=True"
+          -
+            "name": "model-1"
+            "objects": 1
+            "exists": true
+            "terminating": false
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+      "containerRestart":
+        "group": 0
+        "role": "frontend"
+        "ordinal": 0
+        "member": "entry"
+      "processChange": "restart-controller"
+      "timeoutSeconds": 420

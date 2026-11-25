@@ -1,0 +1,187 @@
+"format": "rollout-runner/v3"
+"id": "RUN-665"
+"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"scenario":
+  "requires": "servingGroupObjects"
+  "source":
+    "id": "RUN-665"
+    "designID": "8.6#10"
+    "group": "ServingGroup对象"
+    "kind": "运行"
+    "contract": "2.14"
+    "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7"
+    "config":
+      "coordination": "omitted"
+      "mode": "SG"
+      "n": 3
+      "plugins": "omitted"
+      "recovery": "omitted"
+      "roles":
+        "f":
+          "r": 1
+          "w": 0
+      "top":
+        "p": 0
+        "s": 1
+        "u": 0
+    "initial": "A全Ready"
+    "action": "提交B并停在surge未就绪；令controller对ServingGroup的直读（命名空间内的LIST）失败一次（503），随后恢复"
+    "expect": "错误不视为空对象集或成功完成；重试幂等：surge组只建一个并被回收，正式组各替换一次；原健康容量不被无预算清空；恢复后自动全B"
+    "mustReject": "失败之后重复创建或重复删除ServingGroup；把读失败当成没有组；停住不再推进"
+  "profile": "controlled"
+  "initialSpec":
+    "template":
+      "roles":
+        -
+          "name": "frontend"
+          "replicas": 1
+          "workerReplicas": 0
+          "entryTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "sleep 3600"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+    "replicas": 3
+    "schedulerName": "volcano"
+    "rolloutStrategy":
+      "type": "ServingGroupRollingUpdate"
+      "rollingUpdateConfiguration":
+        "partition": 0
+        "maxSurge": 1
+        "maxUnavailable": 0
+  "steps":
+    -
+      "name": "B-surge-blocked-with-all-old-A-healthy"
+      "action": "update"
+      "until": "conditions"
+      "release": "none"
+      "holdSeconds": 5
+      "stableSeconds": 0
+      "expect": {}
+      "spec":
+        "template":
+          "roles":
+            -
+              "name": "frontend"
+              "replicas": 1
+              "workerReplicas": 0
+              "entryTemplate":
+                "metadata":
+                  "annotations":
+                    "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                "spec":
+                  "terminationGracePeriodSeconds": 1
+                  "containers":
+                    -
+                      "name": "workload"
+                      "image": "busybox:1.36"
+                      "imagePullPolicy": "IfNotPresent"
+                      "command":
+                        - "sh"
+                        - "-c"
+                        - "sleep 3600"
+                      "env":
+                        -
+                          "name": "ROLLOUT_VERSION"
+                          "value": "B"
+                      "readinessProbe":
+                        "exec":
+                          "command":
+                            - "test"
+                            - "-f"
+                            - "/tmp/ready"
+                        "periodSeconds": 1
+                        "failureThreshold": 1
+                      "resources":
+                        "requests":
+                          "cpu": "5m"
+                          "memory": "4Mi"
+        "replicas": 3
+        "schedulerName": "volcano"
+        "rolloutStrategy":
+          "type": "ServingGroupRollingUpdate"
+          "rollingUpdateConfiguration":
+            "partition": 0
+            "maxSurge": 1
+            "maxUnavailable": 0
+      "conditions":
+        -
+          "kind": "running-not-ready"
+          "role": "frontend"
+          "version": "B"
+          "count": 1
+      "timeoutSeconds": 420
+    -
+      "name": "one-real-ServingGroup-API-error-and-autonomous-B-recovery"
+      "action": "retry-api-error"
+      "until": "settled"
+      "release": "one"
+      "holdSeconds": 0
+      "stableSeconds": 30
+      "expect":
+        "targets":
+          -
+            "scope": "SG"
+            "versions":
+              "B": 3
+        "servingGroups":
+          -
+            "name": "model-3"
+            "objects": 1
+            "exists": false
+            "pods": 0
+          -
+            "name": "model-4"
+            "objects": 0
+            "exists": false
+          -
+            "name": "model-0"
+            "objects": 2
+            "exists": true
+            "terminating": false
+            "uidDiffersFrom": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+          -
+            "name": "model-1"
+            "objects": 2
+            "exists": true
+            "terminating": false
+            "uidDiffersFrom": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+          -
+            "name": "model-2"
+            "objects": 2
+            "exists": true
+            "terminating": false
+            "uidDiffersFrom": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+      "timeoutSeconds": 420

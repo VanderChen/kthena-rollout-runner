@@ -1,0 +1,219 @@
+"format": "rollout-runner/v3"
+"id": "RUN-653"
+"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"scenario":
+  "requires": "servingGroupObjects"
+  "source":
+    "id": "RUN-653"
+    "designID": "NT1"
+    "group": "ServingGroup对象"
+    "kind": "运行"
+    "contract": "2.14"
+    "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7"
+    "config":
+      "coordination": "omitted"
+      "mode": "SG"
+      "n": 3
+      "plugins": "omitted"
+      "recovery": "omitted"
+      "roles":
+        "f":
+          "r": 1
+          "w": 0
+      "top":
+        "p": 0
+        "s": 0
+        "u": 1
+    "initial": "A全Ready"
+    "action": "滚动替换的同名重建：N=3、U=1、S=0，A→B，钉住组2的Pod使其不消失"
+    "expect": "ServingGroup model-2带deletionTimestamp且仍在；其间没有第二个model-2对象，也没有model-2的新Pod。放开后旧对象消失，新对象UID不同，Pod名字与原来相同"
+    "mustReject": "旧Pod还在时新对象已经建出来；新对象沿用了旧的账本"
+  "profile": "controlled"
+  "initialSpec":
+    "template":
+      "roles":
+        -
+          "name": "frontend"
+          "replicas": 1
+          "workerReplicas": 0
+          "entryTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "sleep 3600"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+    "replicas": 3
+    "schedulerName": "volcano"
+    "rolloutStrategy":
+      "type": "ServingGroupRollingUpdate"
+      "rollingUpdateConfiguration":
+        "partition": 0
+        "maxSurge": 0
+        "maxUnavailable": 1
+  "steps":
+    -
+      "name": "pin-the-pod-of-group-2"
+      "action": "pin"
+      "until": "settled"
+      "release": "none"
+      "holdSeconds": 0
+      "stableSeconds": 0
+      "expect":
+        "noReplacement": true
+        "noNewRevision": true
+      "conditions":
+        -
+          "kind": "unit"
+          "version": "A"
+          "ordinal": 2
+          "count": 1
+      "timeoutSeconds": 420
+    -
+      "name": "rolling-replacement-of-group-2-begins"
+      "action": "update"
+      "until": "conditions"
+      "release": "one"
+      "holdSeconds": 0
+      "stableSeconds": 0
+      "expect": {}
+      "spec":
+        "template":
+          "roles":
+            -
+              "name": "frontend"
+              "replicas": 1
+              "workerReplicas": 0
+              "entryTemplate":
+                "metadata":
+                  "annotations":
+                    "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                "spec":
+                  "terminationGracePeriodSeconds": 1
+                  "containers":
+                    -
+                      "name": "workload"
+                      "image": "busybox:1.36"
+                      "imagePullPolicy": "IfNotPresent"
+                      "command":
+                        - "sh"
+                        - "-c"
+                        - "sleep 3600"
+                      "env":
+                        -
+                          "name": "ROLLOUT_VERSION"
+                          "value": "B"
+                      "readinessProbe":
+                        "exec":
+                          "command":
+                            - "test"
+                            - "-f"
+                            - "/tmp/ready"
+                        "periodSeconds": 1
+                        "failureThreshold": 1
+                      "resources":
+                        "requests":
+                          "cpu": "5m"
+                          "memory": "4Mi"
+        "replicas": 3
+        "schedulerName": "volcano"
+        "rolloutStrategy":
+          "type": "ServingGroupRollingUpdate"
+          "rollingUpdateConfiguration":
+            "partition": 0
+            "maxSurge": 0
+            "maxUnavailable": 1
+      "conditions":
+        -
+          "kind": "terminating"
+          "version": "A"
+          "ordinal": 2
+          "count": 1
+      "timeoutSeconds": 420
+    -
+      "name": "old-object-keeps-the-name-while-its-pod-remains"
+      "action": "observe"
+      "until": "conditions"
+      "release": "none"
+      "holdSeconds": 20
+      "stableSeconds": 0
+      "expect":
+        "servingGroups":
+          -
+            "name": "model-2"
+            "objects": 1
+            "exists": true
+            "terminating": true
+            "uidSameAs": "baseline"
+            "podUIDsSameAs": "baseline"
+      "conditions":
+        -
+          "kind": "terminating"
+          "version": "A"
+          "ordinal": 2
+          "count": 1
+      "timeoutSeconds": 420
+    -
+      "name": "release-the-pod-and-converge"
+      "action": "unpin"
+      "until": "settled"
+      "release": "one"
+      "holdSeconds": 0
+      "stableSeconds": 30
+      "expect":
+        "targets":
+          -
+            "scope": "SG"
+            "versions":
+              "B": 3
+        "servingGroups":
+          -
+            "name": "model-2"
+            "objects": 2
+            "exists": true
+            "terminating": false
+            "uidDiffersFrom": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+            "foregroundDeletions": 1
+          -
+            "name": "model-1"
+            "objects": 2
+            "exists": true
+            "terminating": false
+            "uidDiffersFrom": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+          -
+            "name": "model-0"
+            "objects": 2
+            "exists": true
+            "terminating": false
+            "uidDiffersFrom": "baseline"
+            "podNamesSameAs": "baseline"
+            "podUIDsDisjointFrom": "baseline"
+      "timeoutSeconds": 420

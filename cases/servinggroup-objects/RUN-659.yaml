@@ -1,0 +1,203 @@
+"format": "rollout-runner/v3"
+"id": "RUN-659"
+"baseline": "538b2825c06bc1e8c5392d18f18f84faee9fca95"
+"scenario":
+  "requires": "servingGroupObjects"
+  "source":
+    "id": "RUN-659"
+    "designID": "NT9"
+    "group": "ServingGroup对象"
+    "kind": "运行"
+    "contract": "2.14"
+    "reference": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md#8.7"
+    "config":
+      "coordination": "omitted"
+      "mode": "SG"
+      "n": 3
+      "plugins": "omitted"
+      "recovery": "omitted"
+      "roles":
+        "f":
+          "r": 1
+          "w": 0
+      "top":
+        "p": 0
+        "s": 1
+        "u": 0
+    "initial": "A全Ready"
+    "action": "surge标记的生命周期：N=3、U=0、S=1，A→B走到完成"
+    "expect": "model-3的ServingGroup创建时就带注解，它的Pod带同名同值的副本；序号0–2的组和它们的Pod从来不带；结束时没有带注解的ServingGroup"
+    "mustReject": "标记是后加的；正式的组带过标记；结束时还有带标记的组；对象和Pod上的不同步"
+  "profile": "controlled"
+  "initialSpec":
+    "template":
+      "roles":
+        -
+          "name": "frontend"
+          "replicas": 1
+          "workerReplicas": 0
+          "entryTemplate":
+            "metadata":
+              "annotations":
+                "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+            "spec":
+              "terminationGracePeriodSeconds": 1
+              "containers":
+                -
+                  "name": "workload"
+                  "image": "busybox:1.36"
+                  "imagePullPolicy": "IfNotPresent"
+                  "command":
+                    - "sh"
+                    - "-c"
+                    - "sleep 3600"
+                  "env":
+                    -
+                      "name": "ROLLOUT_VERSION"
+                      "value": "A"
+                  "readinessProbe":
+                    "exec":
+                      "command":
+                        - "test"
+                        - "-f"
+                        - "/tmp/ready"
+                    "periodSeconds": 1
+                    "failureThreshold": 1
+                  "resources":
+                    "requests":
+                      "cpu": "5m"
+                      "memory": "4Mi"
+    "replicas": 3
+    "schedulerName": "volcano"
+    "rolloutStrategy":
+      "type": "ServingGroupRollingUpdate"
+      "rollingUpdateConfiguration":
+        "partition": 0
+        "maxSurge": 1
+        "maxUnavailable": 0
+  "steps":
+    -
+      "name": "surge-group-is-created-with-its-mark"
+      "action": "update"
+      "until": "conditions"
+      "release": "none"
+      "holdSeconds": 5
+      "stableSeconds": 0
+      "expect":
+        "servingGroups":
+          -
+            "name": "model-3"
+            "objects": 1
+            "exists": true
+            "surge": true
+            "surgeAtCreation": true
+          -
+            "name": "model-0"
+            "objects": 1
+            "exists": true
+            "surge": false
+            "uidSameAs": "baseline"
+          -
+            "name": "model-1"
+            "objects": 1
+            "exists": true
+            "surge": false
+            "uidSameAs": "baseline"
+          -
+            "name": "model-2"
+            "objects": 1
+            "exists": true
+            "surge": false
+            "uidSameAs": "baseline"
+      "spec":
+        "template":
+          "roles":
+            -
+              "name": "frontend"
+              "replicas": 1
+              "workerReplicas": 0
+              "entryTemplate":
+                "metadata":
+                  "annotations":
+                    "production.kthena.io/ranktable": "{\"pod_name\":\"frontend-entry\",\"server_id\":\"frontend\"}"
+                "spec":
+                  "terminationGracePeriodSeconds": 1
+                  "containers":
+                    -
+                      "name": "workload"
+                      "image": "busybox:1.36"
+                      "imagePullPolicy": "IfNotPresent"
+                      "command":
+                        - "sh"
+                        - "-c"
+                        - "sleep 3600"
+                      "env":
+                        -
+                          "name": "ROLLOUT_VERSION"
+                          "value": "B"
+                      "readinessProbe":
+                        "exec":
+                          "command":
+                            - "test"
+                            - "-f"
+                            - "/tmp/ready"
+                        "periodSeconds": 1
+                        "failureThreshold": 1
+                      "resources":
+                        "requests":
+                          "cpu": "5m"
+                          "memory": "4Mi"
+        "replicas": 3
+        "schedulerName": "volcano"
+        "rolloutStrategy":
+          "type": "ServingGroupRollingUpdate"
+          "rollingUpdateConfiguration":
+            "partition": 0
+            "maxSurge": 1
+            "maxUnavailable": 0
+      "conditions":
+        -
+          "kind": "unit"
+          "version": "B"
+          "ordinal": 3
+          "ready": false
+          "count": 1
+      "timeoutSeconds": 420
+    -
+      "name": "finish-B-and-reclaim-the-surge"
+      "action": "observe"
+      "until": "settled"
+      "release": "one"
+      "holdSeconds": 0
+      "stableSeconds": 30
+      "expect":
+        "targets":
+          -
+            "scope": "SG"
+            "versions":
+              "B": 3
+        "servingGroups":
+          -
+            "name": "model-3"
+            "objects": 1
+            "exists": false
+            "pods": 0
+          -
+            "name": "model-0"
+            "objects": 2
+            "exists": true
+            "surge": false
+            "surgeAtCreation": false
+          -
+            "name": "model-1"
+            "objects": 2
+            "exists": true
+            "surge": false
+            "surgeAtCreation": false
+          -
+            "name": "model-2"
+            "objects": 2
+            "exists": true
+            "surge": false
+            "surgeAtCreation": false
+      "timeoutSeconds": 420

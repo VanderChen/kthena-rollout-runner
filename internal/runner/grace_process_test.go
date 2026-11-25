@@ -64,3 +64,36 @@ func TestSyncMarkerTimeIgnoresTheOldProcessAndUnsyncedLines(t *testing.T) {
 		t.Fatal("marker of a build without ServingGroup objects not recognized")
 	}
 }
+
+// The controller is recorded when a case starts, before any step has run. A
+// case that terminates the leader later must already be read against two
+// replicas then; every other case keeps the one-controller check.
+func TestLeaderElectedCaseIsKnownBeforeTheFirstStep(t *testing.T) {
+	steps := func(changes ...string) Case {
+		c := Case{ID: "RUN-900", Scenario: &Scenario{}}
+		for _, change := range changes {
+			c.Scenario.Steps = append(c.Scenario.Steps, ScenarioStep{Action: "fault-member-across-process", ProcessChange: change})
+		}
+		return c
+	}
+	for _, c := range []struct {
+		name          string
+		c             Case
+		processChange string
+		want          bool
+	}{
+		{"terminates the leader in its first step", steps("terminate-leader"), "", true},
+		{"terminates the leader in a later step", steps("", "terminate-leader"), "", true},
+		{"only restarts the single controller", steps("terminate-controller"), "", false},
+		{"no process change at all", steps(""), "", false},
+		{"no steps", steps(), "", false},
+		{"not a scenario case", Case{ID: "RUN-900"}, "", false},
+		{"the step that terminates the leader is running", steps("terminate-controller"), "terminate-leader", true},
+		{"leader-switch suite", Case{ID: "RUN-441"}, "", true},
+	} {
+		e := &normalExecution{c: c.c, processChange: c.processChange}
+		if got := e.leaderElectedCase(); got != c.want {
+			t.Errorf("%s: leader elected=%t want %t", c.name, got, c.want)
+		}
+	}
+}

@@ -74,8 +74,22 @@ func checkGraceAcrossProcess(faultAt, syncedAt, recoveredAt, observedTo time.Tim
 	return nil
 }
 
+// leaderElectedCase is asked before the first step too (the controller is
+// recorded when the case starts), so a case that will terminate the leader in
+// a later step counts from its start.
 func (e *normalExecution) leaderElectedCase() bool {
-	return e.c.ID == "RUN-441" || e.c.ID == "RUN-442" || e.processChange == "terminate-leader"
+	if e.c.ID == "RUN-441" || e.c.ID == "RUN-442" || e.processChange == "terminate-leader" {
+		return true
+	}
+	if e.c.Scenario == nil {
+		return false
+	}
+	for _, step := range e.c.Scenario.Steps {
+		if step.ProcessChange == "terminate-leader" {
+			return true
+		}
+	}
+	return false
 }
 
 // graceAcrossProcess makes one member faulty (container restart, not Ready),

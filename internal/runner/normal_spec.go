@@ -59,14 +59,20 @@ type ScenarioCondition struct {
 	Count   int    `json:"count"`
 }
 type ScenarioExpectation struct {
-	Compound           *CompoundExpectation `json:"compound,omitempty"`
-	RequireCompleted   bool                 `json:"requireCompleted,omitempty"`
-	BlockedByBudget    bool                 `json:"blockedByBudget,omitempty"`
-	NoFullPromotion    bool                 `json:"noFullPromotion,omitempty"`
-	NoReplacement      bool                 `json:"noReplacement,omitempty"`
-	NoNewRevision      bool                 `json:"noNewRevision,omitempty"`
-	PreserveHealthyOld bool                 `json:"preserveHealthyOld,omitempty"`
-	Targets            []ScenarioTarget     `json:"targets,omitempty"`
+	// ServingGroups and ModelServingConditions are declared facts that must
+	// hold, together with the step predicate, for the step to be complete.
+	ServingGroups          []GroupExpectation `json:"servingGroups,omitempty"`
+	ModelServingConditions map[string]string  `json:"modelServingConditions,omitempty"`
+	// TwoStepGroupRecovery asserts the member deletion order of fault-member.
+	TwoStepGroupRecovery bool                 `json:"twoStepGroupRecovery,omitempty"`
+	Compound             *CompoundExpectation `json:"compound,omitempty"`
+	RequireCompleted     bool                 `json:"requireCompleted,omitempty"`
+	BlockedByBudget      bool                 `json:"blockedByBudget,omitempty"`
+	NoFullPromotion      bool                 `json:"noFullPromotion,omitempty"`
+	NoReplacement        bool                 `json:"noReplacement,omitempty"`
+	NoNewRevision        bool                 `json:"noNewRevision,omitempty"`
+	PreserveHealthyOld   bool                 `json:"preserveHealthyOld,omitempty"`
+	Targets              []ScenarioTarget     `json:"targets,omitempty"`
 }
 type CompoundExpectation struct {
 	Groups  []CompoundGroupExpectation `json:"groups"`

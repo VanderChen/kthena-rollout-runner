@@ -49,6 +49,8 @@ type Observer struct {
 	groups  bool
 	// groupStream reduces the ServingGroup stream; nil without that stream.
 	groupStream *GroupStream
+	// podTimeline orders Pod deletions and creations for the same builds.
+	podTimeline *PodTimeline
 }
 
 func NewObserver(ctx context.Context, client dynamic.Interface, ns, dir string) (*Observer, error) {
@@ -67,6 +69,7 @@ func newObserver(ctx context.Context, client dynamic.Interface, ns, dir string, 
 	o := &Observer{cancel: cancel, objects: map[string]map[string]*unstructured.Unstructured{}, journal: f, encoder: json.NewEncoder(f), groups: groups}
 	if groups {
 		o.groupStream = newGroupStream()
+		o.podTimeline = &PodTimeline{}
 	}
 	resources := []schema.GroupVersionResource{PodGVR, MSGVR, PGGVR, CRGVR}
 	if groups {
@@ -180,6 +183,9 @@ func (o *Observer) accept(kind, event string, u *unstructured.Unstructured) {
 	}
 	if kind == SGGVR.Resource {
 		o.groupStream.observe(o.seq, received, event, u)
+	}
+	if kind == "pods" {
+		o.podTimeline.observe(o.seq, event, u)
 	}
 	if o.normal != nil {
 		o.normal.Before(kind, event, u, o.objects)

@@ -1,6 +1,6 @@
-# ServingGroupRollingUpdate 组合场景预期行为规范 v2.13
+# ServingGroupRollingUpdate 组合场景预期行为规范 v2.14
 
-版本 2.13 · 2026-11-23 · [English](servinggroup-compound-rollout.en.md)
+版本 2.14 · 2026-11-25 · [English](servinggroup-compound-rollout.en.md)
 
 本文描述**设计预期**；实现符合程度与实际 Kind 验证结果另行记录。正文保留 `ServingGroupRollingUpdate` 的全部 35 个组合场景；共用原则也说明 `RoleRollingUpdate` 的适用范围。[附录 B](#budget-lookup)提供两种模式的预算与行为对照，不代表新增了相同数量的 Role 执行用例。
 
@@ -730,7 +730,7 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 4. 为零停机而创建的临时 surge，若能够与一名需要删除的范围外旧版保留组配对，可直接建在范围内最低空洞并转为保留组，按该槽位的 partition 选历史/目标模板；否则使用最低空闲范围外 ordinal，滚动结束后清理它。不能先在空洞建一个无法保留的新组，最后为了归位删除健康目标版组。
 5. 缩容先确定 **retainedGroups 中**需要移除的数量；在 retainedGroups 内先选 NotReady，后选较低 deletion cost，最后选较高 ordinal，partition 不改变此选择次序。temporarySurgeGroups 另按新 desiredReplicas/maxSurge 与 Ready 底线决定保留或清理，不把“sg 编号最高”误当成先删有用 surge 的理由。缩容可因此删除 protected 旧版组而保留较高的新版组。已发删除不能撤销；新 spec 只控制尚未发出的动作。
 
-这里的“保序”不是强制每次得到 `[0,desiredReplicas)`，而是**不制造稳定新洞、存在合法容量机会时优先补最低旧洞、保留已经有用的身份**。例如 desiredReplicas:2→3 时从 `{0,3}` 建 sg-1 得到 `{0,1,3}`，sg-2 仍缺失；sg-3 若健康且无需更新，不得仅为了把 3 换成 2 而重建。下次扩容到 desiredReplicas=4 可以再建 sg-2，原 sg-3 原地成为范围内组。
+这里的“保序”不是强制每次得到 `[0,desiredReplicas)`，而是**不制造稳定新洞、存在合法容量机会时优先补最低旧洞、保留已经有用的身份**。例如 desiredReplicas:2→3 时从 `{0,3}` 建 sg-1 得到 `{0,1,3}`，sg-2 仍缺失；sg-3 若健康且无需更新，不得仅为了把 3 换成 2 而重建。下次扩容到 desiredReplicas=4 可以再建 sg-2，原 sg-3 原地成为范围内组。ServingGroup 是对象的实现在稀疏布局下对第 3 条的原位重建有一处已声明的有界出入，见 [A.6](#declared-deviations) 第 1 项。
 
 ### A.4. 操作偏序与版本选择
 
@@ -754,7 +754,7 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 
 **controller重启后的删除续行（2.11）**
 
-用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前标记原选定Pod，正常删除回调不再触发新故障恢复；controller重启后先完成标记的原UID删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation、阶段或私有成员CM；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失自2.13起按controller不在的原因区分处理（见下表及 [API §6.1](modelserving-api-reference.zh-CN.md#controller-absence-scope)），新进程grace重新起算，Terminating和预算规则保持。
+用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前先持久提交原选定的删除范围（两种形式见 [API §6.1](modelserving-api-reference.zh-CN.md#deletion-scope-commit)），正常删除回调不再触发新故障恢复；controller重启后先完成已提交范围内原UID的删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation或私有成员CM，阶段只允许 API §6.1 形式（b）的一个；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失自2.13起按controller不在的原因区分处理（见下表及 [API §6.1](modelserving-api-reference.zh-CN.md#controller-absence-scope)），新进程grace重新起算，Terminating和预算规则保持。
 
 | 重启时事实 | 预期处理 |
 | --- | --- |
@@ -768,7 +768,7 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 
 **恢复中断后的重启续删：RC-01～04（2.11）**
 
-四例均先建立完整Ready A，再提交partition=2的B；真实Failed触发恢复，确认故障UID已消失、原健康成员有删除标记且其DELETE被拒绝后重启。停机期间partition 2→1；重启先续删原标记成员。缺员POST被阻断期间，范围外成员保持原UID并遵守maxUnavailable=1；放行后按保护区历史A完整重建，再正常推进高位B及partition 1→0的全量滚动。
+四例均先建立完整Ready A，再提交partition=2的B；真实Failed触发恢复，确认故障UID已消失、删除范围已提交且续删所需的DELETE被拒绝后重启：形式（a）下，原健康成员带删除标记且其DELETE被拒绝；形式（b）下（2.14），RC-01是组0的ServingGroup对象为Failed、故障成员已清空而该对象的DELETE被拒绝，RC-02～04是prefill实例0的记录为Draining而原健康成员的DELETE被拒绝。停机期间partition 2→1；重启先续删原标记成员。缺员POST被阻断期间，范围外成员保持原UID并遵守maxUnavailable=1；放行后按保护区历史A完整重建，再正常推进高位B及partition 1→0的全量滚动。
 
 | 用例 | 重启后必须完成的原删除范围 | 保留范围 |
 | --- | --- | --- |
@@ -788,7 +788,21 @@ SG/Role 共用 `minAvailable=max(0,desiredReplicas-maxUnavailable)`、`maxScaleD
 - **身份债**：单独记录 `missingOrdinals` 与范围外保留组；不能把它误报成版本未完成，也不能在下次普通 reconcile 中无缘无故把缩容保留下来的健康组删除。故障造成的缺位仍应走修复逻辑，不与“缩容允许的稳定债”混淆。
 - **阻塞**：坏目标、历史 revision 丢失、maxScaleDown 耗尽、预算/容量不足或协调限制挡住候选时停止相应新动作并报告原因；SG 不再仅因健康高位存在就阻塞合法低位旧坏修复。不隐式放宽 maxUnavailable/maxSurge，不把已发删除回滚，不为表面连续而增加额外重建。
 
-实现上由实际 Pod 的身份、版本及 surge 标记区分非空保留组、临时容量和缩容身份债，结合 ControllerRevision 和汇总历史基线恢复模板；不创建成员 ConfigMap 或等价 status/owner annotation 表，并以真实 Ready、Deleting、最新 desiredReplicas、实际活动组数 activeReplicas 和目标版未就绪数 unavailableTargetReplicas 结算预算；在途删除/创建须占位，不能按短暂对象数反复领取 maxScaleDown。这是有限的控制器状态与选择逻辑，不依赖不可实现的 Pod 重命名。本文不宣称现有 production 已符合，也不把静态推导当成 Kind 通过记录。所有复合场景的可观察过程和取舍见 [场景过程表](#scenario-tables)。
+实现上由实际 Pod 的身份、版本及 surge 标记区分非空保留组、临时容量和缩容身份债，结合 ControllerRevision 和汇总历史基线恢复模板；不创建成员 ConfigMap 或等价的逐 Pod status/owner annotation 表（2.14：ServingGroup 是对象的实现可在该对象的 status 中保留 [API §6.2](modelserving-api-reference.zh-CN.md#62-restartgraceperiodseconds) 限定的逐 Role 实例记录；其 surge 标记的来源见 [A.6](#declared-deviations) 第 3 项），并以真实 Ready、Deleting、最新 desiredReplicas、实际活动组数 activeReplicas 和目标版未就绪数 unavailableTargetReplicas 结算预算；在途删除/创建须占位，不能按短暂对象数反复领取 maxScaleDown。这是有限的控制器状态与选择逻辑，不依赖不可实现的 Pod 重命名。本文不宣称现有 production 已符合，也不把静态推导当成 Kind 通过记录。所有复合场景的可观察过程和取舍见 [场景过程表](#scenario-tables)。
+
+<a id="declared-deviations"></a>
+
+### A.6. 已声明的有界出入（2.14）
+
+以下三处是 ServingGroup 为对象、整组替换以删除该对象来实现的版本与本契约字面的出入。它们是**声明**，不是新规则：所列条文的文字不变，仍是预期；声明的含义是，在所列界限之内出现所述行为不判为违约，超出界限仍是违约。三处都不改变用户可见结果的大类：组数、可用性下限、版本按槽位绝对 ordinal 与 partition 的归属。ServingGroup 不是对象的实现不适用本节。
+
+| # | 条文的字面 | 声明的行为 | 界限 | 例子 |
+| --- | --- | --- | --- | --- |
+| 1 稀疏布局下范围内的组不保证原位重建 | A.3 第 3 条“优先在**原 ordinal**重建”；A.3 导言“不得使此前存在的保留 ordinal 永久消失”；§0.6 表“正式范围内优先原位补建”及末段“滚动或故障造成的在途缺位应继续补建，不能当成新的稳定稀疏结果”；§7“非缩容动作没有留下新的稳定空洞” | 替换是先删除再补位；补位取小于 desiredReplicas 的最低空闲 ordinal，不区分这个空位是刚腾出来的还是以前缩容留下的。范围内的旧组下方有空洞时，替代容量落在更低的空洞上。整组恢复相同 | 只在替换或恢复之前范围内已有空洞的稀疏布局下出现；连续布局滚动之后仍是 `[0,desiredReplicas)`。`\|missingOrdinalsAfter\|≤\|missingOrdinalsBefore\|` 仍须成立；组数、新槽位按绝对 ordinal 与 partition 选版本、预算和 Ready 下限不变。变化的只是哪一个 ordinal 留作空洞 | `{1:v1,3:v2}`、desiredReplicas=2、目标 v2：删 sg-1，补建 sg-0，终态 `{0,3}`。`{0,2,3}`、desiredReplicas=3：sg-2 整组恢复之后是 `{0,1,3}` |
+| 2 在途额度不计按基线补建的组 | [API §2.3](modelserving-api-reference.zh-CN.md#23-两层共用的预算与默认选择顺序)“若替代槽受 partition 保护、补建的是历史模板，也不能因其不属于最新目标而提前释放尚未恢复的在途额度” | `maxScaleDown` 按 activeReplicas、可用性下限与 unavailableTargetReplicas 计算，没有单独的在途一项；替代容量落在受保护的空洞上、按历史模板补建时，它不是目标版本，不计入 unavailableTargetReplicas | 只会多删**本来就 NotReady** 的旧版本组；健康组的删除仍须满足删除后 `readyReplicas≥max(0,desiredReplicas-maxUnavailable)`，Ready 数不因此再下降；容量上限、partition 与候选顺序不变 | `{0:v1,3:v1 未就绪,4:v1 未就绪}`、desiredReplicas=3、maxUnavailable=1、partition=2：第 1 轮删 sg-4；第 2 轮补建 sg-1（v1，未就绪）的同时又删 sg-3，字面要求等 sg-1 Ready |
+| 3 组一级 surge 标记的来源在组对象上 | A.5“由实际 Pod 的身份、版本及 surge 标记区分非空保留组、临时容量和缩容身份债” | 临时 surge 身份以 ServingGroup 对象上的标记为准；Pod 上保留同名同值的标记，是它的副本 | 副本只滞后一步：surge 组的 Pod 自创建起带副本，正式组的 Pod 从不带；转正时先摘对象上的标记，随后原地摘 Pod 上的副本，不重建 Pod、不改对象的 spec；稳定检查点上对象与 Pod 必须一致 | desiredReplicas=3、maxUnavailable=0、maxSurge=1：sg-3 的对象创建时即带标记，它的 Pod 带副本；扩容到 4 之后对象先转正，Pod 上的副本随后摘除，UID 不变 |
+
+第 1 项与同一形状下相反的两组预期（`boundary-sparse` RUN-576、579、582、585、588、591、597、603 对 SG-P11、RUN-651 及 API §3.3、§4.3）是同一处规则；该不一致待契约维护者裁决，裁决之前上述八例的结论不因本声明而改变。
 
 <a id="budget-lookup"></a>
 

@@ -1,5 +1,5 @@
 {
-  "purpose": "Final bilingual contract 2.13: user-approved cause-based recovery scope for Pods lost while the controller is absent; new-process grace restart, marked restart deletion scopes, budgets and member-table limits retained.",
+  "purpose": "Final bilingual contract 2.14: user-approved ServingGroup object clauses (per-Role-instance establishment record, refill of instances that are not yet established, two forms of committing a deletion scope, no cancellation after commit) and three declared bounded deviations; new-process grace restart, the 2.13 cause-based scope for Pods lost while the controller is absent, budgets and the ban on per-Pod member tables retained.",
   "originalImport": {
     "importedOn": "2026-10-05",
     "purpose": "Verbatim reference snapshots; import does not amend behavior or approve proposals embedded in source material.",
@@ -16,9 +16,9 @@
     {
       "path": "modelserving-api-reference.en.md",
       "language": "en",
-      "version": "2.13",
-      "sha256": "6fdadef720f60f4f051220eff6c7c98c0c69636899b48bb60389af3036cebad1",
-      "bytes": 97361,
+      "version": "2.14",
+      "sha256": "fb68940fd3dc4af1f79da8bea1cc15fe0b16ab060ce58f48bf121687b512cd4e",
+      "bytes": 102635,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.zh-CN.md",
       "priorEdition": {
@@ -30,7 +30,7 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending. Task 010 version 2.14: ServingGroup object clauses C1, C3, C4 and C12 approved on 2026-11-25 and three bounded deviations declared (SG A.6); no per-Pod member table is added.",
       "priorEdition2_7": {
         "sha256": "d0f771b788aa120815eab795ea26f97e3fb2b0543d83b528d755a5af41a8593b",
         "bytes": 86209,
@@ -55,9 +55,9 @@
     {
       "path": "modelserving-api-reference.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.13",
-      "sha256": "bbc7ba756975a3d533343501681d2a4d2e7b4332518c0597f784c1be7d7fcd05",
-      "bytes": 76443,
+      "version": "2.14",
+      "sha256": "50c84bbb019e2654411797a6af23fc8d29e7413cfed33f3ef1033918b500b055",
+      "bytes": 80647,
       "scope": "api-reference",
       "pairedWith": "modelserving-api-reference.en.md",
       "priorEdition": {
@@ -69,7 +69,7 @@
         "sourceState": "Final edition with separately approved 2026-10-06 sparse partition clarification; original import provenance preserved."
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/modelserving-api-reference.en.v2.0.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending. Task 010 version 2.14: ServingGroup object clauses C1, C3, C4 and C12 approved on 2026-11-25 and three bounded deviations declared (SG A.6); no per-Pod member table is added.",
       "priorEdition2_7": {
         "sha256": "97b6f151ec52e1a9011e461758d2feaa44e7f477bd05aedc29dde26459c70213",
         "bytes": 67253,
@@ -94,9 +94,9 @@
     {
       "path": "servinggroup-compound-rollout.en.md",
       "language": "en",
-      "version": "2.13",
-      "sha256": "60093e5107797c0f1f1b0e6f6626ee9a02e95f9c5c19036a095860c75c72f944",
-      "bytes": 110353,
+      "version": "2.14",
+      "sha256": "94bd6f1f284ea6950c0f92f140f18ed8cf08e907889f4088cccb898eb1d6d882",
+      "bytes": 116328,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.zh-CN.md",
       "priorEdition": {
@@ -125,7 +125,7 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending. Task 010 version 2.14: ServingGroup object clauses C1, C3, C4 and C12 approved on 2026-11-25 and three bounded deviations declared (SG A.6); no per-Pod member table is added.",
       "priorEdition2_7": {
         "sha256": "44c2ecdce26b738202426a42c1214a516047eefa5627c55441d37ef5e14eea9d",
         "bytes": 109843,
@@ -150,9 +150,9 @@
     {
       "path": "servinggroup-compound-rollout.zh-CN.md",
       "language": "zh-CN",
-      "version": "2.13",
-      "sha256": "7583bc6f47cb455f6759791cbe527e584b954819ed863330c3e92287a224cb53",
-      "bytes": 118080,
+      "version": "2.14",
+      "sha256": "c1c5b6634f538e3c80c5943a80c989268197398ea738fdababdccd80d55f0895",
+      "bytes": 122768,
       "scope": "rollout-design",
       "pairedWith": "servinggroup-compound-rollout.en.md",
       "priorEdition": {
@@ -181,7 +181,7 @@
         ]
       },
       "sourceSnapshot": "issues/features/052-runner-spec-contract-alignment-IP/before/SERVINGGROUP_COMPOUND_ROLLOUT_EXPECTATIONS_V2.md",
-      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending.",
+      "sourceState": "Final edition 2.6; task 058 current-fact restart convergence approved on 2026-10-08 and supersedes the undeployed 2.5 D7 legacy-deletion migration/pause design. Original provenance and independent constraints are preserved. D5 production webhook lookup remains deferred at user request; D6 input compatibility remains undecided. Task 059 version 2.7 actual version capacity, nominal partition admission and full-rollout terminal quantization approved on 2026-10-08. Task 064: user-approved independent Role replica scaling, 2026-10-09. Task 066: member ConfigMap removal and process-local restart semantics approved 2026-10-09. Task 069: dependency-staged default Gang requirements during coordinated expansion approved 2026-10-13; no stalled-object migration or production coordination compatibility required; simple current-fact restart convergence. At the initial 2.10 contract synchronization, implementation and new verification were incomplete. Subsequent task 078 implementation and targeted Go/Kind results are recorded separately in issues/bugs/078-coordinated-expansion-gang-DONE/PROPOSAL_COMMIT.md; the original task 069 RUN-160 FAIL remains historical evidence, and targeted results do not establish a passing full runner suite. Task 080: deletion-scope restoration and marked original UID continuation approved on 2026-10-16, superseding abandonment of marked batches only. Task 112: legal in-progress mode switches promise eventual convergence only, approved 2026-11-09; no API-range or restart-marker change approved. New implementation and Kind coverage are recorded separately. Task 009: cause-based scope for unmarked offline losses approved 2026-11-23; upgrade, leader switch and leader deletion/node failure of a multi-replica controller with leader election are not exempt, complete failure (including single-replica absence and manual scale to zero) and post-deletion losses may refill; grace restart and marked continuation unchanged. Contract only; implementation and executable coverage pending. Task 010 version 2.14: ServingGroup object clauses C1, C3, C4 and C12 approved on 2026-11-25 and three bounded deviations declared (SG A.6); no per-Pod member table is added.",
       "priorEdition2_7": {
         "sha256": "91bca93eb04fcbb96dbd19c52d701ac72e5e44862ed87fc55577950f4ca85408",
         "bytes": 118040,
@@ -1719,6 +1719,133 @@
           "after": {
             "sha256": "7583bc6f47cb455f6759791cbe527e584b954819ed863330c3e92287a224cb53",
             "bytes": 118080
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-11-25",
+      "version": "2.14",
+      "approval": [
+        "issues/features/010-modelserving-servinggroup-cr-impl-IP/DESCRIPTION.md: 契约条款 C1、C3、C4、C12 四条都按 008 的设计批准，runner 契约修订为 2.14 并同步用例（C2 此前已定，是契约 2.13）",
+        "issues/features/010-modelserving-servinggroup-cr-impl-IP/evidence/plan-approved-20261125.md: C1、C3、C4、C12 按 008 的设计批准（C2 已定）。runner 契约修订为 2.14 并同步用例",
+        "The user's verbatim replies are kept in the task 010 records above; this entry quotes the recorded decision, not the chat text."
+      ],
+      "proposal": "issues/features/010-modelserving-servinggroup-cr-impl-IP/PROPOSAL_COMMIT.md",
+      "design": "kthena/docs/proposal/modelserving-servinggroup-cr/04-behavior-expectations.md section 11 (clauses C1, C3, C4, C12 in 11.1; declared deviations in 11.2; maintainer question in 11.3)",
+      "supersedes": "The 2.9 ban on relocating member tables to status as far as a per-Role-instance establishment record on the ServingGroup object is concerned; the single form of the 2.11 rule (mark selected original Pods before DELETE, no phase); the part of API 6.2 that cancelled a deletion on a switch to None or -1 whether or not the scope was committed. The 2.9 new-process grace restart, the 2.11 completion of a committed scope after restart and the 2.13 cause-based scope are retained. The 2.13 pending decision on how a successor learns that a Pod existed is closed by C1 and C3.",
+      "clauses": [
+        "C1: SG A.5 closing paragraph; API 6.2 status paragraph; API 6.1 closing paragraph of the 2.13 clause",
+        "C3: API 6.1 behavior table, column \"actual Pod deletion\", and the note \"Established instances (2.14)\"",
+        "C4: API 6.1 \"Deletion-scope markers and controller restart (2.11)\" with the new paragraph \"Two forms of committing a deletion scope (2.14)\"; SG A.4 \"Deletion continuation after controller restart (2.11)\" and the RC-01–04 cut point",
+        "C12: API 6.2 notes on switching to None or -1",
+        "Declared deviations: new SG A.6 (three items) with pointers from SG A.3, SG A.5 and API 2.3",
+        "README approved changes and coverage"
+      ],
+      "before": {
+        "C1": "No per-instance completion fact is kept: no member ConfigMap or equivalent status/owner annotation table (SG A.5); no per-SG/Role/Pod membership, completion facts, fault timestamps or revision maps in status (API 6.2).",
+        "C3": "An actual Pod deletion is recovered at the recoveryPolicy scope without grace whether or not the Role instance had ever been complete; deleting one Pod of an instance under creation recreated the whole scope.",
+        "C4": "Selected original Pods carry workload.kthena.io/deletion-scope=Role|ServingGroup before DELETE; no operation, phase or private member ConfigMap is added.",
+        "C12": "A switch to None or -1 cancels the old deletion effect, including after the scope was marked and before its first Pod was deleted."
+      },
+      "after": {
+        "C1": "An implementation in which a ServingGroup is an object may keep, in the status of that object, one record per Role instance limited to established / Draining or re-creation phase / generation number, and may express whole-group failure and draining with Conditions of that object. One writer; the zero value never causes a deletion; after the record is lost and before it is rebuilt a missing member is only refilled. Per-Pod member tables, fault start times, revision maps, private ConfigMaps and owner-annotation tables remain excluded; grace still restarts in a new process.",
+        "C3": "Scope recovery after an actual Pod deletion applies to an established Role instance (every required member created and observed once). An instance that is not yet established only has its missing Pod created; nothing is deleted and the scope is not widened. None refills in both situations.",
+        "C4": "The deletion scope is durably committed before its first DELETE in exactly one of two forms: (a) the deletion-scope marker on the selected Pods where a ServingGroup is not an object; (b) a record on the ServingGroup object where it is one: Draining phase plus generation number of the Role instance record for a Role scope, Failed condition followed by the deletionTimestamp of the object for a whole-group scope. Finish the original scope after restart, delete healthy members inside it, never absorb same-name new UIDs: unchanged. RC-01–04 cut point: form (a) marked healthy survivor with rejected DELETE; form (b) RC-01 group Failed with the faulty member gone and the ServingGroup DELETE rejected, RC-02–04 instance record Draining and the survivor DELETE rejected.",
+        "C12": "Before the scope is committed a switch to None or -1 still cancels; the commit uses the latest policy and grace on the ModelServing when it is written; a committed scope is not cancelled by a later switch and is completed."
+      },
+      "declaredDeviations": [
+        {
+          "id": 1,
+          "clauses": "SG A.3 item 3 and introduction; SG 0.6 table and last paragraph; SG section 7",
+          "behavior": "In a sparse layout the refill after a replacement or a whole-group recovery takes the lowest free ordinal below desiredReplicas, so an outdated in-range group with a hole below it is not rebuilt at its own ordinal.",
+          "bound": "Only in layouts that already had a hole inside the range; the number of holes does not grow; group count, version selection by absolute ordinal and partition, budgets and the Ready floor are unchanged; contiguous layouts stay [0,desiredReplicas)."
+        },
+        {
+          "id": 2,
+          "clauses": "API 2.3 sentence on a historical-template replacement not releasing the in-flight reservation",
+          "behavior": "maxScaleDown has no separate in-flight term; a group refilled from the baseline in a protected hole is not counted in unavailableTargetReplicas.",
+          "bound": "Only an old-version group that is already NotReady can be deleted earlier; healthy deletions still keep readyReplicas at or above desiredReplicas-maxUnavailable; ceiling, partition and order unchanged."
+        },
+        {
+          "id": 3,
+          "clauses": "SG A.5 sentence on Pod identities, revisions and surge markers",
+          "behavior": "Temporary surge identity is decided by the marker on the ServingGroup object; Pods carry a copy of the same name and value.",
+          "bound": "The copy lags by one step; surge Pods carry it from creation and formal Pods never do; promotion removes the marker from the object first and the copies in place afterwards, without recreating Pods or changing the object spec; object and Pods agree at stable checkpoints."
+        }
+      ],
+      "pendingDecisions": [
+        "Opposite expectations for one shape ({0,3,4}, desiredReplicas=3, partition 3 or 100%, all A, submit B): boundary-sparse RUN-576, 579, 582, 597 (SG) and RUN-585, 588, 591, 603 (Role) expect in-place update of ordinals 3 and 4 (final 1 A, 2 B); SG-P11, RUN-651 and API 3.3/4.3 expect the out-of-range groups to be replaced into the lowest holes below the partition from the historical template (final all A). The contract maintainer has to rule; history-sparse RUN-470, 480, 490, 500, 510, 520 may be the same shape. Declared deviation 1 is the same rule.",
+        "Reading of SG A.4 \"groups not yet created use the latest applicable version / an old-template group whose creation has started is not changed in place\": where a ServingGroup is an object, creation has started once the first member Pod is about to be created (after its PodGroup exists); the maintainer is asked to confirm this boundary.",
+        "Wording that extends the approved clauses instead of quoting the approval: the definition of \"established\" as created and observed once irrespective of readiness; \"exactly one form, never a mixture\"; refill only after the record was lost.",
+        "The 2.13 pending items other than \"how a successor learns that a Pod existed\" are unchanged."
+      ],
+      "priorSnapshot": "issues/features/010-modelserving-servinggroup-cr-impl-IP/evidence/runner-adaptation/before-specs-2.13/",
+      "affectedCases": [
+        "No existing executable expectation is changed. controller-restart/RUN-436 and RUN-439: description text cites clause C4; in a build with ServingGroup objects the fixture additionally requires the committed scope on the ServingGroup (terminating group, or Draining instance record) before the controller is terminated.",
+        "restart-convergence/RC-01..RC-04: the cut point takes form (a) or (b) according to the object model detected from the servinggroups CRD; suite contractVersion stays 2.11 for the clause it executes, the executor documents 2.14.",
+        "api-retry/RUN-456: in a build with ServingGroup objects the single failing deletion is the DELETE of the ServingGroup that owns the captured old Pod (the Pods are removed by the garbage collector, which does not pass the proxy); RUN-460 and the other six are unchanged.",
+        "servinggroup-compound-v2/RUN-628, 633, 635, 637: the partial scale boundary rejects the POST of the next ServingGroup instead of the next PodGroup in a build with ServingGroup objects.",
+        "recovery/RUN-305..388, protected-recovery/RUN-304, deletion-replay/RUN-449,452, history-sparse and boundary-* fixtures: the \"controller paused\" and \"mutations rejected\" barriers add servinggroups and servinggroups/status in a build with ServingGroup objects; expectations unchanged.",
+        "New: cases/servinggroup-objects/RUN-653..665 (design rows NT1, NT2, NT4 x3, NT6, NT9, NT18, NT19, NT45, and one failing ServingGroup POST, status write and direct LIST for row 10 of section 8.6), restricted to builds with ServingGroup objects (NOT_RUN elsewhere). RUN-660 and RUN-661 are the first executable cases for the API 6.2 rule that finite grace restarts in a new process; RUN-661 needs two controller replicas with leader election.",
+        "Not covered by an executable case: C12 after commit, C3 for an instance that is not yet established, upgrade takeover (NT14, NT15, NT17)."
+      ],
+      "coverage": "Contract and runner changed together in task 010. Runner: owner-chain identification, ServingGroup observation stream, object-model dependent fixtures and RC cut point, process invariants for the surge mark, same-name recreation and the instance record, new suite servinggroup-objects. Unit tests cover every new assertion with a rejected counter-example. Kind results for the build under test and the classification of failures are recorded in issues/features/010-modelserving-servinggroup-cr-impl-IP/evidence/runner-adaptation/REPORT.md; a wording revision is not conformance evidence.",
+      "commits": [],
+      "documents": [
+        {
+          "path": "docs/specs/README.md",
+          "before": {
+            "sha256": "4f95070fc5b981d28a24b9a80dea9f69454ea05a21890d687331192f2c8d06cc",
+            "bytes": 33914
+          },
+          "after": {
+            "sha256": "b5824542b8b50933c37f3306266c4e11f11d1c93ce0787eff9f00e30cfb8ca52",
+            "bytes": 44366
+          }
+        },
+        {
+          "path": "docs/specs/modelserving-api-reference.en.md",
+          "before": {
+            "sha256": "6fdadef720f60f4f051220eff6c7c98c0c69636899b48bb60389af3036cebad1",
+            "bytes": 97361
+          },
+          "after": {
+            "sha256": "fb68940fd3dc4af1f79da8bea1cc15fe0b16ab060ce58f48bf121687b512cd4e",
+            "bytes": 102635
+          }
+        },
+        {
+          "path": "docs/specs/modelserving-api-reference.zh-CN.md",
+          "before": {
+            "sha256": "bbc7ba756975a3d533343501681d2a4d2e7b4332518c0597f784c1be7d7fcd05",
+            "bytes": 76443
+          },
+          "after": {
+            "sha256": "50c84bbb019e2654411797a6af23fc8d29e7413cfed33f3ef1033918b500b055",
+            "bytes": 80647
+          }
+        },
+        {
+          "path": "docs/specs/servinggroup-compound-rollout.en.md",
+          "before": {
+            "sha256": "60093e5107797c0f1f1b0e6f6626ee9a02e95f9c5c19036a095860c75c72f944",
+            "bytes": 110353
+          },
+          "after": {
+            "sha256": "94bd6f1f284ea6950c0f92f140f18ed8cf08e907889f4088cccb898eb1d6d882",
+            "bytes": 116328
+          }
+        },
+        {
+          "path": "docs/specs/servinggroup-compound-rollout.zh-CN.md",
+          "before": {
+            "sha256": "7583bc6f47cb455f6759791cbe527e584b954819ed863330c3e92287a224cb53",
+            "bytes": 118080
+          },
+          "after": {
+            "sha256": "c1c5b6634f538e3c80c5943a80c989268197398ea738fdababdccd80d55f0895",
+            "bytes": 122768
           }
         }
       ]

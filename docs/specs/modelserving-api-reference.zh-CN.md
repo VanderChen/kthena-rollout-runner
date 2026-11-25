@@ -1,6 +1,6 @@
 # ModelServing API 参考
 
-版本 2.13 · 2026-11-23 · [English](modelserving-api-reference.en.md)
+版本 2.14 · 2026-11-25 · [English](modelserving-api-reference.en.md)
 
 本文规定字段路径、默认值、可变性、合法范围、百分比取整和跨字段约束。Mutable 表示更新后的完整对象通过校验时可原地修改；Immutable 表示值和可选对象的存在性均不可变，即使滚动完成或副本数为零也不例外。
 
@@ -425,7 +425,7 @@ maxHealthyScaleDown  = max(0, readyReplicas-minAvailable)
 | inFlightReservations | 已占用、尚未由 activeReplicas 减少或 unavailableTargetReplicas 增加反映的在途额度；与 activeReplicas/unavailableTargetReplicas 的变化只记一次，稳定检查点为 0 |
 | maxHealthyScaleDown | 健康删除上限；与 ServingGroup 附录的空洞集合是不同概念 |
 
-例如旧对象删除已发但仍在 activeReplicas 且不在 unavailableTargetReplicas 中，先占 inFlightReservations；对象消失后 activeReplicas 减少，不再重复扣该 inFlightReservations；最新目标替代实例出现但未 Ready，由 unavailableTargetReplicas 占用。若替代槽受 partition 保护、补建的是历史模板，也不能因其不属于最新目标而提前释放尚未恢复的在途额度。目标改变时重分类，不能把已过期坏版本永久锁在旧的在途计数中。所有动作共享同一轮拟执行账本；创建还须遵守包含在途创建预约的 desiredReplicas+maxSurge 上限。
+例如旧对象删除已发但仍在 activeReplicas 且不在 unavailableTargetReplicas 中，先占 inFlightReservations；对象消失后 activeReplicas 减少，不再重复扣该 inFlightReservations；最新目标替代实例出现但未 Ready，由 unavailableTargetReplicas 占用。若替代槽受 partition 保护、补建的是历史模板，也不能因其不属于最新目标而提前释放尚未恢复的在途额度（ServingGroup 是对象的实现对本句有一处已声明的有界出入，见 [SG A.6](servinggroup-compound-rollout.zh-CN.md#declared-deviations) 第 2 项）。目标改变时重分类，不能把已过期坏版本永久锁在旧的在途计数中。所有动作共享同一轮拟执行账本；创建还须遵守包含在途创建预约的 desiredReplicas+maxSurge 上限。
 
 默认允许跳过时，令 eligibleOldNotReady/eligibleOldReady 为满足 partition、版本、身份和在途约束的旧 NotReady/旧 Ready 候选：
 
@@ -948,11 +948,15 @@ spec:
 
 | 策略 | 不健康重启或 Failed | 真实 Pod 删除 |
 | --- | --- | --- |
-| ServingGroupRecreate | 按宽限规则重建所在完整 ServingGroup，含其他 Role、entry、worker | 立即按 ServingGroup 范围恢复，不等待 grace |
-| RoleRecreate | 按宽限规则重建所在 Role **实例**的 entry/全部 worker，其他实例保留 UID | 按该实例范围恢复，不等待 grace |
+| ServingGroupRecreate | 按宽限规则重建所在完整 ServingGroup，含其他 Role、entry、worker | 丢失成员所在的 Role 实例已建成时，立即按 ServingGroup 范围恢复，不等待 grace；尚未建成时只补缺失的 Pod（2.14） |
+| RoleRecreate | 按宽限规则重建所在 Role **实例**的 entry/全部 worker，其他实例保留 UID | 该实例已建成时，按该实例范围恢复，不等待 grace；尚未建成时只补缺失的 Pod（2.14） |
 | None | 不论合法 grace 为何，都不因重启错误或 Failed 主动删除 Pod；继续报告不可用 | 只补缺失的 Pod，其他 UID 全保留 |
 
 **注意事项**
+
+<a id="established-instance"></a>
+
+**已建成的实例（2.14）。** Role 实例的全部必需成员（entry 及其 worker 布局）都已创建并被 controller 观察到过一次，即为“已建成”；是否 Ready 不影响这一判断。实例被重建之后，新一轮的成员全部被观察到之前仍是“尚未建成”。上表“真实 Pod 删除”一栏的范围恢复只适用于已建成的实例：尚未建成的实例缺少成员（包括创建途中被删除的成员）时只创建缺失的 Pod，不删除已有成员，也不扩大到实例或 ServingGroup 范围；None 两种情形都只补缺失的 Pod。原规则不区分实例是否建成，创建途中删除它的一个 Pod 即整范围重建。修订原因：创建途中“成员尚未出现”与“成员丢失”无法区分，不看建成记录就会把每一个尚未观察到的成员当成丢失，整范围删除重来。建成记录的载体及其边界见 §6.2。
 
 触发故障是：Pod 当前不 Ready 且普通或 init 容器 RestartCount>0，或者 Pod 为终态 Failed。Ready Pod 的历史重启计数不触发；没有重启/Failed 的纯 NotReady 不足以证明恢复触发条件。None 允许符合 restartPolicy 的容器由 kubelet 原地恢复，但不保证终态 Failed 自行恢复；真实缺失 Pod 仍须补建。不主动删除不等于把故障算作可用。
 
@@ -972,7 +976,11 @@ spec:
 
 **删除范围标记与controller重启（2.11）**
 
-用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前标记原选定Pod，正常删除回调不再触发新故障恢复；controller重启后先完成标记的原UID删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation、阶段或私有成员CM；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失自2.13起按controller不在的原因区分处理（见下文“controller不在期间丢失的Pod”），新进程grace重新起算，Terminating和预算规则保持。
+用户于2026-10-16明确批准恢复 `workload.kthena.io/deletion-scope=Role|ServingGroup`。主动删除前先持久提交原选定的删除范围（形式见下文2.14一段），正常删除回调不再触发新故障恢复；controller重启后先完成已提交范围内原UID的删除，再按最新数量及适用历史模板/partition补建。已列入删除范围的健康成员仍须删除；同名新UID和范围外成员不得吸纳。不引入operation或私有成员CM，阶段只允许下文形式（b）的一个；不覆盖仅准备未DELETE且partition改变的撤销场景。模板/插件剔除内部标记。无标记的离线缺失自2.13起按controller不在的原因区分处理（见下文“controller不在期间丢失的Pod”），新进程grace重新起算，Terminating和预算规则保持。
+
+<a id="deletion-scope-commit"></a>
+
+**提交删除范围的两种形式（2.14）。** 提交必须先于该范围的第一个 DELETE，并在 controller 重启后仍可读到。形式取决于实现的对象模型，二者择一、不混用：（a）ServingGroup 不是对象的实现，在原选定 Pod 上写 `workload.kthena.io/deletion-scope` 标记，即 2.11 的原形式；（b）ServingGroup 是对象的实现不标记 Pod，把范围记在该 ServingGroup 对象上：Role 范围是该 Role 实例记录的 Draining 阶段和代际号，重建出来的成员属于下一代际，不在旧范围之内；ServingGroup 范围是该对象的 Failed 条件及随后该对象自身的 deletionTimestamp，同名重建的对象是另一个 UID，不在旧范围之内。原条文“主动删除前标记原选定Pod”“不引入operation、阶段”据此修订为允许形式（b）及其中这一个阶段和代际号；记录的载体与边界见 §6.2。两种形式下本节的三项要求相同：重启后完成原范围；范围内的健康成员照删；不吸纳同名新 UID 和范围外成员。本节其余文字及 SG A.4 中的“标记”“带标记”，在形式（b）下指上述对象上的记录；形式（b）下整组范围内的健康成员由该对象的级联删除清除。修订原因：一次对象状态写入即可表达范围，取代逐个 Pod 的标记写入，且范围、代际与对象 UID 绑定。
 
 标记是该Pod当前UID需要完成删除的意图；先恢复这些标记，再执行数量管理、故障补齐或模板滚动。Role标记只涉及对应实例；ServingGroup标记涉及原组成员，不能因迟到的Role缩容回调扩大范围。标记写入失败须重试，不先发送未标记成员DELETE。原标记成员删除完后，重建Pod不继承该标记。普通故障恢复的策略/grace判断仍用于发起新的操作。
 
@@ -996,7 +1004,7 @@ spec:
 
 多副本指期望副本数大于1，单副本指期望副本数为1。上表前三行以主实例停止工作时另有controller实例在运行并能够接管为条件，最终由哪个进程取得租约不影响归类；没有任何实例能够接管的（例如多副本的实例全部失效、升级未能完成而没有可用的实例），不论起因按完全故障。选主期间实例仍在运行、只是尚未取得租约的间隔不是完全故障。上表和本段没有列出的情形（例如多副本而未开启选主）用户没有归类，只补缺或按策略范围恢复均符合。
 
-本条规定预期，不规定实现如何识别原因或得知Pod曾经存在；SG A.5与§6.2关于成员表和创建事实的限制本版未改，在该限制下如何区分丢失与在途创建待单独决定。不区分原因、一律按策略范围恢复的实现符合本条。这是批准后的预期，不代表现有实现已符合。
+本条规定预期，不规定实现如何识别原因。2.13留待单独决定的“在SG A.5与§6.2的限制下如何区分丢失与在途创建”已由2.14决定：按Role实例是否已建成区分（见上文[“已建成的实例”](#established-instance)），其记录是§6.2允许的逐Role实例记录。不区分原因、一律按策略范围恢复的实现符合本条。这是批准后的预期，不代表现有实现已符合。
 
 ### 6.2 `restartGracePeriodSeconds`
 
@@ -1039,13 +1047,13 @@ spec:
 
 **注意事项**
 
--1 是哨兵值，不是立即超时或超长睡眠。真实 PodDeleted 不等待宽限；有限宽限内恢复 Ready 则保留 UID。延迟任务执行前读取最新 policy/grace 并验证 ModelServing/Pod UID；切到 None/-1 必须取消旧任务的删除效果，有限宽限增减按最新配置判断。旧对象事件不能删除同名新 UID，controller 重启后仍须保持这些规则。
+-1 是哨兵值，不是立即超时或超长睡眠。真实 PodDeleted 不等待宽限；有限宽限内恢复 Ready 则保留 UID。延迟任务执行前读取最新 policy/grace 并验证 ModelServing/Pod UID；删除范围提交之前（仍在等待宽限、尚未写下 [§6.1 的提交](#deletion-scope-commit)）切到 None/-1 必须取消旧任务的删除效果，有限宽限增减按最新配置判断。**（2.14）** 提交以写入那一刻 ModelServing 上最新的 policy/grace 为准；范围一经提交，其后的动作只取决于已提交的事实，之后再切到 None/-1 不撤销，该范围照常删完并重建。原规则在提交之后、第一个 Pod 删除之前切到 None/-1 也撤销；修订原因：提交是一次写入，其后的行为不应取决于之后又改成了什么策略。旧对象事件不能删除同名新 UID，controller 重启后仍须保持这些规则。
 
 同一进程内，对同一 ModelServing/Pod UID 的持续故障保留首次观察时间；controller 重启或活动 controller 切换后重新观察并起算完整宽限，不记录跨进程故障起点，不计前任离线时间。恢复 Ready 结束该次观察；新 Pod UID 不继承旧删除许可。None/-1 不调度主动删除，重新启用有限宽限时从本进程新观察起算。
 
 例如 grace=60 秒：t=0 首次观察故障，t=40 controller 退出，t=50 新进程重新观察后从 t=50 等待 60 秒；期限内恢复 Ready 则保留 UID。最终动作仍须复核最新 UID、健康、policy 和 grace。
 
-沿用现有汇总 status 字段，不新增逐 SG/Role/Pod 成员、创建事实、故障时间或 revision 映射。Conditions 按固定类型更新，Message 使用有界摘要；LastTransitionTime 只随状态转换变化，汇总未变不重复提交。currentRevision 保留必要的最近完整模板基线；全零组的派生 Ready/版本计数不能自动推进该基线。
+ModelServing 沿用现有汇总 status 字段，不新增逐 SG/Role/Pod 成员、故障时间或 revision 映射。**（2.14）** ServingGroup 是对象的实现，可以在该 ServingGroup 对象的 status 中为每个 Role 实例保留一条记录，内容限于：是否已建成、是否正在清空（Draining）或重新创建，以及清空的代际号；并可用该对象的 Conditions 表达整组的失败与清空。这是 §6.1 “已建成”和删除范围提交的载体，取代原条文对保存“创建事实”的禁止。记录只有一个写者；其零值（没有记录）不得引起任何删除，记录丢失之后、重新建立之前的缺员只补缺。仍不保存逐 Pod 成员表、故障起点时间或 revision 映射，不使用私有 ConfigMap 或 owner annotation 表；故障宽限仍按本节在新进程重新起算。Conditions 按固定类型更新，Message 使用有界摘要；LastTransitionTime 只随状态转换变化，汇总未变不重复提交。currentRevision 保留必要的最近完整模板基线；全零组的派生 Ready/版本计数不能自动推进该基线。
 
 ## 7. `evictionStrategy`
 

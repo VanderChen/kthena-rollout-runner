@@ -69,6 +69,10 @@ type Server struct {
 	maxQueueSize  int
 	replayFrames  map[string]map[string]watchFrame
 	replayStreams map[uint64]*replayStream
+	// groups maps each ServingGroup UID seen in controller traffic to its
+	// owner UIDs; unknownGroups latches one evidence error per unseen UID.
+	groups        map[string][]string
+	unknownGroups map[string]bool
 }
 
 type contextKey struct{}
@@ -193,7 +197,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		var selected *RuleStatus
 		for _, rule := range s.rules {
-			if s.activeLocked(rule) && rule.Mode != "omit-list-object" && rule.matchesRequest(x.meta) && (!rule.needsObject(x.meta) || rule.matchesObject(object)) {
+			if s.activeLocked(rule) && rule.Mode != "omit-list-object" && rule.matchesRequest(x.meta) && (!rule.needsObject(x.meta) || rule.matchesObject(object, s.groupOwnersLocked)) {
 				selected = rule
 				break
 			}
@@ -230,6 +234,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		delete(s.inFlight, x.id)
 		s.mu.Unlock()
 	}()
+	if x.meta.Resource == servingGroupResource && (r.Method == http.MethodGet || r.Method == http.MethodPost) && !x.meta.Watch {
+		// Read and create responses name the owner of each ServingGroup; keep
+		// them uncompressed so that the owner index never misses one.
+		r.Header = r.Header.Clone()
+		r.Header.Set("Accept-Encoding", "identity")
+	}
 	if x.meta.Watch || listOmission {
 		// Native clients understand JSON responses. Negotiate JSON explicitly so
 		// the proxy never treats protobuf watch frames as text. This negotiation

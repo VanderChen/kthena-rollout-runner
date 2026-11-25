@@ -42,6 +42,11 @@ func (b *watchBody) Close() error {
 func (s *Server) response(response *http.Response) error {
 	x := response.Request.Context().Value(contextKey{}).(requestContext)
 	s.record(Record{Request: x.id, Action: "response", Method: x.meta.Method, Path: x.meta.Path, Status: response.StatusCode})
+	if !x.meta.Watch && x.meta.Resource == servingGroupResource && x.meta.Subresource == "" && (x.meta.Method == http.MethodGet || x.meta.Method == http.MethodPost) && response.StatusCode >= 200 && response.StatusCode < 300 {
+		if err := s.learnGroupResponse(response); err != nil {
+			return err
+		}
+	}
 	if !x.meta.Watch && response.StatusCode == http.StatusOK {
 		return s.omitListObject(response, x)
 	}
@@ -90,6 +95,11 @@ func (s *Server) watch(ctx context.Context, cancel context.CancelFunc, upstream 
 			if err := json.Unmarshal(raw, &envelope); err != nil || envelope.Type == "" {
 				errors <- fmt.Errorf("malformed JSON watch frame")
 				return
+			}
+			if request.meta.Resource == servingGroupResource && envelope.Type != "BOOKMARK" && envelope.Type != "ERROR" {
+				// Learn before forwarding or holding: the controller cannot act
+				// on a ServingGroup that this proxy has not decoded first.
+				s.learnGroup(envelope.Object.Metadata)
 			}
 			select {
 			case frames <- watchFrame{raw: raw, event: envelope.Type, object: envelope.Object.Metadata}:
@@ -194,7 +204,7 @@ func (s *Server) deliverOrHold(out io.Writer, request requestContext, frame *wat
 	s.mu.Lock()
 	var selected *RuleStatus
 	for _, rule := range s.rules {
-		if !s.activeLocked(rule) || rule.InitialSync || rule.Subresource != "" || rule.Resource != request.meta.Resource || !rule.matchesObject(frame.object) {
+		if !s.activeLocked(rule) || rule.InitialSync || rule.Subresource != "" || rule.Resource != request.meta.Resource || !rule.matchesObject(frame.object, s.groupOwnersLocked) {
 			continue
 		}
 		if rule.Mode == "hold" || rule.Mode == "drop-deletion" && (frame.event == "DELETED" || frame.object.DeletionTimestamp != nil) {

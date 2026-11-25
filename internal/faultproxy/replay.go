@@ -77,7 +77,7 @@ func (s *Server) captureDeletion(request requestContext, frame watchFrame) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, rule := range s.rules {
-		if !s.activeLocked(rule) || rule.Mode != "replay-deletion" || rule.LabelSelector != "" && rule.LabelSelector != request.meta.LabelSelector || !rule.matchesObject(frame.object) {
+		if !s.activeLocked(rule) || rule.Mode != "replay-deletion" || rule.LabelSelector != "" && rule.LabelSelector != request.meta.LabelSelector || !rule.matchesObject(frame.object, s.groupOwnersLocked) {
 			continue
 		}
 		if rule.Captured[frame.object.UID] != "" {

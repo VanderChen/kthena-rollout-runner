@@ -179,7 +179,10 @@ func (r Rule) matchesRequest(m requestMeta) bool {
 		return false
 	}
 	if r.InitialSync {
-		return m.Namespace == "" && m.Name == "" && (!m.Watch || m.InitialEvents)
+		// A list limited to one object cannot fill a cache: it probes whether
+		// the resource is served (a start-up gate), it is not an informer sync.
+		probe := !m.Watch && m.ListLimit != nil && *m.ListLimit == 1
+		return m.Namespace == "" && m.Name == "" && (!m.Watch || m.InitialEvents) && !probe
 	}
 	if m.Namespace == r.Namespace {
 		return true
@@ -197,11 +200,25 @@ func (r Rule) needsObject(m requestMeta) bool {
 type objectMeta struct {
 	Name, Namespace, UID string
 	Generation           int64
-	OwnerReferences      []struct{ UID string }
+	OwnerReferences      []ownerMeta
 	DeletionTimestamp    *string
 }
 
-func (r Rule) matchesObject(m objectMeta) bool {
+type ownerMeta struct{ UID, Kind string }
+
+// servingGroupKind is the one owner kind a rule looks through: a Pod, PodGroup
+// or Service of a build with ServingGroup objects is owned by its ServingGroup,
+// which is owned by the ModelServing a rule names.
+const servingGroupKind = "ServingGroup"
+
+// groupOwners returns the owner UIDs learned for one ServingGroup UID, and
+// whether that ServingGroup was ever seen.
+type groupOwners func(group string) ([]string, bool)
+
+// matchesObject compares the selected identity. OwnerUID matches the object
+// itself, a direct owner, or the owner of the ServingGroup that owns it; a
+// same-name ServingGroup created later has another UID and is resolved anew.
+func (r Rule) matchesObject(m objectMeta, groups groupOwners) bool {
 	if r.Generation > 0 && r.Generation != m.Generation {
 		return false
 	}
@@ -211,6 +228,12 @@ func (r Rule) matchesObject(m objectMeta) bool {
 	if r.OwnerUID != "" && r.OwnerUID != m.UID {
 		for _, owner := range m.OwnerReferences {
 			if owner.UID == r.OwnerUID {
+				return true
+			}
+			if owner.Kind != servingGroupKind || groups == nil {
+				continue
+			}
+			if owners, _ := groups(owner.UID); has(owners, r.OwnerUID) {
 				return true
 			}
 		}

@@ -141,7 +141,9 @@ func (e *normalExecution) terminateLeader(ctx context.Context, prefix string) (r
 			}
 		}
 	}
-	if oldReady < 1 || newReady < 1 {
+	// The leader-switch catalogue terminates the leader in the middle of a
+	// rollout; a grace measurement across the switch has no rollout in flight.
+	if e.processChange == "" && (oldReady < 1 || newReady < 1) {
 		return fmt.Errorf("TRIGGER_MISSED: elected leader termination requires actual healthy A/B mixture")
 	}
 	for suffix, object := range map[string]interface{}{"-leader-before.yaml": leader, "-standby-before.yaml": standby, "-lease-before.yaml": lease, "-deployment-before.yaml": dep, "-workload-pods-before.yaml": pods} {

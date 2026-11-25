@@ -486,6 +486,8 @@ func (e *normalExecution) step(ctx context.Context, p ScenarioStep) error {
 		}
 	case "fault-member":
 		return e.faultMember(ctx, p, prefix)
+	case "fault-member-across-process":
+		return e.graceAcrossProcess(ctx, p, prefix)
 	case "update", "merge-patch":
 		if err := e.installPartialScaleBoundary(ctx, p); err != nil {
 			return err

@@ -117,6 +117,7 @@ runner 同步迁移，被测版本的对象模型在预检查时由 `servinggrou
 | controller 完成初始同步的日志 | `initial sync has been done` | `Starting the ModelServing controller` |
 | 同序号新旧对象并存 | 新 PodGroup 早于旧 Pod 消失时计为两个物理组 | 仍这样计数，另加过程断言 `GROUP_OBJECT_OVERLAP`：新对象的 Pod 出现时旧对象的 Pod 仍在即违约 |
 | 观察流 | Pod、ModelServing、PodGroup、ControllerRevision | 另加 ServingGroup，逐例输出 `servinggroups.json`，结果里带 `servingGroups` 摘要 |
+| 旧候选先后（`ORDER_MISMATCH`）里“这一组已是当前模板” | 只看该组现有的 Pod | 对象先于它的 Pod 出现，其间组里可能只有模板没变的 Pod（例如只改 worker 布局时的 entry）。整组滚动下，若这些 Pod 都属于同一个存活、未在终止、归该 ModelServing 的 ServingGroup 对象，对象的 `spec.revision` 是 runner 见过记录且等于当前模板的版本，且没有 Pod 带别的版本标签，则该组不算旧候选；其余情况（含 Role 滚动）仍只看 Pod。先后规则本身、终态、保护范围和容量检查都不变 |
 
 ServingGroup 为对象时另有逐事件的过程断言（`internal/runner/group_invariants.go`）：surge 标记创建时即有、不事后添加；正式范围内的组不以 surge 创建；转正不改 spec、只在序号进入正式范围后发生、不重建 Pod；实例记录的代际号不回退、新对象不沿用旧记录。稳定检查点另要求每组一个存活对象、正式范围内的组已转正、Pod 上的副本与对象一致。
 

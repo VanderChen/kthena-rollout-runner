@@ -561,7 +561,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	// Contract 2.2: unavailable old units first, descending within a health
 	// class. Coordinated stable instances retain a descending prefix.
 	if !scale && !reservedEarlier && !l.OrderCheckedUIDs[uid] && !l.unitTarget(u) {
-		l.checkOldCandidateOrder(u, units)
+		l.checkOldCandidateOrder(u, units, objects)
 	}
 	if l.Model.Mode == "Role" && !scale && !reservedEarlier && !l.unitTarget(u) && (!u.Ready || readyAfter >= max(d-v, 0)) {
 		c, unavailable, inFlight := 0, 0, 0
@@ -602,7 +602,7 @@ func (l *NormalLedger) Before(kind, event string, o *unstructured.Unstructured, 
 	l.Starts = append(l.Starts, start)
 }
 
-func (l *NormalLedger) checkOldCandidateOrder(selected NormalUnit, units map[string]NormalUnit) {
+func (l *NormalLedger) checkOldCandidateOrder(selected NormalUnit, units map[string]NormalUnit, objects Objects) {
 	if !l.CompoundV2 {
 		checked := len(selected.Pods) > 0
 		for _, pod := range selected.Pods {
@@ -615,6 +615,11 @@ func (l *NormalLedger) checkOldCandidateOrder(selected NormalUnit, units map[str
 	_, _, _, partition := l.scopeBudget(selected)
 	for _, other := range units {
 		if other.Scope != selected.Scope || other.Key == selected.Key || other.Ordinal < partition || !other.Active || l.unitTarget(other) || l.recoveryOrderPending(other) || !l.oldCandidatePrecedes(other, selected) {
+			continue
+		}
+		// Only old units are candidates. A replacement group whose Pods are
+		// still being created is a unit of the current template, not an old one.
+		if l.unitAtTargetByObject(other, objects) {
 			continue
 		}
 		available := true
@@ -1057,7 +1062,7 @@ func (l *NormalLedger) podGroupBefore(kind, event string, o *unstructured.Unstru
 		// This is the first destructive evidence for this finite cohort. A
 		// recovery member may disappear before the following Pod stream event,
 		// changing which old units are eligible without changing this start.
-		l.checkOldCandidateOrder(u, units)
+		l.checkOldCandidateOrder(u, units, objects)
 	}
 	optimistic := func(u NormalUnit) bool {
 		if !u.Complete {

@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // SGGVR is the ServingGroup custom resource. A build that has it makes every
@@ -125,6 +126,53 @@ func groupOwnerRef(o metav1.Object) *metav1.OwnerReference {
 		}
 	}
 	return nil
+}
+
+// unitAtTargetByObject reports whether a ServingGroup-level unit belongs to the
+// current template according to the ServingGroup object that controls its Pods.
+//
+// On a build that keeps ServingGroups as objects the group object exists before
+// its Pods: the ServingGroup controller creates them some milliseconds later.
+// A replacement group can therefore show, for a moment, only Pods whose own
+// template did not change (an unchanged Role, an unchanged entry when only the
+// worker layout changes). Read from those Pods alone it looks like an old unit
+// that is not Ready. The object says which revision the group was created for.
+//
+// The answer is yes only when all of this holds; in every other case the unit
+// is read from its Pods, exactly as on a build without the objects:
+//   - the build has ServingGroup objects and the rollout unit is the group;
+//   - every Pod of the unit is controlled by one ServingGroup UID, and that
+//     object is live, not terminating and owned by the ModelServing of the case;
+//   - its spec.revision names a revision the runner has seen recorded (a
+//     ControllerRevision) and the recorded template is the current template;
+//   - no Pod of the unit carries the label of another revision.
+func (l *NormalLedger) unitAtTargetByObject(u NormalUnit, objects Objects) bool {
+	if !l.GroupObjects || l.Model.Mode != "SG" || u.Scope != "SG" || len(u.Pods) == 0 {
+		return false
+	}
+	var uid types.UID
+	for _, pod := range u.Pods {
+		ref := groupOwnerRef(pod)
+		if ref == nil || ref.UID == "" || uid != "" && ref.UID != uid {
+			return false
+		}
+		uid = ref.UID
+	}
+	group := objects[SGGVR.Resource][string(uid)]
+	if group == nil || group.GetUID() != uid || group.GetDeletionTimestamp() != nil || !objectOwned(group, l.Owner) {
+		return false
+	}
+	revision := textValue(mapValue(group.Object, "spec"), "revision")
+	recorded, known := l.RevisionLayouts[revision]
+	if revision == "" || !known || !sameTemplates(recorded, l.Model) {
+		return false
+	}
+	for _, pod := range u.Pods {
+		if label := pod.Labels["modelserving.volcano.sh/revision"]; label != "" && label != revision {
+			return false
+		}
+	}
+	return true
 }
 
 // groupKind names the stream whose object stands for a whole ServingGroup:
